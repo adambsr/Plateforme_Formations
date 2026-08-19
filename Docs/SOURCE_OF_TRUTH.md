@@ -77,7 +77,7 @@ Il peut notamment :
 - consulter les factures ;
 - gérer les coûts des formations ;
 - définir/mettre à jour le coût fixe associé aux Formateurs lorsque nécessaire ;
-- gérer les évaluations et certificats selon les permissions prévues ;
+- superviser l'ensemble des évaluations et certificats ;
 - consulter les statistiques ;
 - consulter la rentabilité.
 
@@ -103,10 +103,10 @@ L'implémentation peut utiliser un mot de passe temporaire ou un mécanisme d'in
 
 ## 3.2 Formateur
 
-Le Formateur peut, selon les permissions qui lui sont accordées :
+Le Formateur peut, dans le périmètre des formations dont il est propriétaire et des sessions qui lui sont affectées :
 
 - consulter et gérer son profil ;
-- créer et gérer les formations qui lui sont attribuées/autoriséés ;
+- créer et gérer les formations dont il est l'unique propriétaire ;
 - structurer le contenu pédagogique ;
 - ajouter des modules ;
 - ajouter des lessons ;
@@ -120,6 +120,20 @@ Le Formateur peut, selon les permissions qui lui sont accordées :
 - revoir et modifier les questions générées ;
 - publier/activer une évaluation ;
 - consulter les résultats nécessaires à son activité.
+
+### Propriété des formations et affectation aux sessions
+
+Chaque Formation possède exactement un Formateur propriétaire (`ownerTrainer`).
+
+- lorsqu'un Formateur crée une Formation, il en devient automatiquement le propriétaire ;
+- lorsqu'un Admin crée une Formation, il doit désigner son Formateur propriétaire ;
+- seul l'Admin peut transférer la propriété d'une Formation à un autre Formateur ;
+- le propriétaire peut gérer le cycle de vie, le contenu pédagogique et les évaluations de sa Formation ;
+- il n'existe pas de liste de copropriétaires ni de permissions personnalisées par Formation.
+
+Une Session présentielle peut en revanche être affectée à un ou plusieurs Formateurs. L'Admin ou le propriétaire de la Formation peut effectuer ces affectations. Un Formateur affecté à une Session peut gérer son planning opérationnel, consulter les Apprenants concernés, enregistrer les présences et consulter les résultats nécessaires à cette Session.
+
+L'affectation à une Session donne un accès en lecture au contenu nécessaire de la Formation, mais ne permet pas de modifier la Formation, son contenu ou ses évaluations. Le Formateur propriétaire conserve ces droits. Un Formateur indiqué sur une entrée de planning doit être affecté à la Session correspondante.
 
 ## 3.3 Apprenant
 
@@ -139,7 +153,8 @@ L'Apprenant peut :
 - consulter son planning pour les formations présentielles ;
 - passer les évaluations disponibles ;
 - consulter ses résultats ;
-- télécharger ses certificats obtenus.
+- télécharger ses certificats obtenus ;
+- attribuer une note de satisfaction à une Formation lorsqu'il remplit les conditions d'éligibilité.
 
 ---
 
@@ -167,9 +182,13 @@ Son compte est créé par l'Admin.
 
 Le système doit empêcher la création publique d'un compte Formateur.
 
+L'Admin crée le Formateur avec un mot de passe temporaire transmis de manière sécurisée en dehors de la plateforme. Le Formateur doit obligatoirement remplacer ce mot de passe lors de sa première connexion avant d'accéder aux autres fonctionnalités. Aucun workflow d'invitation par email n'est requis.
+
 ## 4.3 Compte Admin
 
-Les mécanismes de création initiale du compte Admin sont une question de déploiement/initialisation. Le rôle Admin ne doit jamais être attribuable par un utilisateur public.
+Le compte Admin initial est créé par une commande CLI/seed de déploiement idempotente utilisant `INITIAL_ADMIN_EMAIL` et `INITIAL_ADMIN_PASSWORD`. Cette commande ne crée rien lorsqu'un compte Admin existe déjà.
+
+L'Admin initial doit remplacer son mot de passe d'initialisation lors de sa première connexion. Aucun endpoint HTTP public ne permet de créer un Admin et aucune opération d'inscription, de profil ou de gestion Formateur ne permet d'attribuer ce rôle. La création d'Admins supplémentaires est hors périmètre du MVP.
 
 ## 4.4 Authentification
 
@@ -180,10 +199,27 @@ La plateforme doit prévoir :
 - autorisation par rôle ;
 - réinitialisation du mot de passe ;
 - modification du profil ;
-- mécanisme de refresh token si retenu lors de la conception technique ;
+- mécanisme de refresh token rotatif ;
 - protection des routes côté backend.
 
 Les protections côté frontend ne remplacent jamais l'autorisation côté backend.
+
+L'architecture d'authentification utilise :
+
+- un JWT d'accès d'une durée par défaut de 15 minutes ;
+- un refresh token aléatoire d'une durée par défaut de 7 jours ;
+- rotation du refresh token après chaque utilisation ;
+- stockage uniquement de l'empreinte du refresh token dans MongoDB ;
+- révocation de tous les refresh tokens lors d'un changement de mot de passe ou de la désactivation du compte ;
+- révocation du refresh token courant lors de la déconnexion.
+
+Le Web conserve le JWT d'accès en mémoire et reçoit le refresh token dans un cookie `HttpOnly`, `Secure` en production et configuré avec une politique `SameSite` adaptée. Le mobile conserve le refresh token dans le stockage sécurisé fourni par la plateforme mobile et le transmet à l'endpoint de refresh. Les deux clients utilisent le même backend et les mêmes règles de rotation et de révocation.
+
+Chaque requête protégée vérifie que l'utilisateur existe toujours et que son compte est actif. La désactivation d'un compte bloque donc immédiatement l'accès backend, même si un JWT non expiré existe encore.
+
+Les jetons de réinitialisation de mot de passe sont aléatoires, à usage unique, stockés sous forme d'empreinte et expirent après 30 minutes. Les liens sont transmis par un serveur SMTP configuré pour les environnements de développement/test.
+
+Un mot de passe contient au minimum huit caractères. Les emails sont normalisés en minuscules avant comparaison et protégés par un index unique.
 
 ---
 
@@ -195,6 +231,8 @@ La plateforme supporte **exactement deux types de formations** :
 2. **Formation en présentiel**
 
 Ces deux types ne doivent pas être modélisés comme une seule modalité avec des comportements identiques.
+
+Le type est obligatoire et définitivement immuable dès la création de la Formation.
 
 ---
 
@@ -217,7 +255,7 @@ Formation
         └── Resources
 ```
 
-Une formation peut contenir zéro ou plusieurs modules.
+Une formation en brouillon peut contenir zéro ou plusieurs modules.
 
 Un module peut contenir plusieurs lessons.
 
@@ -254,6 +292,8 @@ La plateforme ne devient pas un système propriétaire de streaming vidéo.
 
 Pour une formation self-paced, le système doit pouvoir suivre la progression de l'Apprenant dans le contenu.
 
+La progression appartient à l'inscription self-paced (`Enrollment`) et non directement au couple global Apprenant + Formation. Il ne peut exister qu'un enregistrement de progression de lesson pour une même combinaison `Enrollment + Lesson`.
+
 Le modèle de progression peut notamment permettre de savoir :
 
 - quelles lessons ont été consultées/complétées ;
@@ -261,7 +301,13 @@ Le modèle de progression peut notamment permettre de savoir :
 - le pourcentage de progression ;
 - l'état global de progression de la formation.
 
-Les règles exactes de ce qui constitue une lesson « terminée » doivent être définies techniquement sans contredire ce principe.
+Une Formation self-paced est considérée comme terminée lorsque 100 % de ses lessons ont été explicitement marquées comme terminées par l'Apprenant. La consultation des ressources peut être suivie à titre informatif, mais elle ne constitue pas une condition indépendante de complétion ou de certification.
+
+Le pourcentage est calculé à partir du nombre de lessons terminées et ne peut pas être modifié directement. Une progression de lesson conserve au minimum son état terminé et sa date de complétion.
+
+L'Apprenant peut marquer ou démarquer une lesson avant l'émission du Certificat. Après émission, les progressions ayant servi à établir l'éligibilité deviennent immuables.
+
+Lorsqu'une nouvelle lesson est ajoutée à une Formation publiée, elle entre dans le calcul des inscriptions actives qui ne possèdent pas encore de Certificat. Les Certificats déjà délivrés et leur historique d'éligibilité ne sont pas modifiés.
 
 ## 6.4 Inscription
 
@@ -272,9 +318,11 @@ Apprenant
   ↓
 Formation en ligne
   ↓
-Inscription
+Stripe Checkout
   ↓
-Paiement
+Paiement confirmé par le webhook backend
+  ↓
+Création de l'inscription active
   ↓
 Accès au contenu
   ↓
@@ -318,7 +366,11 @@ Une session peut contenir :
 
 ## 7.2 Planning
 
-Une session peut contenir plusieurs entrées de planning.
+Une Session contient une ou plusieurs entrées de planning (`SessionSchedule`). Chaque entrée représente une occurrence planifiée avec sa propre date et ses propres heures de début et de fin.
+
+Les entrées d'une même Session peuvent être réparties sur plusieurs dates calendaires. Par exemple, une Session organisée sur dix dates possède dix entrées de planning. Il ne faut pas créer dix Sessions distinctes pour représenter ces dix dates.
+
+La timezone métier unique de la plateforme est la timezone IANA `Africa/Tunis`. Le Web et le mobile affichent et saisissent les horaires dans cette timezone. Le backend convertit les horaires en instants UTC pour le stockage et les comparaisons. Les timestamps échangés par l'API utilisent le format ISO 8601 avec un offset explicite ou le suffixe `Z`.
 
 Une entrée peut contenir :
 
@@ -331,7 +383,28 @@ Une entrée peut contenir :
 - lieu ;
 - salle.
 
-Le système doit détecter les conflits évidents de planning lorsque cela est applicable.
+Pour chaque entrée, l'instant de début doit être strictement antérieur à l'instant de fin. Les dates de début et de fin de la Session sont dérivées respectivement de la première et de la dernière entrée de planning.
+
+Deux entrées se chevauchent lorsque :
+
+```text
+première.startAt < seconde.endAt
+ET
+seconde.startAt < première.endAt
+```
+
+Deux entrées adjacentes, dont l'une commence exactement lorsque l'autre se termine, sont autorisées.
+
+Le backend doit refuser, parmi les Sessions non annulées :
+
+- le chevauchement de deux entrées affectées au même Formateur ;
+- le chevauchement de deux entrées utilisant la même combinaison normalisée lieu + salle.
+
+Le contrôle de conflit de salle ne s'applique pas lorsqu'aucune salle n'est renseignée. Des entrées parallèles restent permises lorsqu'elles utilisent des Formateurs et des salles différents. Les Sessions annulées ne participent pas aux contrôles de conflit.
+
+Lorsqu'un module ou une lesson est associé à une entrée de planning, il doit appartenir à la Formation parente de la Session.
+
+Le système ne détecte pas les conflits d'emploi du temps personnels des Apprenants et n'introduit pas de timezone par utilisateur ou par Session.
 
 ## 7.3 Statuts de session
 
@@ -341,6 +414,8 @@ Les statuts peuvent être :
 - En cours ;
 - Terminée ;
 - Annulée.
+
+Une Session ne peut passer au statut Annulée que si elle ne possède aucune inscription. Dès qu'une inscription existe, l'annulation de la Session est interdite dans le périmètre actuel.
 
 ## 7.4 Inscription
 
@@ -353,9 +428,11 @@ Formation présentielle
   ↓
 Choix d'une session
   ↓
-Inscription
+Stripe Checkout
   ↓
-Paiement
+Paiement confirmé par le webhook backend
+  ↓
+Création de l'inscription active
   ↓
 Participation aux séances
   ↓
@@ -395,10 +472,11 @@ Règle importante :
 Une Formation possède notamment :
 
 - titre ;
+- Formateur propriétaire unique ;
 - description ;
 - catégorie ;
 - niveau ;
-- prix ;
+- prix strictement positif en dinar tunisien (`TND`) ;
 - durée ;
 - objectifs ;
 - prérequis ;
@@ -408,7 +486,8 @@ Une Formation possède notamment :
 - statut ;
 - modules ;
 - contenu pédagogique ;
-- règles d'évaluation/certification applicables.
+- règles d'évaluation/certification applicables ;
+- pour une Formation présentielle, pourcentage minimal de présence requis pour la certification, avec une valeur par défaut de 80 %.
 
 ## 9.1 Types
 
@@ -418,6 +497,8 @@ Le type doit être explicitement l'un des deux :
 SELF_PACED_ONLINE
 IN_PERSON
 ```
+
+Le type ne peut être modifié après la création, y compris lorsque la Formation n'est pas encore publiée ou lorsqu'elle est archivée. Une erreur de modalité impose de créer une nouvelle Formation avec le type correct. Aucun workflow de conversion ou de migration entre les deux modalités n'est prévu.
 
 ## 9.2 Cycle de vie
 
@@ -429,6 +510,22 @@ Une formation peut être :
 - archivée.
 
 L'archivage ne doit pas détruire l'historique des inscriptions, paiements, évaluations, progressions ou certificats.
+
+Une Formation self-paced ne peut être publiée que si elle contient au moins un module contenant au moins une lesson. Une Formation présentielle peut être publiée sans Session, mais aucun Checkout ne peut être créé tant qu'elle ne possède pas de Session planifiée disponible.
+
+## 9.3 Suppression et préservation de l'historique
+
+La suppression définitive est réservée aux éléments non utilisés qui ne possèdent aucun historique métier :
+
+- une Formation en brouillon peut être supprimée uniquement si elle ne possède aucune Session, inscription, paiement ou tentative d'Évaluation ;
+- une Session peut être annulée uniquement si elle ne possède aucune inscription ; elle peut être supprimée définitivement uniquement si elle ne possède aucune inscription ni aucun paiement ;
+- une Évaluation en brouillon peut être supprimée ; une Évaluation publiée doit être archivée ;
+- un module, une lesson ou une ressource peut être supprimé tant qu'aucune progression d'Apprenant ne le référence ; sinon il doit être archivé ;
+- un utilisateur sans historique métier peut être supprimé ; sinon son compte doit être désactivé.
+
+Les paiements, Factures, Certificats, tentatives d'Évaluation soumises, présences et progressions terminées ne sont jamais supprimés définitivement.
+
+Une opération `DELETE` interdite par ces règles doit retourner une erreur de conflit et ne doit jamais effectuer de suppression en cascade. Un fichier local n'est supprimé que lorsque sa ressource est supprimée définitivement et qu'aucun autre enregistrement ne le référence.
 
 ---
 
@@ -477,18 +574,15 @@ Les ressources doivent être accessibles uniquement aux utilisateurs autorisés.
 
 # 11. Évaluations et quiz
 
-Les évaluations ont deux fonctions possibles dans le projet :
-
-1. permettre l'évaluation pédagogique/certifiante de l'Apprenant ;
-2. recueillir du feedback/satisfaction lorsque le formulaire correspondant est prévu.
-
-Ces usages doivent être distingués dans le modèle si leurs comportements sont différents.
+Les Évaluations permettent l'évaluation pédagogique et, lorsqu'elles sont désignées comme telles, la certification de l'Apprenant. Le Feedback de satisfaction est un concept séparé décrit dans une section dédiée.
 
 ## 11.1 Création par le Formateur
 
 Les évaluations/quiz sont créés et gérés par le **Formateur**.
 
-L'Admin peut disposer de droits de supervision/gestion selon les permissions définies.
+Dans le modèle de propriété retenu, il s'agit du Formateur propriétaire de la Formation concernée. Un Formateur uniquement affecté à une Session ne peut pas modifier les évaluations de la Formation.
+
+L'Admin peut consulter et archiver toutes les Évaluations à des fins de supervision. La création et la modification du contenu des questions restent sous la responsabilité du Formateur propriétaire de la Formation.
 
 ## 11.2 Génération assistée par IA
 
@@ -502,6 +596,21 @@ La génération doit pouvoir utiliser comme contexte le matériel réel de la fo
 - PDFs ;
 - documents ;
 - ressources pédagogiques pertinentes.
+
+Les fichiers pédagogiques sont stockés sur le système de fichiers persistant du backend. Lors d'une demande de génération, le backend construit le contexte à partir du texte des modules et lessons puis extrait à la demande le texte des ressources compatibles de la Formation concernée.
+
+Les formats extractibles dans le périmètre actuel sont :
+
+- PDF contenant du texte ;
+- DOCX ;
+- PPTX ;
+- TXT.
+
+Les images, PDF scannés, anciens formats DOC/PPT, archives et autres fichiers binaires restent téléchargeables comme ressources, mais ne contribuent pas au contexte IA. Aucun OCR n'est prévu. Les ressources `EXTERNAL_URL` ne sont ni explorées ni téléchargées automatiquement par le backend.
+
+Si une ressource ne peut pas être extraite, la génération peut continuer avec les autres contenus disponibles. Si aucun contenu textuel exploitable n'existe pour la Formation, le backend refuse la génération avec une erreur explicite.
+
+Seul le contenu pédagogique de la Formation sélectionnée est transmis au fournisseur IA. Les données des Apprenants, présences, paiements et autres Formations ne doivent pas être incluses. La réponse IA doit respecter le schéma structuré des types de questions autorisés avant d'être enregistrée dans une Évaluation `DRAFT`.
 
 Le principe est :
 
@@ -549,11 +658,62 @@ Une question peut notamment contenir :
 - nombre de points ;
 - ordre.
 
+Les types de questions pris en charge dans le périmètre actuel sont :
+
+```text
+SINGLE_CHOICE
+MULTIPLE_CHOICE
+TRUE_FALSE
+```
+
+Toutes les questions sont corrigées automatiquement par le backend. Une question attribue soit la totalité de ses points, soit zéro point. Pour une question `MULTIPLE_CHOICE`, la réponse doit correspondre exactement à l'ensemble des bonnes réponses ; aucun crédit partiel n'est attribué.
+
 Le système doit conserver la version finale validée par le Formateur.
 
-## 11.4 Passage de l'évaluation
+## 11.4 Cycle de vie de l'Évaluation
+
+Le cycle de vie est :
+
+```text
+DRAFT → PUBLISHED → ARCHIVED
+```
+
+- seule une Évaluation `DRAFT` peut être modifiée ;
+- la publication exige au moins une question valide, un total de points positif, un seuil de réussite compris entre 1 et 100, et un nombre maximal de tentatives strictement positif ;
+- après publication, les questions, réponses, points, seuil de réussite, nombre maximal de tentatives et durée ne sont plus modifiables ;
+- l'archivage empêche toute nouvelle tentative sans modifier les tentatives et résultats existants ;
+- une Évaluation désignée comme certifiante ne peut pas être archivée tant qu'elle conserve cette désignation.
+
+## 11.5 Évaluation certifiante
+
+Une Formation peut désigner au maximum une Évaluation publiée comme Évaluation certifiante obligatoire.
+
+- si aucune Évaluation certifiante n'est désignée, la complétion de la Formation selon sa modalité suffit pour l'éligibilité au Certificat ;
+- si une Évaluation certifiante est désignée, l'Apprenant doit disposer d'au moins une tentative réussie à cette Évaluation ;
+- un Formateur affecté uniquement à une Session ne peut pas désigner ou modifier l'Évaluation certifiante de la Formation.
+
+## 11.6 Passage de l'évaluation
 
 L'Apprenant doit pouvoir passer une évaluation qui lui est accessible.
+
+Seul un Apprenant disposant d'une inscription active peut commencer une tentative sur une Évaluation `PUBLISHED` de la Formation concernée.
+
+Le Formateur propriétaire définit pour chaque Évaluation :
+
+- le seuil de réussite en pourcentage ;
+- le nombre maximal de tentatives, avec une valeur par défaut de trois ;
+- une durée optionnelle exprimée en minutes ; l'absence de durée signifie que l'Évaluation n'est pas chronométrée.
+
+Le score en pourcentage correspond au total des points obtenus divisé par le total des points disponibles. Le backend calcule le score et détermine le résultat de la tentative.
+
+Le cycle de vie d'une tentative est :
+
+```text
+IN_PROGRESS → PASSED
+            → FAILED
+```
+
+Une tentative est comptabilisée lorsqu'elle est soumise ou lorsque sa durée configurée expire. Le score et le résultat réussite/échec sont présentés immédiatement à l'Apprenant. Les bonnes réponses et explications ne deviennent visibles qu'après une tentative réussie ou après utilisation de la dernière tentative autorisée.
 
 Le système doit enregistrer :
 
@@ -565,7 +725,25 @@ Le système doit enregistrer :
 - le statut ;
 - les informations nécessaires à la certification.
 
-Les règles de tentatives, seuil de réussite et durée doivent être définies dans la conception fonctionnelle détaillée si elles ne sont pas fixées par le centre.
+Les tentatives soumises ou expirées sont immuables et restent disponibles dans l'historique, y compris après archivage de l'Évaluation.
+
+## 11.7 Feedback de satisfaction
+
+Après avoir terminé une Formation selon les règles de sa modalité, l'Apprenant peut attribuer une note de satisfaction entière de 1 à 5 étoiles.
+
+Lorsque la Formation possède une Évaluation certifiante, l'Apprenant doit également avoir réussi cette Évaluation. Lorsqu'aucune Évaluation certifiante n'est configurée, la complétion de la Formation suffit.
+
+Le Feedback respecte les règles suivantes :
+
+- il appartient à une inscription et à sa Formation ;
+- il ne peut exister qu'un seul Feedback par inscription ;
+- la note est un entier compris entre 1 et 5 ;
+- le backend recalcule l'éligibilité avant d'accepter le Feedback ;
+- le Feedback devient immuable après sa création ;
+- aucun commentaire textuel n'est prévu ;
+- aucun affichage public, système de modération ou moteur de recommandation n'est prévu.
+
+Le dashboard Admin utilise les Feedbacks pour présenter au minimum le nombre de notes, la moyenne et la distribution des notes de 1 à 5, globalement et par Formation.
 
 ---
 
@@ -579,7 +757,17 @@ Les termes `Attestation`, `Attestation PDF` et les fonctionnalités associées n
 
 ## 12.1 Condition d'obtention
 
-Un certificat est généré uniquement lorsque l'Apprenant a satisfait les conditions requises, notamment la réussite de l'évaluation obligatoire lorsqu'une évaluation est requise pour la formation.
+Un certificat est généré uniquement lorsque l'Apprenant satisfait toutes les conditions d'éligibilité applicables.
+
+Conditions communes :
+
+- l'Apprenant possède une inscription active à la Formation ou à la Session concernée ;
+- la Formation est terminée selon les règles de sa modalité ;
+- l'Évaluation certifiante est réussie lorsqu'une telle Évaluation est désignée pour la Formation.
+
+Pour une Formation self-paced, la complétion exige que 100 % des lessons soient explicitement marquées comme terminées. La consultation des ressources peut contribuer aux informations de progression, mais ne bloque pas séparément l'éligibilité.
+
+Pour une Formation en présentiel, la complétion exige que la Session possède le statut Terminée et que l'Apprenant satisfasse la règle de présence définie pour la certification.
 
 Principe :
 
@@ -594,6 +782,10 @@ Certificat
 ```
 
 Le backend doit être la source de vérité de l'éligibilité.
+
+La génération du Certificat est effectuée à la demande par une opération backend idempotente. Le backend recalcule systématiquement l'éligibilité avant la génération. L'Admin ne peut pas contourner ou forcer manuellement une éligibilité non satisfaite.
+
+Une inscription peut produire au maximum un Certificat. Une nouvelle demande de génération retourne le Certificat existant. Si le fichier PDF doit être recréé pour une raison technique, il est régénéré à partir du même enregistrement sans créer un nouveau Certificat ni un nouveau numéro.
 
 ## 12.2 Contenu du certificat
 
@@ -620,6 +812,10 @@ La suppression ou l'archivage d'une formation ne doit pas supprimer les certific
 
 Le modèle d'inscription dépend du type de formation.
 
+Une `Enrollment` représente une inscription valide donnant accès à la formation ou à la session concernée. Elle est créée par le backend uniquement après confirmation d'un paiement réussi par le webhook Stripe.
+
+Le système n'introduit pas d'état `PENDING_PAYMENT` dans `Enrollment`. Un paiement en attente, échoué ou annulé ne crée pas d'inscription et ne donne aucun accès. Les détails de traitement du paiement restent portés par `Payment` et ne sont pas recopiés dans le cycle de vie de `Enrollment`.
+
 ### Self-paced
 
 ```text
@@ -634,11 +830,15 @@ Enrollment → Learner + Session
 
 Règles :
 
-1. un Apprenant ne peut pas avoir deux inscriptions actives équivalentes ;
-2. une session présentielle ne peut pas dépasser sa capacité ;
+1. un Apprenant ne peut pas avoir deux inscriptions équivalentes ; pour le self-paced, l'équivalence correspond au même Apprenant et à la même Formation ; pour le présentiel, elle correspond au même Apprenant et à la même Session ;
+2. une session présentielle ne peut pas dépasser sa capacité ; le backend vérifie la disponibilité avant de créer le Checkout puis applique de manière atomique la limite de capacité lors de la création de l'inscription après paiement confirmé ;
 3. une session annulée ne peut pas recevoir de nouvelles inscriptions ;
-4. les règles d'annulation doivent être respectées ;
-5. l'accès au contenu doit être vérifié côté backend.
+4. une Session ne peut être annulée que si elle ne possède aucune inscription ;
+5. une inscription créée après paiement réussi est permanente dans le périmètre actuel et ne possède aucun workflow ou statut d'annulation ;
+6. l'accès au contenu doit être vérifié côté backend à partir de l'inscription ;
+7. aucune entité de réservation temporaire de place n'est introduite dans le périmètre actuel.
+
+Un Apprenant peut s'inscrire à des Sessions différentes d'une même Formation présentielle. Il ne peut pas se réinscrire à la même Formation self-paced ou à la même Session tant que l'inscription correspondante existe.
 
 ---
 
@@ -646,18 +846,37 @@ Règles :
 
 Les présences concernent les formations présentielles.
 
-Le Formateur/Admin peut enregistrer la présence des Apprenants d'une session autorisée.
+Une présence est enregistrée pour une inscription active et une entrée de planning (`SessionSchedule`) déterminée. Il ne peut exister qu'un seul enregistrement de présence pour une même combinaison `Enrollment + SessionSchedule`.
 
-Statuts possibles :
+L'Admin et les Formateurs affectés à la Session peuvent enregistrer les présences pendant que la Session est Planifiée ou En cours.
 
-- Présent ;
-- Absent ;
-- Retard ;
-- Absence justifiée.
+Les seuls statuts de présence sont :
+
+```text
+PRESENT
+ABSENT
+```
+
+Il n'existe pas de statut `LATE`, `EXCUSED_ABSENCE`, « Retard » ou « Absence justifiée » dans le périmètre.
+
+Une absence d'enregistrement signifie que la présence n'a pas encore été saisie ; elle ne doit pas être interprétée automatiquement comme `ABSENT`.
+
+Le pourcentage de présence est calculé par entrée de planning :
+
+```text
+pourcentage de présence =
+nombre de PRESENT
+÷ nombre total d'entrées de planning de la Session
+× 100
+```
+
+`PRESENT` compte comme une présence complète. `ABSENT` ne compte pas comme une présence. Aucun calcul pondéré par la durée et aucun crédit partiel ne sont appliqués.
+
+Chaque Formation présentielle définit un pourcentage minimal de présence compris entre 1 et 100, avec une valeur par défaut de 80 %. L'Apprenant satisfait la règle de présence pour la certification lorsque son pourcentage est supérieur ou égal à ce seuil.
+
+Une Session ne peut pas passer au statut Terminée tant que chaque inscription active ne possède pas un statut de présence pour chaque entrée de planning. Lorsque la Session devient Terminée, ses enregistrements de présence deviennent immuables.
 
 La plateforme ne doit pas prétendre détecter automatiquement la présence via un service externe.
-
-Les présences sont liées aux séances/entrées de planning ou à la session selon le niveau de granularité retenu lors de la conception.
 
 ---
 
@@ -667,7 +886,11 @@ Les présences sont liées aux séances/entrées de planning ou à la session se
 
 Les revenus du centre proviennent des **paiements d'inscription des Apprenants**.
 
-Le système doit associer un paiement à l'inscription correspondante.
+Un `Payment` enregistre la tentative ou la transaction Stripe d'un Apprenant pour une Formation ou une Session déterminée.
+
+Lorsqu'un paiement est confirmé comme réussi, le backend crée l'inscription active correspondante et l'associe au paiement. Un paiement en attente, échoué ou annulé peut être conservé pour la traçabilité technique, mais il ne crée pas d'inscription et ne donne aucun accès.
+
+Chaque tentative Stripe correspond à un seul `Payment`. Un `Payment` réussi crée exactement une `Enrollment` et chaque `Enrollment` référence exactement le `Payment` réussi qui l'a créée. Les événements webhook répétés doivent réutiliser la même inscription.
 
 Il n'existe pas de concept métier séparé appelé **« Impayé »**.
 
@@ -675,15 +898,16 @@ Le fait qu'un paiement soit en attente ou échoué doit être représenté par s
 
 ## 15.2 Statuts
 
-Les statuts de paiement doivent être explicites, par exemple :
+Les statuts de paiement sont exactement :
 
 - `PENDING`
 - `PAID`
 - `FAILED`
 - `CANCELLED`
-- `REFUNDED`
 
-La liste finale peut être ajustée pendant la conception technique, mais aucun statut ne doit introduire un concept séparé « Unpaid/Impayé ».
+`CANCELLED` représente uniquement une tentative Stripe Checkout annulée avant paiement. Aucun statut ou workflow de remboursement n'est prévu dans le périmètre actuel. Aucun statut ne doit introduire un concept séparé « Unpaid/Impayé ».
+
+Ces statuts appartiennent exclusivement à `Payment`. Ils ne doivent pas être reproduits sous forme d'états de paiement dans `Enrollment`.
 
 ## 15.3 Stripe
 
@@ -691,12 +915,16 @@ Le paiement en ligne doit utiliser **Stripe en mode test/développement** pendan
 
 Aucun paiement réel ne doit être traité pendant le développement.
 
+La devise `TND` est utilisée pour les paiements de test. La disponibilité future d'un compte Stripe de production pour une entité établie en Tunisie ne fait pas partie des garanties de cette version et devra être vérifiée auprès de Stripe avant tout passage en production.
+
 Architecture cible :
 
 ```text
 Frontend
    ↓
-Stripe Checkout / Test Payment
+Demande de Stripe Checkout
+   ↓
+Vérification backend du prix et de la disponibilité
    ↓
 Stripe
    ↓
@@ -706,12 +934,16 @@ Vérification de l'événement
    ↓
 Mise à jour du Payment
    ↓
-Confirmation de l'inscription / accès selon les règles
+Création atomique de l'Enrollment après paiement réussi
+   ↓
+Accès selon les règles
 ```
 
 Le webhook backend est la **source de vérité pour confirmer qu'un paiement Stripe a réellement réussi**.
 
 Le frontend ne doit jamais être considéré comme la preuve suffisante d'un paiement réussi.
+
+Il n'existe ni `Enrollment` en attente de paiement ni entité `SeatReservation`. Pour une session présentielle, la création de l'inscription après paiement confirmé doit appliquer la capacité comme une contrainte atomique afin que la capacité ne soit jamais dépassée.
 
 ## 15.4 Sécurité du paiement
 
@@ -720,27 +952,40 @@ Le backend doit :
 - vérifier les signatures des webhooks Stripe ;
 - traiter les événements de manière idempotente ;
 - éviter de faire confiance aux montants envoyés directement par le client ;
-- associer le paiement à la bonne inscription ;
+- associer le paiement au bon Apprenant et à la bonne Formation ou Session ;
+- créer au plus une inscription pour un paiement réussi ;
 - conserver les références Stripe nécessaires à la traçabilité ;
 - ne jamais stocker les données de carte bancaire sensibles.
 
 ## 15.5 Factures
 
-Une facture peut être générée après confirmation du paiement selon les règles retenues.
+La plateforme utilise une seule devise : le dinar tunisien, code ISO 4217 `TND`. Les requêtes Stripe utilisent le code `tnd`.
 
-Elle peut contenir :
+Pour rester compatible avec le traitement des paiements Stripe, les montants payables utilisent une précision de `0,01 TND` et sont stockés sous forme d'entiers dans l'unité mineure attendue par Stripe. Aucun montant monétaire n'est stocké ou calculé avec un type flottant.
+
+Le backend lit le prix de référence de la Formation lors de la création du Checkout. Le frontend ne fournit jamais le montant faisant autorité. Le `Payment` conserve un instantané du montant, de la devise, du titre de la Formation et, si applicable, de la Session ciblée.
+
+Après confirmation d'un paiement réussi, le backend génère automatiquement et de manière idempotente une Facture unique associée à ce paiement.
+
+Un paiement échoué ou annulé ne crée aucune Facture. Les événements webhook répétés doivent réutiliser la Facture existante.
+
+Elle contient notamment :
 
 - numéro unique ;
-- apprenant ;
-- date ;
-- lignes ;
-- montant ;
-- taxes si applicables ;
+- identité de l'Apprenant au moment de l'émission ;
+- identité du centre au moment de l'émission ;
+- date d'émission ;
+- une ligne correspondant à l'inscription achetée ;
+- description, montant et devise de la ligne ;
+- sous-total ;
 - total ;
-- statut ;
 - référence du paiement.
 
-Elle doit pouvoir être consultée et téléchargée en PDF.
+La plateforme ne calcule aucune taxe dans le périmètre actuel. Le sous-total et le total de la Facture sont identiques et aucune ligne de taxe n'est affichée.
+
+Les informations de la Facture constituent un instantané immuable : une modification ultérieure de la Formation, de son prix, de l'Apprenant ou de l'identité courante du centre ne modifie pas une Facture déjà émise.
+
+Le backend de la plateforme génère le document PDF. La Facture doit pouvoir être consultée et téléchargée uniquement par un utilisateur autorisé.
 
 ---
 
@@ -763,11 +1008,21 @@ RÉSULTAT / RENTABILITÉ
 
 Le centre emploie ses Formateurs et leur verse un coût fixe/salaire.
 
-Le système doit permettre de représenter ce coût afin qu'il puisse contribuer au calcul de rentabilité.
+Le système représente ce coût par un `TrainerCost` mensuel explicitement saisi par l'Admin pour un Formateur et un mois calendaire déterminé.
+
+Un `TrainerCost` contient au minimum :
+
+- le Formateur ;
+- l'année ;
+- le mois ;
+- le montant ;
+- une note optionnelle.
+
+Il ne peut exister qu'un seul `TrainerCost` pour une même combinaison Formateur + année + mois. L'Admin peut créer ou mettre à jour cette valeur.
 
 Le système ne doit pas inventer un coût.
 
-Le coût doit être explicitement renseigné ou défini par une règle métier validée.
+Le montant doit être explicitement renseigné. Le système ne génère pas automatiquement de salaire, ne le répartit pas entre les Formations et ne le calcule pas à partir du propriétaire d'une Formation, des heures, des Sessions, des inscriptions ou des revenus.
 
 ## 16.2 Autres coûts
 
@@ -779,6 +1034,8 @@ Le système peut prévoir d'autres coûts de formation lorsqu'ils sont explicite
 
 Ils ne doivent pas être créés automatiquement sans donnée source.
 
+Un `TrainingCost` contient au minimum la Formation concernée, une date, un montant et une catégorie ou un libellé. Il peut référencer une Session lorsque la dépense concerne spécifiquement cette Session.
+
 ## 16.3 Rentabilité
 
 Le dashboard doit au minimum distinguer :
@@ -788,7 +1045,24 @@ Le dashboard doit au minimum distinguer :
 - résultat/marge ;
 - indicateur de rentabilité.
 
-La formule exacte de rentabilité doit être cohérente avec les données réellement disponibles.
+Les calculs de salaire du dashboard utilisent des mois calendaires complets. Pour une période sélectionnée, le résultat global est calculé ainsi :
+
+```text
+résultat global =
+revenus confirmés
+- TrainerCost enregistrés pour les mois sélectionnés
+- TrainingCost explicitement enregistrés sur la période
+```
+
+L'indicateur de rentabilité est calculé ainsi :
+
+```text
+rentabilité (%) = résultat global ÷ revenus confirmés × 100
+```
+
+Lorsque les revenus confirmés sont égaux à zéro, le pourcentage de rentabilité vaut `null` ; il ne doit pas être présenté comme zéro ou comme une valeur infinie.
+
+Aucun salaire de Formateur n'est automatiquement attribué à une Formation. Une vue par Formation peut présenter ses revenus, ses `TrainingCost` explicites et un résultat avant coûts fixes des Formateurs, mais elle ne doit pas présenter cette valeur comme la rentabilité complète de la Formation.
 
 ---
 
@@ -847,6 +1121,25 @@ Ne pas introduire de manière générique ou spéculative :
 
 Si une information du centre est strictement nécessaire pour un besoin concret, elle doit être modélisée uniquement à partir de ce besoin fonctionnel explicite.
 
+L'identité nécessaire aux Certificats et Factures est fournie par la configuration de déploiement :
+
+```text
+CENTER_NAME
+CENTER_ADDRESS
+CENTER_EMAIL
+CENTER_PHONE             # optionnel
+CENTER_REGISTRATION_ID   # optionnel
+CENTER_LOGO_PATH         # optionnel
+```
+
+`CENTER_NAME`, `CENTER_ADDRESS` et `CENTER_EMAIL` sont obligatoires et validés au démarrage du backend. Les champs optionnels sont affichés uniquement lorsqu'ils sont configurés. Le logo est un fichier local lisible par le moteur de génération PDF.
+
+Le backend expose ces valeurs aux services documentaires au moyen d'un objet typé `IssuerIdentity`. Les modèles métier et les contrôleurs ne lisent pas directement les variables d'environnement.
+
+Lors de l'émission d'une Facture ou d'un Certificat, les valeurs courantes sont copiées dans un instantané immuable du document. Une modification ultérieure de la configuration n'affecte que les nouveaux documents.
+
+Il n'existe aucune collection MongoDB, API CRUD ou interface Admin pour modifier l'identité du centre. Une modification exige un changement de configuration et un redémarrage/redéploiement. Le nom et le logo non sensibles peuvent être fournis aux frontends par leur configuration de build ; aucun endpoint générique de paramètres publics n'est introduit.
+
 L'objectif est de conserver un modèle centré sur la gestion réelle des formations.
 
 ---
@@ -872,7 +1165,9 @@ L'API doit couvrir au minimum les domaines suivants :
 /payments
 /invoices
 /evaluations
+/feedback
 /certificates
+/costs
 /dashboard
 ```
 
@@ -944,16 +1239,18 @@ PUT    /api/schedules/{id}
 DELETE /api/schedules/{id}
 ```
 
+L'annulation d'une Session est autorisée uniquement lorsqu'elle ne possède aucune inscription.
+
 ## 20.5 Inscriptions et progression
 
 ```text
-POST /api/enrollments
 GET  /api/enrollments
-PUT  /api/enrollments/{id}/cancel
 
 GET  /api/progress
 PUT  /api/progress/{id}
 ```
+
+L'inscription payante n'est pas créée directement par un appel public à `/api/enrollments`. Elle est créée par le backend après confirmation du paiement par le webhook Stripe.
 
 ## 20.6 Paiements
 
@@ -983,7 +1280,16 @@ GET  /api/evaluations/{id}/results
 
 La génération IA ne publie pas automatiquement l'évaluation.
 
-## 20.8 Certificats
+## 20.8 Feedback
+
+```text
+POST /api/feedback
+GET  /api/feedback              # Admin uniquement
+```
+
+La création vérifie l'éligibilité côté backend et refuse toute seconde note pour la même inscription.
+
+## 20.9 Certificats
 
 ```text
 GET  /api/certificates
@@ -994,12 +1300,29 @@ GET  /api/certificates/{id}/pdf
 
 La génération doit vérifier l'éligibilité côté backend.
 
-## 20.9 Dashboard
+La génération est idempotente et ne doit pas créer de doublons lorsqu'elle est demandée plusieurs fois pour la même éligibilité.
+
+## 20.10 Coûts
+
+```text
+GET  /api/costs/trainers
+PUT  /api/costs/trainers/{trainerId}/{year}/{month}
+
+GET    /api/costs/trainings
+POST   /api/costs/trainings
+PUT    /api/costs/trainings/{id}
+DELETE /api/costs/trainings/{id}
+```
+
+Ces endpoints sont réservés à l'Admin et n'acceptent que des montants explicitement saisis en TND.
+
+## 20.11 Dashboard
 
 ```text
 GET /api/dashboard/overview
 GET /api/dashboard/participation
 GET /api/dashboard/progress
+GET /api/dashboard/satisfaction
 GET /api/dashboard/financial
 GET /api/dashboard/profitability
 ```
@@ -1111,7 +1434,7 @@ TrainingSession
 SessionSchedule
 
 Enrollment
-Progress
+LessonProgress
 Attendance
 
 Payment
@@ -1139,28 +1462,44 @@ Training 1 ───── N TrainingModule
 TrainingModule 1 ───── N Lesson
 Lesson 1 ───── N TrainingResource
 
+Trainer 1 ───── N Training en tant que propriétaire unique
+
 Training 1 ───── N TrainingSession
 TrainingSession 1 ───── N SessionSchedule
+TrainingSession N ───── N Trainer affecté
 
 Learner 1 ───── N Enrollment
 Enrollment ───── Formation OU Session selon le type
 
-Learner + Training ───── Progress
+Enrollment self-paced 1 ───── N LessonProgress
+Lesson 1 ───── N LessonProgress
 
 Enrollment 1 ───── N Attendance
+SessionSchedule 1 ───── N Attendance
 
-Enrollment 1 ───── N Payment
-Payment 1 ───── N Invoice / InvoiceItem
+Learner 1 ───── N Payment
+Payment ───── Formation OU Session ciblée
+Payment non réussi 1 ───── 0 Enrollment
+Payment non réussi 1 ───── 0 Invoice
+Payment réussi 1 ───── 1 Enrollment
+Enrollment 1 ───── 1 Payment réussi
+Payment réussi 1 ───── 1 Invoice
+Invoice 1 ───── 1 InvoiceItem d'inscription
 
 Training 1 ───── N Evaluation
+Training 1 ───── 0..1 Evaluation certifiante publiée
 Evaluation 1 ───── N EvaluationQuestion
 Learner 1 ───── N EvaluationAttempt
 EvaluationAttempt 1 ───── N EvaluationAnswer
 
-Enrollment 1 ───── N Certificate
+Enrollment 1 ───── 0..1 Feedback
+Training 1 ───── N Feedback
 
-Trainer ───── TrainerCost
-Training ───── TrainingCost
+Enrollment 1 ───── 0..1 Certificate
+
+Trainer 1 ───── N TrainerCost mensuel
+Training 1 ───── N TrainingCost
+TrainingSession 1 ───── N TrainingCost optionnellement rattaché
 ```
 
 Les cardinalités et stratégies de référence/embedding seront validées pendant la conception MongoDB.
@@ -1191,8 +1530,9 @@ Exemples :
 
 - seul l'Admin peut créer un compte Formateur ;
 - seul l'Admin peut désactiver un utilisateur selon ses permissions ;
-- un Formateur ne peut gérer que les formations/sessions qui lui sont autorisées ;
-- un Formateur ne peut modifier que les présences de ses sessions autorisées ;
+- un Formateur ne peut modifier que la Formation dont il est propriétaire ;
+- un Formateur affecté à une Session peut gérer cette Session dans son périmètre opérationnel, sans modifier la Formation parente ;
+- un Formateur ne peut modifier que les présences des Sessions auxquelles il est affecté ;
 - un Apprenant ne consulte que ses propres inscriptions, progressions, paiements, résultats et certificats ;
 - un Apprenant ne peut jamais attribuer son propre rôle ;
 - un paiement confirmé doit provenir d'une confirmation backend fiable.
@@ -1213,7 +1553,30 @@ TrainingResource
     └── ExternalUrl
 ```
 
-Le fournisseur de stockage peut être choisi ultérieurement.
+Dans le périmètre actuel, les fichiers sont stockés uniquement sur le système de fichiers local persistant du backend. Le répertoire racine est défini par la variable d'environnement `UPLOAD_DIR` et ne doit pas être exposé comme répertoire statique public.
+
+Le backend fournit les opérations d'upload et de téléchargement. Chaque accès vérifie l'identité, le rôle et l'autorisation de l'utilisateur sur la Formation concernée. Les fichiers ne disposent pas d'URL publique permanente.
+
+Pour un fichier, `TrainingResource` conserve notamment :
+
+- le nom original ;
+- un nom de stockage généré par le backend ;
+- un chemin relatif interne ;
+- le type MIME ;
+- la taille ;
+- une empreinte de contrôle ;
+- l'utilisateur ayant effectué l'upload ;
+- la date d'upload.
+
+Le backend doit empêcher les traversées de chemin et ne jamais utiliser directement le nom fourni par l'utilisateur comme chemin de stockage. L'extension, le type MIME, la signature réelle du fichier et la taille doivent être validés.
+
+La taille maximale par défaut est de 20 Mo et peut être modifiée par `MAX_UPLOAD_SIZE_MB`.
+
+Les ressources `EXTERNAL_URL` acceptent uniquement des URL valides utilisant `http` ou `https`. Le backend ne télécharge pas automatiquement leur contenu.
+
+Les PDF de Certificat et de Facture utilisent également ce stockage local protégé.
+
+Le déploiement doit monter `UPLOAD_DIR` sur un volume persistant. Cette version suppose une seule instance backend utilisant ce volume ; le stockage distribué et la réplication de fichiers sont hors périmètre.
 
 Le changement de fournisseur de stockage ne doit pas modifier le concept métier `TrainingResource`.
 
@@ -1278,6 +1641,7 @@ Aucune inscription Formateur.
 - Factures ;
 - Évaluations ;
 - Certificats ;
+- Feedbacks de satisfaction ;
 - Coûts ;
 - Rentabilité.
 
@@ -1309,6 +1673,7 @@ Aucun écran obligatoire `SiteSettings` ou `CompanySettings`.
 - Factures ;
 - Évaluations ;
 - Certificats ;
+- Feedback de satisfaction ;
 - Profil.
 
 ---
@@ -1325,9 +1690,9 @@ Aucun écran obligatoire `SiteSettings` ou `CompanySettings`.
 8. Une formation présentielle utilise des sessions.
 9. L'Apprenant s'inscrit à une formation pour le self-paced.
 10. L'Apprenant s'inscrit à une session pour le présentiel.
-11. Une session ne peut pas dépasser sa capacité.
-12. Une session annulée ne reçoit pas de nouvelle inscription.
-13. Un Apprenant ne peut pas avoir deux inscriptions actives équivalentes.
+11. Une session ne peut pas dépasser sa capacité ; cette limite est appliquée de manière atomique lors de la création d'une inscription après paiement confirmé.
+12. Une Session ne peut être annulée ou supprimée que si elle ne possède aucune inscription ; une Session annulée ne reçoit pas de nouvelle inscription.
+13. Un Apprenant ne peut pas avoir deux inscriptions équivalentes.
 14. Les présences concernent les sessions présentielles.
 15. Les ressources pédagogiques sont rattachées aux lessons.
 16. Les contenus d'une formation self-paced sont préparés à l'avance par le Formateur.
@@ -1336,12 +1701,12 @@ Aucun écran obligatoire `SiteSettings` ou `CompanySettings`.
 19. Le certificat est le seul document de réussite prévu dans le périmètre.
 20. Aucune Attestation n'est implémentée.
 21. Un certificat n'est généré que si les conditions d'éligibilité sont satisfaites.
-22. La réussite de l'évaluation obligatoire fait partie des conditions de certification lorsqu'une évaluation est requise.
+22. Une Formation peut désigner au maximum une Évaluation publiée comme Évaluation certifiante ; lorsqu'elle est désignée, au moins une tentative réussie est obligatoire.
 23. Chaque certificat possède un numéro unique.
 24. Les revenus proviennent des paiements d'inscription des Apprenants.
 25. Le système n'a pas de concept métier séparé « Impayé ».
-26. Les paiements utilisent des statuts explicites tels que Pending, Paid, Failed, Cancelled et Refunded.
-27. Le webhook Stripe backend est la source de vérité d'une confirmation de paiement Stripe.
+26. Les paiements utilisent uniquement les statuts `PENDING`, `PAID`, `FAILED` et `CANCELLED` ; ces statuts restent propres à `Payment` et ne sont pas reproduits dans `Enrollment`. Aucun remboursement n'est géré dans le périmètre actuel.
+27. Le webhook Stripe backend est la source de vérité d'une confirmation de paiement Stripe ; seule cette confirmation permet au backend de créer l'inscription active et d'accorder l'accès.
 28. Les coûts ne doivent jamais être inventés.
 29. Le coût fixe/salaire des Formateurs peut être représenté pour les calculs de rentabilité.
 30. Les autres coûts ne sont pris en compte que s'ils sont explicitement enregistrés.
@@ -1353,6 +1718,77 @@ Aucun écran obligatoire `SiteSettings` ou `CompanySettings`.
 36. Il n'existe pas de mode self-paced en dehors du type explicitement défini `SELF_PACED_ONLINE`.
 37. La plateforme ne développe pas son propre système de visioconférence.
 38. Les liens externes de ressources et, si nécessaire, d'outils externes ne transforment pas ces services en intégrations propriétaires.
+39. Chaque Formation possède exactement un Formateur propriétaire.
+40. Le Formateur qui crée une Formation en devient le propriétaire ; l'Admin doit désigner le propriétaire d'une Formation qu'il crée.
+41. Seul l'Admin peut transférer la propriété d'une Formation.
+42. Une Session présentielle peut être affectée à un ou plusieurs Formateurs par l'Admin ou par le propriétaire de la Formation.
+43. L'affectation à une Session ne donne pas le droit de modifier la Formation parente, son contenu ou ses évaluations.
+44. Une Formation self-paced est terminée lorsque 100 % de ses lessons ont été explicitement marquées comme terminées ; le suivi des ressources reste informatif.
+45. Une Formation présentielle est terminée pour la certification lorsque la Session est Terminée et que la règle de présence applicable est satisfaite.
+46. La génération d'un Certificat est une opération backend idempotente qui recalcule l'éligibilité et ne peut pas être forcée par l'Admin.
+47. Les Évaluations utilisent uniquement les questions `SINGLE_CHOICE`, `MULTIPLE_CHOICE` et `TRUE_FALSE`, corrigées automatiquement sans crédit partiel.
+48. Une Évaluation suit le cycle `DRAFT`, `PUBLISHED`, `ARCHIVED` ; seule une Évaluation `DRAFT` est modifiable.
+49. Le seuil de réussite et le nombre maximal de tentatives sont définis par le Formateur propriétaire ; la valeur par défaut du nombre de tentatives est trois et la durée est optionnelle.
+50. Une tentative soumise ou expirée est immuable ; son score et son résultat sont calculés par le backend.
+51. Les bonnes réponses et explications ne sont visibles qu'après réussite ou après utilisation de la dernière tentative autorisée.
+52. Les seuls statuts de présence sont `PRESENT` et `ABSENT` ; aucun statut de retard ou d'absence justifiée n'existe.
+53. Une présence est unique pour une combinaison `Enrollment + SessionSchedule` et une absence d'enregistrement ne signifie pas `ABSENT`.
+54. `PRESENT` compte entièrement dans le pourcentage de présence ; `ABSENT` ne compte pas et aucun calcul pondéré par la durée n'est appliqué.
+55. Le seuil minimal de présence est défini sur la Formation présentielle, avec une valeur par défaut de 80 %.
+56. Une Session ne peut devenir Terminée que lorsque toutes les présences attendues ont été saisies ; elles deviennent alors immuables.
+57. Une Session contient une ou plusieurs entrées `SessionSchedule` et peut ainsi être organisée sur plusieurs dates distinctes sans créer plusieurs Sessions.
+58. Un `TrainerCost` est un coût mensuel explicitement saisi pour un Formateur ; il est unique par Formateur, année et mois.
+59. Les salaires des Formateurs ne sont ni générés automatiquement ni alloués automatiquement aux Formations ou Sessions.
+60. Un `TrainingCost` est une dépense explicite rattachée à une Formation et, si pertinent, à une Session.
+61. Le résultat global correspond aux revenus confirmés diminués des `TrainerCost` et `TrainingCost` enregistrés pour la période.
+62. La rentabilité correspond au résultat global divisé par les revenus confirmés ; son pourcentage vaut `null` lorsque les revenus sont nuls.
+63. La devise unique de la plateforme est le dinar tunisien (`TND`) avec une précision de paiement de `0,01 TND` compatible avec Stripe.
+64. Tous les montants sont stockés sous forme d'entiers dans l'unité mineure attendue par Stripe ; aucun calcul monétaire n'utilise de nombre flottant.
+65. La plateforme ne calcule aucune taxe ; le sous-total et le total d'une Facture sont identiques.
+66. Un paiement réussi génère automatiquement et de manière idempotente une Facture unique contenant une ligne d'inscription.
+67. Une Facture conserve des instantanés immuables des identités, de la description, du montant et de la devise au moment de son émission.
+68. Chaque Formation possède un prix strictement positif en TND ; aucune Formation gratuite n'est prévue.
+69. Le type d'une Formation est obligatoire et définitivement immuable dès sa création.
+70. Aucun workflow de conversion ou de migration entre `SELF_PACED_ONLINE` et `IN_PERSON` n'est prévu ; une autre modalité exige une nouvelle Formation.
+71. La timezone métier unique est `Africa/Tunis` ; les instants sont stockés en UTC et échangés au format ISO 8601 avec offset explicite ou `Z`.
+72. Les dates de début et de fin d'une Session sont dérivées de ses entrées `SessionSchedule`.
+73. Le backend refuse les chevauchements de planning pour un même Formateur ou une même combinaison lieu + salle parmi les Sessions non annulées.
+74. Les entrées adjacentes et les entrées parallèles utilisant des Formateurs et salles différents sont autorisées.
+75. La plateforme ne gère ni timezone par utilisateur ou Session ni détection des conflits personnels des Apprenants.
+76. Les fichiers sont stockés dans un répertoire backend local persistant défini par `UPLOAD_DIR` et ne sont jamais exposés comme fichiers statiques publics.
+77. Les uploads sont autorisés et validés par le backend ; la taille maximale par défaut est de 20 Mo et peut être configurée par `MAX_UPLOAD_SIZE_MB`.
+78. L'extraction IA est effectuée à la demande uniquement pour les PDF textuels, DOCX, PPTX et TXT de la Formation sélectionnée.
+79. Aucun OCR, téléchargement automatique d'URL externe, stockage distribué, système d'embeddings, base vectorielle ou pipeline RAG n'est introduit.
+80. Si aucun contenu textuel exploitable n'existe, la génération IA est refusée explicitement ; toute sortie IA valide reste un brouillon contrôlé par le Formateur propriétaire.
+81. Le premier Admin est créé uniquement par une commande CLI/seed idempotente et doit modifier son mot de passe initial lors de sa première connexion.
+82. Seul l'Admin crée un Formateur avec un mot de passe temporaire que le Formateur doit modifier lors de sa première connexion.
+83. L'authentification utilise un JWT d'accès de 15 minutes et un refresh token rotatif de 7 jours stocké sous forme d'empreinte et révocable.
+84. La déconnexion révoque le refresh token courant ; le changement de mot de passe et la désactivation révoquent tous les refresh tokens.
+85. Chaque requête protégée vérifie l'existence et l'état actif de l'utilisateur.
+86. Les jetons de réinitialisation sont à usage unique, stockés sous forme d'empreinte, expirent après 30 minutes et sont transmis par SMTP.
+87. La création d'Admins supplémentaires et l'invitation de Formateurs par email sont hors périmètre du MVP.
+88. La suppression définitive est limitée aux brouillons et éléments sans historique métier ; les éléments déjà utilisés sont archivés, annulés ou désactivés selon leur nature.
+89. Les paiements, Factures, Certificats, tentatives soumises, présences et progressions terminées ne sont jamais supprimés définitivement.
+90. Aucune suppression en cascade d'un historique métier n'est autorisée ; une demande de suppression incompatible retourne une erreur de conflit.
+91. Un fichier local est supprimé uniquement avec sa ressource définitivement supprimée et lorsqu'aucune autre référence n'existe.
+92. Chaque tentative Stripe correspond à un `Payment` ; un paiement non réussi ne crée ni inscription ni Facture.
+93. Un `Payment` réussi crée exactement une `Enrollment` et une Facture, et chaque `Enrollment` référence exactement son paiement réussi.
+94. Une `Enrollment` peut produire au maximum un Certificat ; les demandes répétées retournent l'enregistrement existant.
+95. La régénération technique d'un PDF ne crée ni nouvel enregistrement, ni nouveau numéro de Facture ou de Certificat.
+96. Des index uniques garantissent l'idempotence des événements Stripe, des relations Payment/Enrollment/Invoice, et des numéros de Facture et de Certificat.
+97. La progression self-paced appartient à l'inscription ; une progression de lesson est unique par combinaison `Enrollment + Lesson`.
+98. Le pourcentage de progression est calculé à partir des lessons terminées et n'est jamais modifié directement.
+99. Une inscription créée après paiement confirmé est permanente dans le périmètre actuel : elle ne peut pas être annulée et l'Apprenant ne peut pas se réinscrire à la même cible équivalente.
+100. Deux inscriptions sont équivalentes pour un même Apprenant lorsqu'elles ciblent la même Formation self-paced ou la même Session présentielle ; des Sessions différentes restent autorisées.
+101. Les progressions utilisées pour un Certificat deviennent immuables après son émission.
+102. Une nouvelle lesson affecte la progression des inscriptions actives non certifiées, mais ne remet pas en cause les Certificats déjà délivrés.
+103. L'identité du centre utilisée pour les Factures et Certificats provient exclusivement de variables d'environnement validées au démarrage.
+104. Chaque Facture et Certificat conserve un instantané immuable de l'identité du centre au moment de son émission.
+105. Aucune collection, API ou interface `CompanySettings`, `SiteSettings` ou équivalent n'est introduite pour gérer cette identité.
+106. Une Formation self-paced ne peut être publiée que si elle contient au moins un Module et une Lesson ; une Formation présentielle peut être publiée sans Session, mais aucun paiement n'est possible tant qu'aucune Session planifiée et disponible n'est sélectionnable.
+107. Un Apprenant peut créer un unique Feedback pour une inscription lorsque la Formation est terminée et que l'Évaluation certifiante éventuelle a été réussie.
+108. Un Feedback contient uniquement une note entière de 1 à 5, devient immuable après création et ne comporte ni commentaire ni workflow de modération.
+109. Les statistiques Admin exposent le nombre, la moyenne et la distribution des Feedbacks, globalement et par Formation.
 
 ---
 
@@ -1367,7 +1803,7 @@ Aucun écran obligatoire `SiteSettings` ou `CompanySettings`.
 | NFR-05 | Architecture maintenable et extensible | Haute |
 | NFR-06 | Compatibilité Web et mobile via API commune | Haute |
 | NFR-07 | Traçabilité des paiements et certificats | Haute |
-| NFR-08 | Prise en compte des principes applicables du RGPD | Haute |
+| NFR-08 | Protection minimale des données personnelles : collecte limitée aux besoins du projet, contrôle d'accès, modification du profil, désactivation du compte et absence de données sensibles dans les logs ; aucun module RGPD dédié | Haute |
 
 ---
 
@@ -1399,8 +1835,9 @@ Les tests doivent couvrir au minimum :
 - génération IA ;
 - validation Formateur ;
 - certificats ;
+- feedbacks et contrôle de leur éligibilité ;
 - calculs financiers ;
-- statistiques.
+- statistiques, y compris les indicateurs de satisfaction.
 
 ## Frontend Web
 
@@ -1416,6 +1853,7 @@ Les tests doivent couvrir au minimum :
 - paiement ;
 - évaluations ;
 - certificats ;
+- feedback de satisfaction ;
 - états loading/error/empty.
 
 ## Mobile
@@ -1443,11 +1881,11 @@ Publication
     ↓
 Apprenant crée son compte
     ↓
-Inscription
-    ↓
 Paiement Stripe
     ↓
 Webhook backend confirmé
+    ↓
+Création de l'inscription active
     ↓
 Accès au contenu
     ↓
@@ -1458,6 +1896,8 @@ Progression
 Réussite
     ↓
 Certificat
+    ↓
+Feedback de satisfaction
 ```
 
 ## Formation présentielle
@@ -1477,11 +1917,11 @@ Apprenant crée son compte
     ↓
 Choix d'une Session
     ↓
-Inscription
-    ↓
 Paiement Stripe
     ↓
 Webhook backend confirmé
+    ↓
+Création de l'inscription active
     ↓
 Session
     ↓
@@ -1492,6 +1932,8 @@ Présences
 Réussite
     ↓
 Certificat
+    ↓
+Feedback de satisfaction
 ```
 
 ---
@@ -1549,9 +1991,12 @@ Ne pas implémenter spontanément :
 - intégrations propriétaires Zoom/Teams/Google Meet ;
 - stockage de cartes bancaires ;
 - paiement réel pendant le développement ;
+- remboursements, avoirs ou annulation d'une inscription ;
+- formations gratuites ;
 - certificats de type Attestation ;
 - concept métier « Impayé » ;
 - fonctionnalités financières non alimentées par des données réelles ;
+- module RGPD dédié, workflow automatisé d'export/effacement, moteur d'anonymisation, gestion de consentements versionnés ou planificateur de rétention ;
 - recommandations automatiques ;
 - prédiction d'abandon ;
 - prédiction d'inscription ;
@@ -1574,16 +2019,15 @@ L'ordre recommandé est :
 6. Modules / Lessons / Resources
 7. Formations self-paced + progression
 8. Sessions / Planning présentiel
-9. Inscriptions
-10. Stripe test + webhook
-11. Présences
-12. Évaluations
-13. Assistance IA à la génération des évaluations
-14. Certificats
-15. Coûts et rentabilité
-16. Dashboard
-17. Tests / sécurité / documentation
-18. Application mobile React Native
+9. Stripe test + paiements + webhook + inscriptions + factures
+10. Présences
+11. Évaluations
+12. Assistance IA à la génération des évaluations
+13. Certificats et Feedbacks
+14. Coûts et rentabilité
+15. Dashboard
+16. Tests / sécurité / documentation
+17. Application mobile React Native
 ```
 
 Cet ordre est indicatif pour l'implémentation et ne remplace pas les dépendances techniques réelles.
@@ -1621,4 +2065,3 @@ Il décrit :
 - son architecture fonctionnelle et technique de référence.
 
 Les instructions spécifiques destinées aux agents de développement Web et mobile sont maintenues dans des documents séparés.
-

@@ -628,4 +628,6 @@ Commence par :
 
 Après validation, développe progressivement.
 
+Avoid over-engineering. Do not introduce entities, states, workflows, abstractions, or infrastructure solely to model hypothetical edge cases unless they are required by the Source of Truth or necessary for security, data integrity, or correct operation of an explicitly required feature.
+
 Le Source of Truth reste l'autorité fonctionnelle.
