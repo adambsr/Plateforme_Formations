@@ -1,0 +1,504 @@
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+  type FormEvent,
+} from 'react';
+
+import { ApiError } from '../../core/api/client.js';
+import { useAuth } from '../../core/auth/AuthContext.js';
+import type { PaginatedUsers } from '../../core/auth/types.js';
+import type { PaginatedSessions } from '../sessions/types.js';
+import type { Training } from '../trainings/types.js';
+import type {
+  Overview,
+  Page,
+  Participation,
+  Profitability,
+  ProgressDashboard,
+  Satisfaction,
+  TrainerCost,
+  TrainingCost,
+} from './types.js';
+
+const money = (value: number) =>
+  new Intl.NumberFormat('fr-TN', {
+    style: 'currency',
+    currency: 'TND',
+    minimumFractionDigits: 3,
+  }).format(value / 1000);
+const percent = (value: number | null) =>
+  value === null ? 'Non calculable' : `${value}%`;
+const message = (error: unknown) =>
+  error instanceof ApiError
+    ? error.message
+    : 'Une erreur inattendue est survenue.';
+type DashboardData = {
+  overview: Overview;
+  participation: Participation;
+  progress: ProgressDashboard;
+  satisfaction: Satisfaction;
+  profitability: Profitability;
+};
+
+export function DashboardPage() {
+  const { request } = useAuth();
+  const initial = useMemo(() => {
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    return {
+      from: `${year}-${month}-01`,
+      to: `${year}-${month}-${String(new Date(year, now.getMonth() + 1, 0).getDate()).padStart(2, '0')}`,
+    };
+  }, []);
+  const [range, setRange] = useState(initial);
+  const [data, setData] = useState<DashboardData>();
+  const [options, setOptions] = useState<{
+    trainers: PaginatedUsers['items'];
+    trainings: Training[];
+    sessions: PaginatedSessions['items'];
+  }>({ trainers: [], trainings: [], sessions: [] });
+  const [trainerCosts, setTrainerCosts] = useState<TrainerCost[]>([]);
+  const [trainingCosts, setTrainingCosts] = useState<TrainingCost[]>([]);
+  const [editing, setEditing] = useState<TrainingCost>();
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+  const [notice, setNotice] = useState('');
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    setError('');
+    const query = new URLSearchParams(range).toString();
+    try {
+      const results = await Promise.all([
+        request<Overview>(`/dashboard/overview?${query}`),
+        request<Participation>(`/dashboard/participation?${query}`),
+        request<ProgressDashboard>(`/dashboard/progress?${query}`),
+        request<Satisfaction>(`/dashboard/satisfaction?${query}`),
+        request<Profitability>(`/dashboard/profitability?${query}`),
+        request<PaginatedUsers>('/trainers?pageSize=100'),
+        request<Page<Training>>('/trainings?view=MANAGED&pageSize=100'),
+        request<PaginatedSessions>('/sessions?view=MANAGED&pageSize=100'),
+        request<Page<TrainerCost>>('/costs/trainers?pageSize=100'),
+        request<Page<TrainingCost>>(`/costs/trainings?${query}&pageSize=100`),
+      ]);
+      setData({
+        overview: results[0],
+        participation: results[1],
+        progress: results[2],
+        satisfaction: results[3],
+        profitability: results[4],
+      });
+      setOptions({
+        trainers: results[5].items,
+        trainings: results[6].items,
+        sessions: results[7].items,
+      });
+      setTrainerCosts(results[8].items);
+      setTrainingCosts(results[9].items);
+    } catch (caught) {
+      setError(message(caught));
+    } finally {
+      setLoading(false);
+    }
+  }, [range, request]);
+  useEffect(() => {
+    // Route entry and range changes synchronize backend-owned aggregates.
+    // oxlint-disable-next-line react/set-state-in-effect
+    void load();
+  }, [load]);
+
+  async function saveMonthly(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setSaving(true);
+    const form = new FormData(event.currentTarget);
+    try {
+      await request(
+        `/costs/trainers/${form.get('trainerId')}/${form.get('year')}/${form.get('month')}`,
+        {
+          method: 'PUT',
+          body: JSON.stringify({
+            amountMinor: Math.round(Number(form.get('amount')) * 1000),
+            ...(form.get('note') ? { note: form.get('note') } : {}),
+          }),
+        },
+      );
+      setNotice('Coût mensuel enregistré.');
+      await load();
+    } catch (caught) {
+      setError(message(caught));
+    } finally {
+      setSaving(false);
+    }
+  }
+  async function saveExplicit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setSaving(true);
+    const form = new FormData(event.currentTarget);
+    const sessionId = String(form.get('sessionId'));
+    const body = {
+      trainingId: form.get('trainingId'),
+      sessionId: sessionId === '' ? null : sessionId,
+      date: form.get('date'),
+      amountMinor: Math.round(Number(form.get('amount')) * 1000),
+      label: form.get('label'),
+    };
+    try {
+      await request(
+        editing ? `/costs/trainings/${editing.id}` : '/costs/trainings',
+        { method: editing ? 'PUT' : 'POST', body: JSON.stringify(body) },
+      );
+      setEditing(undefined);
+      setNotice('Dépense enregistrée.');
+      await load();
+    } catch (caught) {
+      setError(message(caught));
+    } finally {
+      setSaving(false);
+    }
+  }
+  async function remove(cost: TrainingCost) {
+    if (!window.confirm(`Supprimer « ${cost.label} » ?`)) return;
+    try {
+      await request(`/costs/trainings/${cost.id}`, { method: 'DELETE' });
+      setNotice('Dépense supprimée.');
+      await load();
+    } catch (caught) {
+      setError(message(caught));
+    }
+  }
+
+  return (
+    <section>
+      <div className="section-heading">
+        <div>
+          <span className="eyebrow">Pilotage du centre</span>
+          <h1>Tableau de bord</h1>
+        </div>
+      </div>
+      <form
+        className="dashboard-range"
+        onSubmit={(event) => {
+          event.preventDefault();
+          void load();
+        }}
+      >
+        <label>
+          Du
+          <input
+            aria-label="Du"
+            type="date"
+            value={range.from}
+            onChange={(event) =>
+              setRange({ ...range, from: event.target.value })
+            }
+            required
+          />
+        </label>
+        <label>
+          Au
+          <input
+            aria-label="Au"
+            type="date"
+            value={range.to}
+            onChange={(event) => setRange({ ...range, to: event.target.value })}
+            required
+          />
+        </label>
+        <button className="primary-button" disabled={loading}>
+          Actualiser
+        </button>
+      </form>
+      {notice && <p className="success-message">{notice}</p>}
+      {error && (
+        <p className="form-error" role="alert">
+          {error}
+        </p>
+      )}
+      {loading ? (
+        <p className="muted">Calcul des indicateurs…</p>
+      ) : data ? (
+        <DashboardResults data={data} />
+      ) : null}
+      <div className="dashboard-management">
+        <form
+          className="content-card"
+          onSubmit={(event) => void saveMonthly(event)}
+        >
+          <h2>Coût mensuel formateur</h2>
+          <label>
+            Formateur
+            <select name="trainerId" required>
+              <option value="">Choisir</option>
+              {options.trainers.map((trainer) => (
+                <option key={trainer.id} value={trainer.id}>
+                  {[trainer.profile.firstName, trainer.profile.lastName]
+                    .filter(Boolean)
+                    .join(' ') || trainer.email}
+                </option>
+              ))}
+            </select>
+          </label>
+          <div className="form-grid">
+            <label>
+              Année
+              <input
+                name="year"
+                type="number"
+                min="2000"
+                max="2100"
+                defaultValue={new Date().getFullYear()}
+                required
+              />
+            </label>
+            <label>
+              Mois
+              <input
+                name="month"
+                type="number"
+                min="1"
+                max="12"
+                defaultValue={new Date().getMonth() + 1}
+                required
+              />
+            </label>
+          </div>
+          <label>
+            Montant TND
+            <input
+              name="amount"
+              type="number"
+              min="0.001"
+              step="0.001"
+              required
+            />
+          </label>
+          <label>
+            Note
+            <textarea name="note" maxLength={1000} />
+          </label>
+          <button className="primary-button" disabled={saving}>
+            Enregistrer
+          </button>
+          {trainerCosts.length === 0 ? (
+            <p className="muted">Aucun coût mensuel.</p>
+          ) : (
+            <div className="dashboard-table">
+              {trainerCosts.map((cost) => (
+                <div key={cost.id}>
+                  <span>
+                    {cost.trainer.email} · {cost.month}/{cost.year}
+                  </span>
+                  <strong>{money(cost.amountMinor)}</strong>
+                </div>
+              ))}
+            </div>
+          )}
+        </form>
+        <form
+          className="content-card"
+          key={editing?.id ?? 'create'}
+          onSubmit={(event) => void saveExplicit(event)}
+        >
+          <h2>
+            {editing ? 'Modifier la dépense' : 'Nouvelle dépense formation'}
+          </h2>
+          <label>
+            Formation
+            <select
+              name="trainingId"
+              defaultValue={editing?.training.id ?? ''}
+              required
+            >
+              <option value="">Choisir</option>
+              {options.trainings.map((training) => (
+                <option key={training.id} value={training.id}>
+                  {training.title}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label>
+            Session facultative
+            <select name="sessionId" defaultValue={editing?.session?.id ?? ''}>
+              <option value="">Aucune</option>
+              {options.sessions.map((session) => (
+                <option key={session.id} value={session.id}>
+                  {session.training.title} · {session.title}
+                </option>
+              ))}
+            </select>
+          </label>
+          <div className="form-grid">
+            <label>
+              Date
+              <input
+                name="date"
+                type="date"
+                defaultValue={editing?.date ?? range.from}
+                required
+              />
+            </label>
+            <label>
+              Montant TND
+              <input
+                name="amount"
+                type="number"
+                min="0.001"
+                step="0.001"
+                defaultValue={editing ? editing.amountMinor / 1000 : ''}
+                required
+              />
+            </label>
+          </div>
+          <label>
+            Libellé
+            <input
+              name="label"
+              maxLength={200}
+              defaultValue={editing?.label ?? ''}
+              required
+            />
+          </label>
+          <div className="form-actions">
+            <button className="primary-button" disabled={saving}>
+              {editing ? 'Mettre à jour' : 'Créer'}
+            </button>
+            {editing && (
+              <button
+                type="button"
+                className="secondary-button"
+                onClick={() => setEditing(undefined)}
+              >
+                Annuler
+              </button>
+            )}
+          </div>
+          {trainingCosts.length === 0 ? (
+            <p className="muted">Aucune dépense sur cette période.</p>
+          ) : (
+            <div className="dashboard-table">
+              {trainingCosts.map((cost) => (
+                <div key={cost.id}>
+                  <span>
+                    <strong>{cost.training.title}</strong>
+                    <small>
+                      {cost.date} · {cost.label}
+                    </small>
+                  </span>
+                  <strong>{money(cost.amountMinor)}</strong>
+                  <button
+                    type="button"
+                    className="secondary-button compact-button"
+                    onClick={() => setEditing(cost)}
+                  >
+                    Modifier
+                  </button>
+                  <button
+                    type="button"
+                    className="danger-button"
+                    onClick={() => void remove(cost)}
+                  >
+                    Supprimer
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </form>
+      </div>
+    </section>
+  );
+}
+
+function DashboardResults({ data }: { data: DashboardData }) {
+  return (
+    <>
+      <div className="metric-grid">
+        {Object.entries(data.overview.counts).map(([label, value]) => (
+          <article className="metric-card" key={label}>
+            <span>{label}</span>
+            <strong>{value}</strong>
+          </article>
+        ))}
+      </div>
+      <div className="dashboard-panels">
+        <article className="content-card">
+          <h2>Participation</h2>
+          <strong>
+            {percent(data.participation.overall.participationPercent)}
+          </strong>
+          <p>
+            {data.participation.overall.present}/
+            {data.participation.overall.expected} présences attendues
+          </p>
+        </article>
+        <article className="content-card">
+          <h2>Apprentissage</h2>
+          <p>
+            Progression :{' '}
+            <strong>
+              {percent(data.progress.selfPaced.averagePercentage)}
+            </strong>
+          </p>
+          <p>
+            Réussite :{' '}
+            <strong>{percent(data.progress.evaluations.passPercent)}</strong>
+          </p>
+        </article>
+        <article className="content-card">
+          <h2>Satisfaction</h2>
+          <strong>
+            {data.satisfaction.global.average === null
+              ? 'Aucun avis'
+              : `${data.satisfaction.global.average}/5`}
+          </strong>
+          <p>{data.satisfaction.global.count} avis</p>
+        </article>
+      </div>
+      <div className="metric-grid">
+        <article className="metric-card">
+          <span>Revenus payés</span>
+          <strong>{money(data.profitability.revenueMinor)}</strong>
+        </article>
+        <article className="metric-card">
+          <span>Coûts formateurs</span>
+          <strong>{money(data.profitability.trainerCostsMinor)}</strong>
+        </article>
+        <article className="metric-card">
+          <span>Dépenses formations</span>
+          <strong>{money(data.profitability.trainingCostsMinor)}</strong>
+        </article>
+        <article className="metric-card">
+          <span>Résultat global</span>
+          <strong>{money(data.profitability.resultMinor)}</strong>
+          <small>{percent(data.profitability.profitabilityPercent)}</small>
+        </article>
+      </div>
+      <TrainingResults rows={data.profitability.byTraining} />
+    </>
+  );
+}
+
+function TrainingResults({ rows }: { rows: Profitability['byTraining'] }) {
+  if (rows.length === 0)
+    return (
+      <div className="empty-state">
+        <h2>Aucun mouvement par formation</h2>
+      </div>
+    );
+  return (
+    <div className="content-card dashboard-table">
+      <h2>Résultat avant coûts fixes des formateurs</h2>
+      {rows.map((row) => (
+        <div key={row.training.id}>
+          <span>{row.training.title}</span>
+          <strong>{money(row.resultBeforeFixedTrainerCostsMinor)}</strong>
+        </div>
+      ))}
+    </div>
+  );
+}

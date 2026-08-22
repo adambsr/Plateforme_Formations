@@ -266,15 +266,7 @@ Mobile
 → Payment status
 ```
 
-Statuts :
-
-```text
-PENDING
-PAID
-FAILED
-CANCELLED
-REFUNDED
-```
+Les statuts de paiement sont exactement ceux définis dans le Source of Truth.
 
 Ne crée pas de concept `UNPAID` / `IMPAYE`.
 

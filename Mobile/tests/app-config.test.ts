@@ -1,0 +1,8 @@
+import appConfig from '../app.json';
+
+describe('Expo application configuration', () => {
+  it('uses the project identity', () => {
+    expect(appConfig.expo.name).toBe('Plateforme de Formations');
+    expect(appConfig.expo.slug).toBe('plateforme-formations');
+  });
+});

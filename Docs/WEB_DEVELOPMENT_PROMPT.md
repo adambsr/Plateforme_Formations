@@ -249,15 +249,7 @@ Le webhook doit :
 
 Ne stocke jamais de données de carte sensibles.
 
-Statuts de paiement à utiliser, sauf décision technique justifiée :
-
-```text
-PENDING
-PAID
-FAILED
-CANCELLED
-REFUNDED
-```
+Les statuts de paiement sont exactement ceux définis dans le Source of Truth.
 
 N'introduis pas un concept métier `UNPAID` / `IMPAYE`.
 

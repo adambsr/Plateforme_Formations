@@ -1,0 +1,42 @@
+{
+  "name": "plateforme-formations",
+  "version": "0.1.0",
+  "private": true,
+  "workspaces": [
+    "Web/backend",
+    "Web/frontend",
+    "Mobile"
+  ],
+  "scripts": {
+    "build": "npm run build --workspace @plateforme-formations/backend && npm run build --workspace @plateforme-formations/frontend",
+    "check": "npm run format:check && npm run lint && npm run typecheck && npm run test && npm run build",
+    "ci": "npm run check && docker compose config",
+    "dev:backend": "npm run dev --workspace @plateforme-formations/backend",
+    "dev:frontend": "npm run dev --workspace @plateforme-formations/frontend",
+    "dev:mobile": "npm run start --workspace @plateforme-formations/mobile",
+    "docker:down": "docker compose down",
+    "docker:config": "docker compose config",
+    "docker:logs": "docker compose logs --follow",
+    "docker:up": "docker compose up --build --detach --wait",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "lint": "npm run lint --workspace @plateforme-formations/backend && npm run lint --workspace @plateforme-formations/frontend && npm run lint --workspace @plateforme-formations/mobile",
+    "seed:admin": "npm run build --workspace @plateforme-formations/backend && npm run seed:admin --workspace @plateforme-formations/backend",
+    "test": "npm run test --workspace @plateforme-formations/backend && npm run test --workspace @plateforme-formations/frontend && npm run test --workspace @plateforme-formations/mobile",
+    "test:integration": "npm run test:integration --workspace @plateforme-formations/backend",
+    "typecheck": "npm run typecheck --workspace @plateforme-formations/backend && npm run typecheck --workspace @plateforme-formations/frontend && npm run typecheck --workspace @plateforme-formations/mobile"
+  },
+  "devDependencies": {
+    "oxlint": "^1.79.0",
+    "prettier": "^3.9.6"
+  },
+  "engines": {
+    "node": ">=24.0.0",
+    "npm": ">=11.0.0"
+  },
+  "packageManager": "npm@11.17.0",
+  "allowScripts": {
+    "esbuild@0.28.2": true,
+    "@scarf/scarf@1.4.0": false
+  }
+}

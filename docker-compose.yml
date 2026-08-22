@@ -1,0 +1,112 @@
+name: plateforme-formations
+
+services:
+  mongodb:
+    image: mongo:8.0.29-noble
+    command:
+      - --replSet
+      - rs0
+      - --bind_ip_all
+      - --oplogSize
+      - '128'
+    ports:
+      - '127.0.0.1:27017:27017'
+    volumes:
+      - mongodb_data:/data/db
+    healthcheck:
+      test:
+        [
+          'CMD',
+          'mongosh',
+          '--host',
+          'localhost',
+          '--quiet',
+          '--eval',
+          'quit(db.adminCommand({ ping: 1 }).ok ? 0 : 1)',
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
+    restart: unless-stopped
+
+  mongodb-init:
+    image: mongo:8.0.29-noble
+    depends_on:
+      mongodb:
+        condition: service_healthy
+    entrypoint: ['mongosh']
+    command:
+      - mongodb://mongodb:27017/admin
+      - --quiet
+      - /scripts/init-replica-set.js
+    volumes:
+      - ./Web/backend/docker/init-replica-set.js:/scripts/init-replica-set.js:ro
+    restart: 'no'
+
+  mailpit:
+    image: axllent/mailpit:v1.30.3
+    ports:
+      - '127.0.0.1:8025:8025'
+    restart: unless-stopped
+
+  backend:
+    build:
+      context: .
+      dockerfile: Web/backend/Dockerfile
+    depends_on:
+      mongodb-init:
+        condition: service_completed_successfully
+      mailpit:
+        condition: service_started
+    environment:
+      NODE_ENV: development
+      PORT: 3000
+      MONGODB_URI: mongodb://mongodb:27017/plateforme_formations?replicaSet=rs0&directConnection=true
+      WEB_APP_URL: http://localhost:5173
+      CORS_ORIGINS: http://localhost:5173
+      TZ: UTC
+      LOG_LEVEL: info
+      JWT_ACCESS_SECRET: compose-only-secret-that-is-at-least-32-characters
+      JWT_ACCESS_TTL_MINUTES: 15
+      REFRESH_TOKEN_TTL_DAYS: 7
+      PASSWORD_RESET_TTL_MINUTES: 30
+      SMTP_HOST: mailpit
+      SMTP_PORT: 1025
+      SMTP_SECURE: 'false'
+      SMTP_FROM: Plateforme de Formations <no-reply@example.com>
+      STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:-sk_test_compose_placeholder}
+      STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET:-whsec_compose_placeholder}
+      STRIPE_SUCCESS_URL: ${STRIPE_SUCCESS_URL:-http://localhost:5173/payments/success}
+      STRIPE_CANCEL_URL: ${STRIPE_CANCEL_URL:-http://localhost:5173/payments/cancel}
+      UPLOAD_DIR: /app/uploads
+      MAX_UPLOAD_SIZE_MB: 20
+      AI_API_KEY: ${AI_API_KEY:-compose-placeholder}
+      AI_MODEL: ${AI_MODEL:-gemini-3.7-flash}
+      AI_BASE_URL: ${AI_BASE_URL:-}
+      AI_MAX_CONTEXT_CHARS: ${AI_MAX_CONTEXT_CHARS:-100000}
+      CENTER_NAME: Centre de Formation
+      CENTER_ADDRESS: Adresse du centre
+      CENTER_EMAIL: contact@example.com
+    ports:
+      - '127.0.0.1:3000:3000'
+    volumes:
+      - backend_uploads:/app/uploads
+    healthcheck:
+      test:
+        [
+          'CMD',
+          'node',
+          '-e',
+          "fetch('http://localhost:3000/api/health').then(response => { if (!response.ok) process.exit(1) }).catch(() => process.exit(1))",
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
+    init: true
+    restart: unless-stopped
+
+volumes:
+  mongodb_data:
+  backend_uploads:

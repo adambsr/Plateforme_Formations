@@ -1,0 +1,411 @@
+# Plateforme de Formations
+
+Monorepo for the shared Web/Mobile training platform. The implementation follows
+`Docs/SOURCE_OF_TRUTH.md`, then `PLAN.md`, then the client development prompts.
+
+## Current implementation phase
+
+Phases 0 through 11 are complete. The repository provides the engineering foundation, shared
+authentication and user management, the Training catalogue and ownership slice, protected
+training content, in-person Session planning, and the Stripe test-mode payment, Enrollment, and
+Invoice access boundary, self-paced progression, in-person Attendance completion, complete
+Evaluation attempts/grading, bounded Gemini-assisted draft question generation, Certificates, and
+immutable satisfaction Feedback, explicit costs, and the Admin statistics/profitability dashboard.
+Phase 12 (Web completion and hardening) is the next roadmap phase.
+
+## Phase 0 status
+
+Phase 0 provides the engineering foundation only:
+
+- an Express/Mongoose backend in `Web/backend`;
+- a Vite/React Web client in `Web/frontend`;
+- an Expo/React Native Mobile client in `Mobile`;
+- strict TypeScript, Oxlint, Prettier, tests, and production builds;
+- typed backend configuration, structured/redacted request logs, a central error contract,
+  database-aware health, and an OpenAPI shell;
+- MongoDB 8 as a single-node replica set plus persistent database and upload volumes;
+- a CI workflow that runs all checks and starts the real Compose stack.
+
+Phase 0 itself defined no business collections, indexes, data migrations, or seed data. Phase 1
+identity models now own their index declarations, which the backend initializes before it listens.
+The initial Admin seed uses `INITIAL_ADMIN_EMAIL` and `INITIAL_ADMIN_PASSWORD`; those values are
+validated only for the seed command and remain unnecessary for a normal backend start.
+
+## Phase 1 status
+
+Phase 1 includes:
+
+- strict User, refresh-session, and single-use password-reset persistence with the required unique,
+  lookup, and TTL indexes;
+- public Learner-only registration, login, 15-minute access JWTs, seven-day rotating refresh
+  tokens, logout, password reset, password change, and profile updates;
+- an idempotent initial-Admin CLI seed and Admin-only Trainer creation/deactivation;
+- mandatory first password change for seeded Admins and new Trainers before other protected work;
+- backend role/self authorization that re-checks the active user on every protected request;
+- Web auth/reset/profile/Admin-user screens, in-memory access tokens, secure refresh-cookie flow,
+  guards, and role layouts;
+- synchronized OpenAPI routes plus unit, Web, and real replica-set HTTP integration coverage.
+
+The Web refresh token is an `HttpOnly`, `SameSite=Lax` cookie (`Secure` in production). Mobile
+receives the same rotating refresh token in authenticated response bodies so its later client phase
+can store it in platform secure storage. MongoDB stores only token hashes, and password change,
+password reset, or account deactivation revokes every active refresh session for that user.
+
+## Phase 2 status
+
+Phase 2 includes:
+
+- archived-capable Training categories and strict Training persistence with catalogue/owner
+  indexes;
+- the exact immutable `SELF_PACED_ONLINE` and `IN_PERSON` types, strictly positive integer minor
+  unit TND prices, and the in-person attendance threshold default of 80 percent;
+- backend-enforced ownership: Trainer creators own their Training, Admin creators select an active
+  Trainer, and only an Admin can transfer ownership;
+- `DRAFT` to `PUBLISHED` to `ARCHIVED` lifecycle rules, public visibility limited to published
+  Training, and conflict-safe hard deletion of unused drafts only;
+- a public responsive catalogue/detail UI and authenticated Admin/owner management workspace with
+  loading, error, empty, filtering, lifecycle, category, and ownership-transfer states;
+- complete OpenAPI descriptions plus unit, Web, and real replica-set HTTP integration coverage.
+
+Self-paced publication checks for at least one active Module containing an active Lesson. An
+in-person Training may be published without a Session as required.
+
+## Phase 3 status
+
+Phase 3 includes:
+
+- ordered Modules, Lessons, and FILE or EXTERNAL_URL Resources, with archive and progress-safe
+  hard-deletion rules enforced by the backend;
+- self-paced publication validation against the persisted active content hierarchy;
+- Admin/owner authoring, assigned-Session-Trainer reading, and Enrollment-backed Learner reading;
+- generated, sharded local filenames and a persistent Compose upload volume, with no public static
+  file route or internal storage path in API responses;
+- extension, declared MIME, detected signature, maximum-size, SHA-256 checksum, and traversal
+  validation for PDF, PNG, JPEG, GIF, WebP, DOCX, PPTX, XLSX, ZIP, TXT, and CSV files;
+- HTTP(S)-only external links that are stored without server-side fetching;
+- a role-filtered Web content reader/authoring workspace and authenticated file downloads;
+- complete OpenAPI, unit, Web, and real replica-set HTTP integration coverage.
+
+Local files are removed only after their Resource is hard-deleted and no other Resource references
+the same stored path. Content with learner progress is archived instead of cascading history.
+Learner access depends on an Enrollment record, which Phase 5 creates only after a verified Stripe
+test webhook.
+
+## Phase 4 status
+
+Phase 4 includes:
+
+- in-person-only Sessions with the exact PLANNED, IN_PROGRESS, COMPLETED, and CANCELLED states;
+- any number of SessionSchedule dates, optional Module/Lesson associations, derived overall dates,
+  capacity, and available-seat views;
+- Admin/owner structural management and assignment of multiple active Trainers, while assigned
+  Trainers receive read/start/complete operational permissions only;
+- exact Trainer and normalized location/room overlap checks across non-cancelled Sessions, with
+  adjacent date ranges allowed;
+- cancellation blocked by Enrollment history, schedule deletion blocked by Attendance, Session
+  deletion blocked by Enrollment or Payment, and completion blocked until Attendance coverage is
+  complete;
+- a public available-Session view and a role-aware Web scheduling workspace with multiple-date,
+  assignment, lifecycle, loading, empty, error, and conflict states;
+- complete OpenAPI, unit, Web, and real replica-set HTTP integration coverage.
+
+The API accepts only ISO 8601 Session instants containing `Z` or an explicit offset and stores them
+as UTC dates. Web date inputs and displays use the IANA zone `Africa/Tunis`; server and container
+processes remain on `TZ=UTC`.
+
+## Phase 5 status
+
+Phase 5 includes:
+
+- Payment, Enrollment, Invoice, and InvoiceItem persistence with explicit uniqueness, lookup, and
+  financial-reporting indexes initialized during backend startup;
+- Learner-only hosted Stripe Checkout created from published Training and available Session data,
+  with the positive integer TND price sourced exclusively from the backend;
+- raw-body Stripe signature verification and transaction-backed, idempotent webhook fulfillment;
+- duplicate-Enrollment protection and an atomic in-person capacity gate without seat reservations;
+- Enrollment-backed paid content access, with Admin-wide and Learner-own payment, Enrollment, and
+  Invoice views while Trainers have no financial access;
+- immutable purchase, learner, issuer, and line-item snapshots plus idempotently generated,
+  protected Invoice PDFs;
+- responsive catalogue purchase controls, Checkout-return confirmation, and payment/Enrollment/
+  Invoice views with loading, empty, error, and conflict states;
+- synchronized OpenAPI documentation plus unit, Web, signed-webhook, PDF-content, and real
+  replica-set integration coverage.
+
+No Phase 5 seed or data migration is required. Startup creates the model indexes. Existing content
+access tests may construct Enrollment prerequisites directly, but production Enrollment creation
+is owned exclusively by successful verified payment fulfillment.
+
+## Phase 6 status
+
+Phase 6 includes:
+
+- LessonProgress persistence unique per Enrollment and Lesson, with learner/training lookup indexes;
+- Learner-only mark/unmark behavior resolved through the paid self-paced Enrollment;
+- server-calculated active-Lesson counts, percentages, and exact 100-percent completion;
+- archived Module/Lesson exclusion and recalculation when applicable published content changes;
+- Certificate issuance cutoff handling: applicable completion history is preserved, later Lessons
+  do not change the issued eligibility snapshot, and served progress becomes immutable;
+- progress-aware hard-deletion conflicts, a responsive Learner overview, and lesson-level controls;
+- synchronized OpenAPI, strict DTO/index tests, Web state tests, and real replica-set lifecycle
+  coverage.
+
+## Phase 7 status
+
+Phase 7 includes:
+
+- Attendance persistence unique per Enrollment and SessionSchedule with only PRESENT and ABSENT;
+- authorized bulk upsert by Admins and Trainers assigned to the Session, while owners without an
+  assignment receive no implicit Attendance permission;
+- explicit missing-entry representation: an unsupplied Attendance remains null and is never
+  interpreted as ABSENT;
+- unweighted per-schedule percentage calculation, Training threshold evaluation, and reusable
+  in-person completion results;
+- transactional full-coverage gating before Session completion and immutable Attendance afterward;
+- enrolled-Learner Session discovery, own schedule/Attendance views, and compact Admin/Trainer
+  roster entry with loading, empty, error, and conflict states;
+- synchronized OpenAPI and integration coverage for authorization, missing coverage, thresholds,
+  completion, and immutability.
+
+Phases 6 and 7 require no seed or one-off data migration. Backend startup initializes the
+LessonProgress and Attendance indexes. Existing Enrollments remain valid and acquire progress or
+Attendance records only when users perform the corresponding actions.
+
+## Phase 8 status
+
+Phase 8 includes owner-only draft Evaluation and objective Question authoring, publication and
+archive rules, one published certifying Evaluation per Training, enrolled-Learner Attempts with
+server timestamps and optional expiry, exact-set automatic grading without partial credit,
+immutable submitted/expired answer snapshots, answer release only after a pass or final attempt,
+and owner/Admin result views. The Web workspace supports authoring, review, lifecycle actions,
+timed attempts, immediate results, and role-specific loading, empty, validation, and error states.
+
+## Phase 9 status
+
+Phase 9 adds on-demand text extraction for text PDFs, DOCX, PPTX, and TXT, a deterministic
+`AI_MAX_CONTEXT_CHARS` bound, and selected-Training-only context construction. Unsupported,
+no-text, and failed resources are reported explicitly; there is no OCR, URL crawling, embedding,
+vector store, or RAG. The backend calls Gemini with a JSON schema, validates the response again
+with the same question DTO, and transactionally imports only draft questions. The owner must
+review/edit/delete the proposals and explicitly publish; AI cannot publish or designate a
+certifying Evaluation.
+
+Phases 8 and 9 require no seed or one-off migration. Backend startup initializes the Evaluation,
+Question, Attempt, and Answer indexes. Existing Trainings and Enrollments remain valid.
+
+## Phase 10 status
+
+Phase 10 adds one shared backend eligibility calculation for self-paced completion, completed
+in-person Session attendance, and any designated certifying Evaluation. No role, including Admin,
+can force issuance or Feedback while those rules fail. Certificate generation is idempotent per
+Enrollment, snapshots Learner, Training, completion evidence, relevant dates/duration, and centre
+identity, and materializes an authorization-protected PDF without changing the Certificate number.
+Learners can submit one immutable integer 1-to-5 rating per eligible Enrollment, with no comment,
+edit, moderation, or public display. Admin statistics expose count, average, and the complete
+1-to-5 distribution globally and per Training. The Web workspace includes Learner generation,
+download, and rating controls, Admin issuance/satisfaction views, and relevant Trainer Certificate
+history.
+
+Phase 10 requires no seed, backfill, or one-off data migration. Backend startup creates unique
+Certificate indexes for Enrollment and number plus Feedback Enrollment and Training/rating
+indexes. Existing Enrollments remain valid and produce records only on an authorized request after
+current eligibility is recalculated. Generated PDFs live below the persistent configured
+`UPLOAD_DIR`; preserve and back up that volume together with MongoDB.
+
+## Phase 11 status
+
+Phase 11 adds Admin-only monthly `TrainerCost` upserts, unique by Trainer/year/month, and explicit
+dated `TrainingCost` records optionally linked to a matching Session. All money remains positive
+integer TND millimes. The backend calculates operational counts, schedule-based participation,
+self-paced progression, Evaluation results, satisfaction, paid revenue, costs, result, and
+profitability through MongoDB aggregations over explicit inclusive `Africa/Tunis` calendar-date
+ranges. Trainer costs apply only when the selected range contains their complete calendar month.
+Zero revenue returns `null` profitability. Per-Training reporting subtracts explicit Training
+costs only and is labelled as result before fixed Trainer costs; salaries are never inferred or
+allocated to a Training.
+
+The responsive Admin Web dashboard provides period filtering, loading/error/empty states, the
+centre metrics, monthly Trainer-cost upserts, and Training-cost create/edit/delete workflows.
+OpenAPI documents every cost and dashboard endpoint.
+
+Phase 11 requires no seed, backfill, or one-off data migration. Backend startup creates the unique
+Trainer/month index and the Trainer calendar, Training-cost period, and Training/Session target
+indexes. Existing Payments, Enrollments, Attendance, progress, Evaluations, and Feedback remain
+unchanged; dashboard values are calculated from their existing persisted records.
+
+## Prerequisites
+
+- Node.js 24.19 or newer in the Node 24 line
+- npm 11.17 or newer
+- Docker Desktop with Docker Compose
+
+## Local setup
+
+Install the workspace dependencies:
+
+```sh
+npm ci
+```
+
+Copy the examples before running applications directly:
+
+```powershell
+Copy-Item Web/backend/.env.example Web/backend/.env
+Copy-Item Web/frontend/.env.example Web/frontend/.env
+Copy-Item Mobile/.env.example Mobile/.env
+```
+
+Replace every placeholder with a suitable local value. The backend fails before listening when
+required configuration is missing or invalid. It accepts Stripe test keys only. Empty SMTP user
+and password values select an unauthenticated local SMTP server; otherwise both values are
+required. Keep all real secrets out of Git.
+
+Run an individual application from the repository root:
+
+```sh
+npm run dev:backend
+npm run dev:frontend
+npm run dev:mobile
+```
+
+The backend expects a transaction-capable MongoDB replica set. The easiest supported local path
+is Compose:
+
+```sh
+npm run docker:up
+```
+
+Compose builds the backend, initializes the idempotent `rs0` replica set, waits for database and
+API health, starts a local SMTP capture service, and binds exposed ports to loopback only. Its
+checked-in credentials and provider values are non-production placeholders used to validate
+integration boundaries; they do not grant access to any external service.
+
+`plateforme-formations-mongodb-init-1` is intentionally a one-shot initialization container. It
+waits for MongoDB, creates or confirms replica set `rs0`, and then exits with status 0. An
+`Exited (0)` state is success, not an unavailable database; the long-running `mongodb` and
+`backend` services should remain healthy.
+
+Useful endpoints after startup:
+
+- API health: <http://127.0.0.1:3000/api/health>
+- OpenAPI JSON: <http://127.0.0.1:3000/api/openapi.json>
+- Swagger UI: <http://127.0.0.1:3000/api/docs/>
+- Mailpit development inbox: <http://127.0.0.1:8025/>
+
+Useful lifecycle commands:
+
+```sh
+npm run docker:config
+npm run docker:logs
+npm run docker:down
+```
+
+`docker:down` preserves the named `mongodb_data` and `backend_uploads` volumes. Deleting those
+volumes destroys local database and uploaded-file data and is not part of the normal workflow.
+
+## Initial Admin seed
+
+Set `MONGODB_URI`, `INITIAL_ADMIN_EMAIL`, and `INITIAL_ADMIN_PASSWORD` in the untracked
+`Web/backend/.env`, then run:
+
+```sh
+npm run seed:admin
+```
+
+The command creates an `ADMIN` only when no Admin exists. It normalizes the email, stores only a
+salted password hash, marks the account active, and requires a password change at first login.
+Repeated runs leave the existing Admin unchanged. If the configured email already belongs to a
+non-Admin, the command fails instead of promoting that account. The MVP permits only the initial
+Admin, enforced by a partial unique database index.
+
+For MongoDB Atlas, use a complete rotated connection string with the database name included, keep
+it only in `.env`, and allow the machine's current IP in Atlas Network Access. Never commit or paste
+database credentials into source files, issue trackers, or chat.
+
+## Stripe test boundary
+
+Phase 5 calls Stripe only in test mode. `STRIPE_SECRET_KEY` must begin with `sk_test_`, while the
+checked-in defaults are inert placeholders that keep the local stack configurable but cannot create
+a real Checkout Session. For a directly started backend, put the account's test secret key in the
+untracked `Web/backend/.env`. For Compose, copy the repository-root `.env.example` to `.env` and
+replace its Stripe placeholders; Compose reads those ignored overrides without changing tracked
+YAML. Then forward test webhooks to the raw-body endpoint and use the signing secret printed by the
+Stripe CLI:
+
+```powershell
+stripe listen --forward-to http://127.0.0.1:3000/api/payments/webhook/stripe
+```
+
+Set that `whsec_...` value as `STRIPE_WEBHOOK_SECRET`, restart the backend, and use Stripe's test
+payment methods through the hosted Checkout page. Checkout redirects are never treated as proof of
+payment: the Web client waits for backend status, and only a verified successful webhook can create
+the Enrollment and Invoice. Automated tests use an injected Checkout adapter and locally signed
+webhook fixtures, so they create no Stripe objects or charges. Never place account secrets in
+Compose or Git. Production support for a Tunisia-established Stripe account remains a separate
+pre-launch readiness check.
+
+## Gemini AI question generation
+
+This implementation uses the Gemini API. Create a Gemini API auth key in Google AI Studio and
+keep it backend-only. For Docker Compose, put these values in the ignored repository-root `.env`:
+
+```dotenv
+AI_API_KEY=your_real_gemini_key
+AI_MODEL=gemini-3.7-flash
+AI_MAX_CONTEXT_CHARS=100000
+```
+
+For `npm run dev:backend` without Compose, put the same values in the ignored
+`Web/backend/.env` instead. Do not add the key to Web, Mobile, tracked `.env.example` files,
+source code, or `docker-compose.yml`. Leave `AI_BASE_URL` empty for Google's normal endpoint and
+restart/rebuild the backend after changing environment values.
+
+When an owner clicks **Générer avec Gemini**, the backend gathers only that Evaluation's selected
+Training context, sends bounded educational text with a strict JSON schema, validates the response
+locally, and imports editable questions into the `DRAFT` Evaluation. It never sends Learner,
+Attendance, Payment, or other Training data, and it never publishes. Production use still sends
+Training content to an external provider, so use the centre's approved Google project, quota,
+billing, and data policy.
+
+## Quality and CI
+
+Run the complete local quality gate:
+
+```sh
+npm run check
+```
+
+This checks formatting, linting, strict types (including tests), all workspace tests, and backend
+and Web builds. `npm run ci` adds Compose configuration validation. GitHub Actions also builds and
+starts the stack, checks the HTTP health endpoint and writable MongoDB primary, runs the Phase 1
+through Phase 10 integration lifecycles, prints logs on failure, and removes only its disposable CI
+volumes.
+
+To run that transaction-backed integration lifecycle locally after Compose is healthy:
+
+```powershell
+$env:TEST_MONGODB_URI = 'mongodb://127.0.0.1:27017/plateforme_formations_integration?replicaSet=rs0&directConnection=true'
+npm run test:integration
+```
+
+The integration command accepts only the dedicated
+`plateforme_formations_integration` database name and cleans that test database's phase-specific
+collections before and after each integration suite.
+
+## Backend environment contract
+
+The complete annotated contract is in `Web/backend/.env.example`. It covers application/database,
+JWT lifetime and secret values, SMTP, Stripe test mode, local uploads, the backend-only AI adapter,
+and immutable centre identity. Defaults are limited to the values documented by `PLAN.md`:
+`PORT=3000`, `TZ=UTC`, `LOG_LEVEL=info`, access JWT 15 minutes, refresh token 7 days, password reset
+30 minutes, upload size 20 MB, and AI context 100,000 characters.
+
+Web and Mobile build-time public values live in their respective `.env.example` files. Secret
+provider values must remain backend-only.
+
+## Architecture boundaries
+
+`Web/backend` is the only backend for both clients. Business rules, validation, and authorization
+belong there. Client packages may handle presentation and local interaction state but must not
+duplicate backend business decisions. New functionality should be added phase-by-phase as the
+vertical slices in `PLAN.md`; later-phase entities and workflows should not be scaffolded early.

@@ -1,0 +1,8 @@
+Docs/
+PLAN.md
+AGENTS.md
+Mobile/LICENSE
+node_modules/
+dist/
+coverage/
+package-lock.json
