@@ -8,7 +8,7 @@
     "build": "tsc -b && vite build",
     "lint": "oxlint src vite.config.ts",
     "preview": "vite preview",
-    "test": "vitest run",
+    "test": "vitest run --maxWorkers=1",
     "test:watch": "vitest",
     "typecheck": "tsc -b"
   },

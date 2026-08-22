@@ -128,7 +128,7 @@ describe('Phase 2 management routes', () => {
       await screen.findByRole('heading', { name: 'Aucune formation gérée' }),
     ).toBeVisible();
     expect(fetchMock).toHaveBeenCalledWith(
-      expect.stringContaining('/trainings?view=MANAGED&pageSize=100'),
+      expect.stringContaining('/trainings?view=MANAGED&page=1&pageSize=12'),
       expect.objectContaining({ credentials: 'include' }),
     );
   });

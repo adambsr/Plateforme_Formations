@@ -126,6 +126,23 @@ export function createApp({
 
   app.disable('x-powered-by');
   app.use(requestLogging(logger));
+  app.use((_request, response, next) => {
+    response.setHeader('X-Content-Type-Options', 'nosniff');
+    response.setHeader('X-Frame-Options', 'DENY');
+    response.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+    response.setHeader(
+      'Permissions-Policy',
+      'camera=(), microphone=(), geolocation=()',
+    );
+    response.setHeader('Cross-Origin-Opener-Policy', 'same-origin');
+    if (config.application.nodeEnv === 'production') {
+      response.setHeader(
+        'Strict-Transport-Security',
+        'max-age=31536000; includeSubDomains',
+      );
+    }
+    next();
+  });
   app.use(cors({ origin: config.application.corsOrigins, credentials: true }));
   app.post(
     '/api/payments/webhook/stripe',

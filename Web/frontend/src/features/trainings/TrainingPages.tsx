@@ -5,6 +5,8 @@ import { Link, useParams } from 'react-router';
 import { ApiError, apiRequest } from '../../core/api/client.js';
 import { useAuth } from '../../core/auth/AuthContext.js';
 import type { PaginatedUsers, User } from '../../core/auth/types.js';
+import { Pagination } from '../../shared/components/Pagination.js';
+import { Select } from '../../shared/components/Select.js';
 import { PublicTrainingSessions } from '../sessions/SessionPages.js';
 import type {
   PaginatedTrainings,
@@ -55,21 +57,6 @@ function parseTndMinor(value: string): number | undefined {
   const decimals = Number((match[2] ?? '').padEnd(2, '0'));
   const minor = units * 100 + decimals;
   return Number.isSafeInteger(minor) && minor > 0 ? minor : undefined;
-}
-
-function PublicCatalogueHeader() {
-  return (
-    <header className="catalogue-header">
-      <Link className="brand-link" to="/catalogue">
-        Plateforme de Formations
-      </Link>
-      <nav aria-label="Navigation publique">
-        <Link to="/catalogue">Catalogue</Link>
-        <Link to="/login">Connexion</Link>
-        <Link to="/register">Inscription</Link>
-      </nav>
-    </header>
-  );
 }
 
 function TrainingCard({ training }: { training: Training }) {
@@ -155,7 +142,7 @@ export function CataloguePage({ embedded = false }: { embedded?: boolean }) {
       <div className="catalogue-filters" aria-label="Filtres du catalogue">
         <label>
           Catégorie
-          <select
+          <Select
             value={categoryId}
             onChange={(event) => {
               setCategoryId(event.target.value);
@@ -168,11 +155,11 @@ export function CataloguePage({ embedded = false }: { embedded?: boolean }) {
                 {category.name}
               </option>
             ))}
-          </select>
+          </Select>
         </label>
         <label>
           Modalité
-          <select
+          <Select
             value={type}
             onChange={(event) => {
               setType(event.target.value);
@@ -182,7 +169,7 @@ export function CataloguePage({ embedded = false }: { embedded?: boolean }) {
             <option value="">Toutes</option>
             <option value="SELF_PACED_ONLINE">En ligne autonome</option>
             <option value="IN_PERSON">Présentiel</option>
-          </select>
+          </Select>
         </label>
       </div>
       {loading ? (
@@ -230,14 +217,7 @@ export function CataloguePage({ embedded = false }: { embedded?: boolean }) {
     </section>
   );
 
-  return embedded ? (
-    content
-  ) : (
-    <div className="public-shell">
-      <PublicCatalogueHeader />
-      <main className="catalogue-page">{content}</main>
-    </div>
-  );
+  return embedded ? content : <div className="catalogue-page">{content}</div>;
 }
 
 export function TrainingDetailPage() {
@@ -292,109 +272,105 @@ export function TrainingDetailPage() {
   }
 
   return (
-    <div className="public-shell">
-      <PublicCatalogueHeader />
-      <main className="training-detail-page">
-        <Link to="/catalogue">← Retour au catalogue</Link>
-        {loading ? (
-          <p className="muted">Chargement de la formation…</p>
-        ) : routeError !== '' || error !== '' || training === null ? (
-          <div className="form-error" role="alert">
-            {routeError || error || 'Formation introuvable.'}
+    <div className="training-detail-page">
+      <Link to="/catalogue">← Retour au catalogue</Link>
+      {loading ? (
+        <p className="muted">Chargement de la formation…</p>
+      ) : routeError !== '' || error !== '' || training === null ? (
+        <div className="form-error" role="alert">
+          {routeError || error || 'Formation introuvable.'}
+        </div>
+      ) : (
+        <article className="training-detail">
+          <div>
+            <span className="eyebrow">{training.category.name}</span>
+            <h1>{training.title}</h1>
+            <p className="lead">{training.description}</p>
           </div>
-        ) : (
-          <article className="training-detail">
+          <dl className="training-facts training-detail-facts">
             <div>
-              <span className="eyebrow">{training.category.name}</span>
-              <h1>{training.title}</h1>
-              <p className="lead">{training.description}</p>
+              <dt>Modalité</dt>
+              <dd>{typeLabel(training.type)}</dd>
             </div>
-            <dl className="training-facts training-detail-facts">
-              <div>
-                <dt>Modalité</dt>
-                <dd>{typeLabel(training.type)}</dd>
-              </div>
-              <div>
-                <dt>Niveau</dt>
-                <dd>{training.level}</dd>
-              </div>
-              <div>
-                <dt>Durée</dt>
-                <dd>{formatDuration(training.durationMinutes)}</dd>
-              </div>
-              <div>
-                <dt>Prix</dt>
-                <dd>{formatPrice(training.priceMinor)}</dd>
-              </div>
-            </dl>
-            <div className="detail-columns">
-              <section>
-                <h2>Objectifs</h2>
-                {training.objectives.length === 0 ? (
-                  <p className="muted">Aucun objectif détaillé.</p>
-                ) : (
-                  <ul>
-                    {training.objectives.map((objective) => (
-                      <li key={objective}>{objective}</li>
-                    ))}
-                  </ul>
-                )}
-              </section>
-              <section>
-                <h2>Prérequis</h2>
-                {training.prerequisites.length === 0 ? (
-                  <p className="muted">Aucun prérequis.</p>
-                ) : (
-                  <ul>
-                    {training.prerequisites.map((prerequisite) => (
-                      <li key={prerequisite}>{prerequisite}</li>
-                    ))}
-                  </ul>
-                )}
-              </section>
+            <div>
+              <dt>Niveau</dt>
+              <dd>{training.level}</dd>
             </div>
-            <p className="muted">
-              Formateur :{' '}
-              {[training.ownerTrainer.firstName, training.ownerTrainer.lastName]
-                .filter(Boolean)
-                .join(' ') || 'Formateur du centre'}
+            <div>
+              <dt>Durée</dt>
+              <dd>{formatDuration(training.durationMinutes)}</dd>
+            </div>
+            <div>
+              <dt>Prix</dt>
+              <dd>{formatPrice(training.priceMinor)}</dd>
+            </div>
+          </dl>
+          <div className="detail-columns">
+            <section>
+              <h2>Objectifs</h2>
+              {training.objectives.length === 0 ? (
+                <p className="muted">Aucun objectif détaillé.</p>
+              ) : (
+                <ul>
+                  {training.objectives.map((objective) => (
+                    <li key={objective}>{objective}</li>
+                  ))}
+                </ul>
+              )}
+            </section>
+            <section>
+              <h2>Prérequis</h2>
+              {training.prerequisites.length === 0 ? (
+                <p className="muted">Aucun prérequis.</p>
+              ) : (
+                <ul>
+                  {training.prerequisites.map((prerequisite) => (
+                    <li key={prerequisite}>{prerequisite}</li>
+                  ))}
+                </ul>
+              )}
+            </section>
+          </div>
+          <p className="muted">
+            Formateur :{' '}
+            {[training.ownerTrainer.firstName, training.ownerTrainer.lastName]
+              .filter(Boolean)
+              .join(' ') || 'Formateur du centre'}
+          </p>
+          {checkoutError !== '' && (
+            <p className="form-error" role="alert">
+              {checkoutError}
             </p>
-            {checkoutError !== '' && (
-              <p className="form-error" role="alert">
-                {checkoutError}
-              </p>
-            )}
-            {user === null ? (
-              <Link className="primary-link" to="/login">
-                Se connecter pour acheter
-              </Link>
-            ) : user.role === 'LEARNER' &&
-              training.type === 'SELF_PACED_ONLINE' ? (
-              <button
-                className="primary-button purchase-button"
-                disabled={purchasingSessionId !== undefined}
-                onClick={() => void checkout()}
-              >
-                {purchasingSessionId === 'SELF_PACED'
-                  ? 'Redirection vers Stripe…'
-                  : 'Acheter avec Stripe test'}
-              </button>
-            ) : null}
-            {training.type === 'IN_PERSON' && (
-              <PublicTrainingSessions
-                trainingId={training.id}
-                purchasingSessionId={purchasingSessionId}
-                {...(user?.role === 'LEARNER'
-                  ? {
-                      onPurchase: (sessionId: string) =>
-                        void checkout(sessionId),
-                    }
-                  : {})}
-              />
-            )}
-          </article>
-        )}
-      </main>
+          )}
+          {user === null ? (
+            <Link className="primary-link" to="/login">
+              Se connecter pour acheter
+            </Link>
+          ) : user.role === 'LEARNER' &&
+            training.type === 'SELF_PACED_ONLINE' ? (
+            <button
+              className="primary-button purchase-button"
+              disabled={purchasingSessionId !== undefined}
+              onClick={() => void checkout()}
+            >
+              {purchasingSessionId === 'SELF_PACED'
+                ? 'Redirection vers Stripe…'
+                : 'Acheter avec Stripe test'}
+            </button>
+          ) : null}
+          {training.type === 'IN_PERSON' && (
+            <PublicTrainingSessions
+              trainingId={training.id}
+              purchasingSessionId={purchasingSessionId}
+              {...(user?.role === 'LEARNER'
+                ? {
+                    onPurchase: (sessionId: string) => void checkout(sessionId),
+                  }
+                : {})}
+            />
+          )}
+        </article>
+      )}
     </div>
   );
 }
@@ -439,7 +415,7 @@ function OwnerTransfer({
   const [ownerId, setOwnerId] = useState(training.ownerTrainer.id);
   return (
     <div className="inline-action">
-      <select
+      <Select
         aria-label={`Nouveau propriétaire de ${training.title}`}
         value={ownerId}
         onChange={(event) => setOwnerId(event.target.value)}
@@ -451,7 +427,7 @@ function OwnerTransfer({
               {trainer.profile.firstName} {trainer.profile.lastName}
             </option>
           ))}
-      </select>
+      </Select>
       <button
         className="secondary-button"
         disabled={ownerId === training.ownerTrainer.id}
@@ -467,6 +443,10 @@ export function TrainingManagementPage() {
   const { request: authenticatedRequest, user } = useAuth();
   const [categories, setCategories] = useState<TrainingCategory[]>([]);
   const [trainings, setTrainings] = useState<Training[]>([]);
+  const [trainingPage, setTrainingPage] = useState<PaginatedTrainings | null>(
+    null,
+  );
+  const [pageNumber, setPageNumber] = useState(1);
   const [trainers, setTrainers] = useState<User[]>([]);
   const [editing, setEditing] = useState<Training | null>(null);
   const [editingCategory, setEditingCategory] =
@@ -501,7 +481,7 @@ export function TrainingManagementPage() {
             : '/categories',
         ),
         authenticatedRequest<PaginatedTrainings>(
-          '/trainings?view=MANAGED&pageSize=100',
+          `/trainings?view=MANAGED&page=${pageNumber}&pageSize=12`,
         ),
         user.role === 'ADMIN'
           ? authenticatedRequest<PaginatedUsers>('/trainers?pageSize=100')
@@ -511,13 +491,14 @@ export function TrainingManagementPage() {
         await Promise.all(operations);
       setCategories(categoryResult);
       setTrainings(trainingResult.items);
+      setTrainingPage(trainingResult);
       setTrainers(trainerResult?.items ?? []);
     } catch (caught) {
       setError(errorMessage(caught));
     } finally {
       setLoading(false);
     }
-  }, [authenticatedRequest, user]);
+  }, [authenticatedRequest, pageNumber, user]);
 
   useEffect(() => {
     // Route entry synchronizes owner/Admin management data with the API.
@@ -575,7 +556,9 @@ export function TrainingManagementPage() {
           <span className="eyebrow">Catalogue</span>
           <h1>{user.role === 'ADMIN' ? 'Formations' : 'Mes formations'}</h1>
         </div>
-        <span className="count-badge">{trainings.length} formation(s)</span>
+        <span className="count-badge">
+          {trainingPage?.total ?? 0} formation(s)
+        </span>
       </div>
       {notice !== '' && <p className="success-message">{notice}</p>}
       {error !== '' && (
@@ -656,14 +639,14 @@ export function TrainingManagementPage() {
             <div className="form-grid">
               <label>
                 Catégorie
-                <select required {...form.register('categoryId')}>
+                <Select required {...form.register('categoryId')}>
                   <option value="">Sélectionner</option>
                   {activeCategories.map((category) => (
                     <option key={category.id} value={category.id}>
                       {category.name}
                     </option>
                   ))}
-                </select>
+                </Select>
               </label>
               <label>
                 Niveau
@@ -672,10 +655,10 @@ export function TrainingManagementPage() {
               <label>
                 Type immuable
                 {editing === null ? (
-                  <select {...form.register('type')}>
+                  <Select {...form.register('type')}>
                     <option value="SELF_PACED_ONLINE">En ligne autonome</option>
                     <option value="IN_PERSON">Présentiel</option>
-                  </select>
+                  </Select>
                 ) : (
                   <>
                     <input disabled value={typeLabel(editing.type)} />
@@ -717,7 +700,7 @@ export function TrainingManagementPage() {
             {user.role === 'ADMIN' && editing === null && (
               <label>
                 Formateur propriétaire
-                <select required {...form.register('ownerTrainerId')}>
+                <Select required {...form.register('ownerTrainerId')}>
                   <option value="">Sélectionner</option>
                   {trainers
                     .filter((trainer) => trainer.isActive)
@@ -726,7 +709,7 @@ export function TrainingManagementPage() {
                         {trainer.profile.firstName} {trainer.profile.lastName}
                       </option>
                     ))}
-                </select>
+                </Select>
               </label>
             )}
             <label>
@@ -878,115 +861,126 @@ export function TrainingManagementPage() {
             </p>
           </div>
         ) : (
-          trainings.map((training) => (
-            <article className="content-card" key={training.id}>
-              <div className="managed-training-heading">
-                <div>
-                  <span
-                    className={`status-pill status-${training.status.toLowerCase()}`}
-                  >
-                    {training.status}
-                  </span>
-                  <h2>{training.title}</h2>
-                  <p className="muted">
-                    {typeLabel(training.type)} · {training.category.name} ·{' '}
-                    {formatPrice(training.priceMinor)}
-                  </p>
-                </div>
-                <div className="management-actions">
-                  <Link
-                    className="secondary-button"
-                    to={`/app/trainings/${training.id}/content`}
-                  >
-                    Contenu
-                  </Link>
-                  {training.status !== 'ARCHIVED' && (
-                    <button
-                      className="secondary-button"
-                      onClick={() => beginEdit(training)}
+          <>
+            {trainings.map((training) => (
+              <article className="content-card" key={training.id}>
+                <div className="managed-training-heading">
+                  <div>
+                    <span
+                      className={`status-pill status-${training.status.toLowerCase()}`}
                     >
-                      Modifier
-                    </button>
-                  )}
-                  {training.status === 'DRAFT' && (
-                    <>
+                      {training.status}
+                    </span>
+                    <h2>{training.title}</h2>
+                    <p className="muted">
+                      {typeLabel(training.type)} · {training.category.name} ·{' '}
+                      {formatPrice(training.priceMinor)}
+                    </p>
+                  </div>
+                  <div className="management-actions">
+                    <Link
+                      className="secondary-button"
+                      to={`/app/trainings/${training.id}/content`}
+                    >
+                      Contenu
+                    </Link>
+                    {training.status !== 'ARCHIVED' && (
                       <button
-                        className="primary-button compact-button"
+                        className="secondary-button"
+                        onClick={() => beginEdit(training)}
+                      >
+                        Modifier
+                      </button>
+                    )}
+                    {training.status === 'DRAFT' && (
+                      <>
+                        <button
+                          className="primary-button compact-button"
+                          onClick={() =>
+                            void mutate(
+                              `/trainings/${training.id}/publish`,
+                              { method: 'POST' },
+                              'Formation publiée.',
+                            )
+                          }
+                        >
+                          Publier
+                        </button>
+                        <button
+                          className="danger-button"
+                          onClick={() => {
+                            if (
+                              window.confirm(
+                                'Supprimer définitivement ce brouillon inutilisé ?',
+                              )
+                            ) {
+                              void mutate(
+                                `/trainings/${training.id}`,
+                                { method: 'DELETE' },
+                                'Brouillon supprimé.',
+                              );
+                            }
+                          }}
+                        >
+                          Supprimer
+                        </button>
+                      </>
+                    )}
+                    {training.status === 'PUBLISHED' && (
+                      <button
+                        className="danger-button"
                         onClick={() =>
                           void mutate(
-                            `/trainings/${training.id}/publish`,
+                            `/trainings/${training.id}/archive`,
                             { method: 'POST' },
-                            'Formation publiée.',
+                            'Formation archivée.',
                           )
                         }
                       >
-                        Publier
+                        Archiver
                       </button>
-                      <button
-                        className="danger-button"
-                        onClick={() => {
-                          if (
-                            window.confirm(
-                              'Supprimer définitivement ce brouillon inutilisé ?',
-                            )
-                          ) {
-                            void mutate(
-                              `/trainings/${training.id}`,
-                              { method: 'DELETE' },
-                              'Brouillon supprimé.',
-                            );
-                          }
-                        }}
-                      >
-                        Supprimer
-                      </button>
-                    </>
-                  )}
-                  {training.status === 'PUBLISHED' && (
-                    <button
-                      className="danger-button"
-                      onClick={() =>
-                        void mutate(
-                          `/trainings/${training.id}/archive`,
-                          { method: 'POST' },
-                          'Formation archivée.',
-                        )
-                      }
-                    >
-                      Archiver
-                    </button>
-                  )}
+                    )}
+                  </div>
                 </div>
-              </div>
-              <p>{training.description}</p>
-              <p className="muted">
-                Propriétaire :{' '}
-                {[
-                  training.ownerTrainer.firstName,
-                  training.ownerTrainer.lastName,
-                ]
-                  .filter(Boolean)
-                  .join(' ') || training.ownerTrainer.id}
-              </p>
-              {user.role === 'ADMIN' && trainers.length > 0 && (
-                <OwnerTransfer
-                  key={`${training.id}:${training.ownerTrainer.id}`}
-                  training={training}
-                  trainers={trainers}
-                  transfer={async (ownerTrainerId) => {
-                    await mutate(
-                      `/trainings/${training.id}/owner`,
-                      {
-                        method: 'PUT',
-                        body: JSON.stringify({ ownerTrainerId }),
-                      },
-                      'Propriété transférée.',
-                    );
-                  }}
-                />
-              )}
-            </article>
-          ))
+                <p>{training.description}</p>
+                <p className="muted">
+                  Propriétaire :{' '}
+                  {[
+                    training.ownerTrainer.firstName,
+                    training.ownerTrainer.lastName,
+                  ]
+                    .filter(Boolean)
+                    .join(' ') || training.ownerTrainer.id}
+                </p>
+                {user.role === 'ADMIN' && trainers.length > 0 && (
+                  <OwnerTransfer
+                    key={`${training.id}:${training.ownerTrainer.id}`}
+                    training={training}
+                    trainers={trainers}
+                    transfer={async (ownerTrainerId) => {
+                      await mutate(
+                        `/trainings/${training.id}/owner`,
+                        {
+                          method: 'PUT',
+                          body: JSON.stringify({ ownerTrainerId }),
+                        },
+                        'Propriété transférée.',
+                      );
+                    }}
+                  />
+                )}
+              </article>
+            ))}
+            {trainingPage !== null && (
+              <Pagination
+                page={trainingPage.page}
+                pageSize={trainingPage.pageSize}
+                total={trainingPage.total}
+                onPageChange={setPageNumber}
+                label="Pagination des formations"
+              />
+            )}
+          </>
         )}
       </div>
     </section>

@@ -8,6 +8,8 @@ import {
 
 import { ApiError, apiRequest } from '../../core/api/client.js';
 import { useAuth } from '../../core/auth/AuthContext.js';
+import { Pagination } from '../../shared/components/Pagination.js';
+import { Select } from '../../shared/components/Select.js';
 import type { Training } from '../trainings/types.js';
 import { formatTunisDate, tunisInputToUtc } from './time.js';
 import type {
@@ -45,11 +47,12 @@ export function PublicTrainingSessions({
   purchasingSessionId?: string;
 }) {
   const [page, setPage] = useState<PaginatedSessions | null>(null);
+  const [pageNumber, setPageNumber] = useState(1);
   const [error, setError] = useState('');
   useEffect(() => {
     let active = true;
     void apiRequest<PaginatedSessions>(
-      `/sessions?view=PUBLIC&trainingId=${trainingId}&pageSize=100`,
+      `/sessions?view=PUBLIC&trainingId=${trainingId}&page=${pageNumber}&pageSize=6`,
     )
       .then((result) => {
         if (active) setPage(result);
@@ -60,7 +63,7 @@ export function PublicTrainingSessions({
     return () => {
       active = false;
     };
-  }, [trainingId]);
+  }, [pageNumber, trainingId]);
 
   return (
     <section className="public-sessions">
@@ -104,6 +107,13 @@ export function PublicTrainingSessions({
               )}
             </article>
           ))}
+          <Pagination
+            page={page.page}
+            pageSize={page.pageSize}
+            total={page.total}
+            onPageChange={setPageNumber}
+            label="Pagination des sessions disponibles"
+          />
         </div>
       )}
     </section>
@@ -117,6 +127,7 @@ function ScheduleForm({
   session: TrainingSession;
   mutate(path: string, options: RequestInit, notice: string): Promise<boolean>;
 }) {
+  const [validationError, setValidationError] = useState('');
   return (
     <form
       className="compact-form schedule-form"
@@ -131,8 +142,9 @@ function ScheduleForm({
         try {
           startAt = tunisInputToUtc(String(form.get('startAt')));
           endAt = tunisInputToUtc(String(form.get('endAt')));
+          setValidationError('');
         } catch (caught) {
-          window.alert(message(caught));
+          setValidationError(message(caught));
           return;
         }
         void mutate(
@@ -158,6 +170,11 @@ function ScheduleForm({
         });
       }}
     >
+      {validationError !== '' && (
+        <p className="form-error" role="alert">
+          {validationError}
+        </p>
+      )}
       <h4>Ajouter une date (heure de Tunis)</h4>
       <div className="form-grid">
         <label>
@@ -170,7 +187,7 @@ function ScheduleForm({
         </label>
         <label>
           Formateurs
-          <select
+          <Select
             name="trainerIds"
             multiple
             required
@@ -181,7 +198,7 @@ function ScheduleForm({
                 {name(trainer)}
               </option>
             ))}
-          </select>
+          </Select>
         </label>
         <label>
           Lieu spécifique
@@ -347,7 +364,7 @@ function ManagedSession({
           >
             <label>
               Formateurs affectés
-              <select
+              <Select
                 name="assignedTrainerIds"
                 multiple
                 required
@@ -358,7 +375,7 @@ function ManagedSession({
                     {name(trainer)}
                   </option>
                 ))}
-              </select>
+              </Select>
             </label>
             <button className="secondary-button">
               Enregistrer l’affectation
@@ -374,6 +391,10 @@ function ManagedSession({
 export function SessionManagementPage() {
   const { user, request } = useAuth();
   const [sessions, setSessions] = useState<TrainingSession[]>([]);
+  const [sessionPage, setSessionPage] = useState<PaginatedSessions | null>(
+    null,
+  );
+  const [pageNumber, setPageNumber] = useState(1);
   const [trainings, setTrainings] = useState<Training[]>([]);
   const [trainers, setTrainers] = useState<SessionTrainer[]>([]);
   const [loading, setLoading] = useState(true);
@@ -384,12 +405,15 @@ export function SessionManagementPage() {
     setLoading(true);
     setError('');
     try {
-      const [sessionPage, trainingPage, trainerList] = await Promise.all([
-        request<PaginatedSessions>('/sessions?view=MANAGED&pageSize=100'),
+      const [sessionResult, trainingPage, trainerList] = await Promise.all([
+        request<PaginatedSessions>(
+          `/sessions?view=MANAGED&page=${pageNumber}&pageSize=12`,
+        ),
         request<{ items: Training[] }>('/trainings?view=MANAGED&pageSize=100'),
         request<SessionTrainer[]>('/session-trainers'),
       ]);
-      setSessions(sessionPage.items);
+      setSessions(sessionResult.items);
+      setSessionPage(sessionResult);
       setTrainings(
         trainingPage.items.filter(({ type }) => type === 'IN_PERSON'),
       );
@@ -399,7 +423,7 @@ export function SessionManagementPage() {
     } finally {
       setLoading(false);
     }
-  }, [request]);
+  }, [pageNumber, request]);
 
   useEffect(() => {
     // Route entry synchronizes role-filtered Session management data.
@@ -434,7 +458,9 @@ export function SessionManagementPage() {
           <span className="eyebrow">Présentiel</span>
           <h1>Sessions et calendrier</h1>
         </div>
-        <span className="count-badge">{sessions.length} session(s)</span>
+        <span className="count-badge">
+          {sessionPage?.total ?? 0} session(s)
+        </span>
       </div>
       <p className="muted">
         Toutes les saisies et dates affichées utilisent le fuseau Africa/Tunis.
@@ -479,14 +505,14 @@ export function SessionManagementPage() {
           <div className="form-grid">
             <label>
               Formation
-              <select name="trainingId" required>
+              <Select name="trainingId" required>
                 <option value="">Sélectionner</option>
                 {trainings.map((training) => (
                   <option key={training.id} value={training.id}>
                     {training.title}
                   </option>
                 ))}
-              </select>
+              </Select>
             </label>
             <label>
               Titre
@@ -542,6 +568,15 @@ export function SessionManagementPage() {
               mutate={mutate}
             />
           ))}
+          {sessionPage !== null && (
+            <Pagination
+              page={sessionPage.page}
+              pageSize={sessionPage.pageSize}
+              total={sessionPage.total}
+              onPageChange={setPageNumber}
+              label="Pagination des sessions"
+            />
+          )}
         </div>
       )}
     </section>

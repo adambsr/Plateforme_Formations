@@ -7,11 +7,7 @@ import {
   RegisterPage,
   ResetPasswordPage,
 } from '../features/auth/AuthPages.js';
-import {
-  AdminUsersPage,
-  ProfilePage,
-  RoleHomePage,
-} from '../features/users/UserPages.js';
+import { AdminUsersPage, ProfilePage } from '../features/users/UserPages.js';
 import {
   CataloguePage,
   TrainingDetailPage,
@@ -29,6 +25,19 @@ import { AttendancePage } from '../features/attendance/AttendancePage.js';
 import { EvaluationPage } from '../features/evaluations/EvaluationPage.js';
 import { CertificateFeedbackPage } from '../features/certificates/CertificateFeedbackPage.js';
 import { DashboardPage } from '../features/dashboard/DashboardPage.js';
+import { PublicLayout } from './layouts/PublicLayout.js';
+import { AuthLayout } from './layouts/AuthLayout.js';
+import {
+  AboutPage,
+  ContactPage,
+  FaqPage,
+  LandingPage,
+} from '../features/public/PublicPages.js';
+import {
+  LearnerDashboard,
+  RoleIndexRedirect,
+  TrainerDashboard,
+} from '../features/dashboard/RoleDashboards.js';
 import {
   PublicOnly,
   RequireAuthentication,
@@ -38,14 +47,22 @@ import {
 export function App() {
   return (
     <Routes>
-      <Route element={<PublicOnly />}>
-        <Route path="/login" element={<LoginPage />} />
-        <Route path="/register" element={<RegisterPage />} />
-        <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+      <Route element={<PublicLayout />}>
+        <Route index element={<LandingPage />} />
+        <Route path="/catalogue" element={<CataloguePage />} />
+        <Route path="/trainings/:id" element={<TrainingDetailPage />} />
+        <Route path="/about" element={<AboutPage />} />
+        <Route path="/faq" element={<FaqPage />} />
+        <Route path="/contact" element={<ContactPage />} />
       </Route>
-      <Route path="/reset-password" element={<ResetPasswordPage />} />
-      <Route path="/catalogue" element={<CataloguePage />} />
-      <Route path="/trainings/:id" element={<TrainingDetailPage />} />
+      <Route element={<PublicOnly />}>
+        <Route element={<AuthLayout />}>
+          <Route path="/login" element={<LoginPage />} />
+          <Route path="/register" element={<RegisterPage />} />
+          <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+          <Route path="/reset-password" element={<ResetPasswordPage />} />
+        </Route>
+      </Route>
       <Route element={<RequireAuthentication />}>
         <Route path="/payments/success" element={<CheckoutReturnPage />} />
         <Route
@@ -54,7 +71,7 @@ export function App() {
         />
         <Route path="/change-password" element={<ChangePasswordPage />} />
         <Route path="/app" element={<RoleLayout />}>
-          <Route index element={<RoleHomePage />} />
+          <Route index element={<RoleIndexRedirect />} />
           <Route path="profile" element={<ProfilePage />} />
           <Route path="catalogue" element={<CataloguePage embedded />} />
           <Route element={<RequireRole roles={['ADMIN', 'TRAINER']} />}>
@@ -70,7 +87,11 @@ export function App() {
           <Route path="evaluations" element={<EvaluationPage />} />
           <Route path={'certificates'} element={<CertificateFeedbackPage />} />
           <Route element={<RequireRole roles={['LEARNER']} />}>
+            <Route path="learner" element={<LearnerDashboard />} />
             <Route path="progress" element={<ProgressPage />} />
+          </Route>
+          <Route element={<RequireRole roles={['TRAINER']} />}>
+            <Route path="trainer" element={<TrainerDashboard />} />
           </Route>
           <Route element={<RequireRole roles={['ADMIN']} />}>
             <Route path="users" element={<AdminUsersPage />} />
@@ -81,7 +102,7 @@ export function App() {
           </Route>
         </Route>
       </Route>
-      <Route path="*" element={<Navigate to="/app" replace />} />
+      <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );
 }

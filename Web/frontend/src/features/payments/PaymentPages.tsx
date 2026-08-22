@@ -3,6 +3,7 @@ import { Link, useSearchParams } from 'react-router';
 
 import { ApiError } from '../../core/api/client.js';
 import { useAuth } from '../../core/auth/AuthContext.js';
+import { Pagination } from '../../shared/components/Pagination.js';
 import type { Enrollment, Invoice, Page, Payment } from './types.js';
 
 function message(error: unknown): string {
@@ -126,9 +127,12 @@ export function CheckoutReturnPage({
 
 export function PaymentCenterPage() {
   const { user, request, download } = useAuth();
-  const [payments, setPayments] = useState<Payment[]>([]);
-  const [enrollments, setEnrollments] = useState<Enrollment[]>([]);
-  const [invoices, setInvoices] = useState<Invoice[]>([]);
+  const [payments, setPayments] = useState<Page<Payment> | null>(null);
+  const [enrollments, setEnrollments] = useState<Page<Enrollment> | null>(null);
+  const [invoices, setInvoices] = useState<Page<Invoice> | null>(null);
+  const [paymentPage, setPaymentPage] = useState(1);
+  const [enrollmentPage, setEnrollmentPage] = useState(1);
+  const [invoicePage, setInvoicePage] = useState(1);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
@@ -136,20 +140,23 @@ export function PaymentCenterPage() {
     setLoading(true);
     setError('');
     try {
-      const [paymentPage, enrollmentPage, invoicePage] = await Promise.all([
-        request<Page<Payment>>('/payments?pageSize=100'),
-        request<Page<Enrollment>>('/enrollments?pageSize=100'),
-        request<Page<Invoice>>('/invoices?pageSize=100'),
-      ]);
-      setPayments(paymentPage.items);
-      setEnrollments(enrollmentPage.items);
-      setInvoices(invoicePage.items);
+      const [paymentResult, enrollmentResult, invoiceResult] =
+        await Promise.all([
+          request<Page<Payment>>(`/payments?page=${paymentPage}&pageSize=10`),
+          request<Page<Enrollment>>(
+            `/enrollments?page=${enrollmentPage}&pageSize=10`,
+          ),
+          request<Page<Invoice>>(`/invoices?page=${invoicePage}&pageSize=10`),
+        ]);
+      setPayments(paymentResult);
+      setEnrollments(enrollmentResult);
+      setInvoices(invoiceResult);
     } catch (caught) {
       setError(message(caught));
     } finally {
       setLoading(false);
     }
-  }, [request]);
+  }, [enrollmentPage, invoicePage, paymentPage, request]);
 
   useEffect(() => {
     // Route entry synchronizes the webhook-confirmed financial records.
@@ -196,11 +203,11 @@ export function PaymentCenterPage() {
         <div className="financial-sections">
           <section className="content-card">
             <h2>Paiements</h2>
-            {payments.length === 0 ? (
+            {payments?.items.length === 0 ? (
               <p className="muted">Aucune tentative de paiement.</p>
             ) : (
               <ul className="financial-list">
-                {payments.map((payment) => (
+                {payments?.items.map((payment) => (
                   <li key={payment.id}>
                     <div>
                       <strong>{payment.training.title}</strong>
@@ -217,14 +224,24 @@ export function PaymentCenterPage() {
                 ))}
               </ul>
             )}
+            {payments && (
+              <Pagination
+                page={payments.page}
+                pageSize={payments.pageSize}
+                total={payments.total}
+                onPageChange={setPaymentPage}
+                disabled={loading}
+                label="Pages des paiements"
+              />
+            )}
           </section>
           <section className="content-card">
             <h2>Inscriptions actives</h2>
-            {enrollments.length === 0 ? (
+            {enrollments?.items.length === 0 ? (
               <p className="muted">Aucune inscription confirmée par webhook.</p>
             ) : (
               <ul className="financial-list">
-                {enrollments.map((enrollment) => (
+                {enrollments?.items.map((enrollment) => (
                   <li key={enrollment.id}>
                     <div>
                       <strong>{enrollment.training.title}</strong>
@@ -242,14 +259,24 @@ export function PaymentCenterPage() {
                 ))}
               </ul>
             )}
+            {enrollments && (
+              <Pagination
+                page={enrollments.page}
+                pageSize={enrollments.pageSize}
+                total={enrollments.total}
+                onPageChange={setEnrollmentPage}
+                disabled={loading}
+                label="Pages des inscriptions"
+              />
+            )}
           </section>
           <section className="content-card">
             <h2>Factures</h2>
-            {invoices.length === 0 ? (
+            {invoices?.items.length === 0 ? (
               <p className="muted">Aucune facture émise.</p>
             ) : (
               <ul className="financial-list">
-                {invoices.map((invoice) => (
+                {invoices?.items.map((invoice) => (
                   <li key={invoice.id}>
                     <div>
                       <strong>{invoice.number}</strong>
@@ -267,6 +294,16 @@ export function PaymentCenterPage() {
                   </li>
                 ))}
               </ul>
+            )}
+            {invoices && (
+              <Pagination
+                page={invoices.page}
+                pageSize={invoices.pageSize}
+                total={invoices.total}
+                onPageChange={setInvoicePage}
+                disabled={loading}
+                label="Pages des factures"
+              />
             )}
           </section>
         </div>

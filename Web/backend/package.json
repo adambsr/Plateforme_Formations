@@ -8,6 +8,7 @@
     "dev": "tsx watch src/server.ts",
     "lint": "oxlint docker src tests",
     "seed:admin": "node dist/scripts/seed-admin.js",
+    "seed:dev": "node dist/scripts/seed-development.js",
     "start": "node dist/server.js",
     "test": "vitest run",
     "test:integration": "vitest run tests/phase1.integration.test.ts tests/phase2.integration.test.ts tests/phase3-4.integration.test.ts tests/phase5.integration.test.ts tests/phase6-7.integration.test.ts tests/phase8-9.integration.test.ts tests/phase10.integration.test.ts tests/phase11.integration.test.ts --no-file-parallelism",

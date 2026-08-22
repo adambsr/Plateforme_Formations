@@ -22,7 +22,9 @@
     "format:check": "prettier --check .",
     "lint": "npm run lint --workspace @plateforme-formations/backend && npm run lint --workspace @plateforme-formations/frontend && npm run lint --workspace @plateforme-formations/mobile",
     "seed:admin": "npm run build --workspace @plateforme-formations/backend && npm run seed:admin --workspace @plateforme-formations/backend",
+    "seed:dev": "npm run build --workspace @plateforme-formations/backend && npm run seed:dev --workspace @plateforme-formations/backend",
     "test": "npm run test --workspace @plateforme-formations/backend && npm run test --workspace @plateforme-formations/frontend && npm run test --workspace @plateforme-formations/mobile",
+    "test:e2e": "npm run test --workspace @plateforme-formations/frontend && npm run test:integration --workspace @plateforme-formations/backend",
     "test:integration": "npm run test:integration --workspace @plateforme-formations/backend",
     "typecheck": "npm run typecheck --workspace @plateforme-formations/backend && npm run typecheck --workspace @plateforme-formations/frontend && npm run typecheck --workspace @plateforme-formations/mobile"
   },

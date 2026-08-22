@@ -81,7 +81,7 @@ describe('Phase 7 attendance and learner schedule UI', () => {
     expect(await screen.findByText('Non saisie')).toBeVisible();
     expect(screen.getByText(/n’ont pas encore été saisies/i)).toBeVisible();
     expect(request).toHaveBeenCalledWith(
-      '/sessions?view=ENROLLED&pageSize=100',
+      '/sessions?view=ENROLLED&page=1&pageSize=12',
     );
   });
 

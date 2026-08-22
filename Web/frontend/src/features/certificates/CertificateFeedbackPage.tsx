@@ -8,6 +8,7 @@ import type {
   FeedbackStatistics,
   Page,
 } from './types.js';
+import { Pagination } from '../../shared/components/Pagination.js';
 
 const ratings = [1, 2, 3, 4, 5] as const;
 
@@ -28,6 +29,13 @@ export function CertificateFeedbackPage() {
   const { user, request, download } = useAuth();
   const [certificates, setCertificates] = useState<Certificate[]>([]);
   const [enrollments, setEnrollments] = useState<Enrollment[]>([]);
+  const [certificatePage, setCertificatePage] =
+    useState<Page<Certificate> | null>(null);
+  const [enrollmentPage, setEnrollmentPage] = useState<Page<Enrollment> | null>(
+    null,
+  );
+  const [certificatePageNumber, setCertificatePageNumber] = useState(1);
+  const [enrollmentPageNumber, setEnrollmentPageNumber] = useState(1);
   const [statistics, setStatistics] = useState<FeedbackStatistics | null>(null);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState('');
@@ -42,15 +50,17 @@ export function CertificateFeedbackPage() {
     setLoading(true);
     setError('');
     try {
-      const certificatePage = await request<Page<Certificate>>(
-        '/certificates?pageSize=100',
+      const certificateResult = await request<Page<Certificate>>(
+        `/certificates?page=${certificatePageNumber}&pageSize=10`,
       );
-      setCertificates(certificatePage.items);
+      setCertificates(certificateResult.items);
+      setCertificatePage(certificateResult);
       if (user.role === 'LEARNER' || user.role === 'ADMIN') {
-        const enrollmentPage = await request<Page<Enrollment>>(
-          '/enrollments?pageSize=100',
+        const enrollmentResult = await request<Page<Enrollment>>(
+          `/enrollments?page=${enrollmentPageNumber}&pageSize=10`,
         );
-        setEnrollments(enrollmentPage.items);
+        setEnrollments(enrollmentResult.items);
+        setEnrollmentPage(enrollmentResult);
       }
       if (user.role === 'ADMIN') {
         setStatistics(await request<FeedbackStatistics>('/feedback'));
@@ -60,7 +70,7 @@ export function CertificateFeedbackPage() {
     } finally {
       setLoading(false);
     }
-  }, [request, user]);
+  }, [certificatePageNumber, enrollmentPageNumber, request, user]);
 
   useEffect(() => {
     // Route entry loads role-authorized certificate and satisfaction data.
@@ -238,6 +248,16 @@ export function CertificateFeedbackPage() {
                   })}
                 </ul>
               )}
+              {enrollmentPage && (
+                <Pagination
+                  page={enrollmentPage.page}
+                  pageSize={enrollmentPage.pageSize}
+                  total={enrollmentPage.total}
+                  onPageChange={setEnrollmentPageNumber}
+                  disabled={loading}
+                  label="Pages des inscriptions certifiables"
+                />
+              )}
               <p className="muted">
                 La génération et la note sont refusées tant que la complétion ou
                 l'évaluation certifiante requise n'est pas satisfaite.
@@ -270,6 +290,16 @@ export function CertificateFeedbackPage() {
                   </li>
                 ))}
               </ul>
+            )}
+            {certificatePage && (
+              <Pagination
+                page={certificatePage.page}
+                pageSize={certificatePage.pageSize}
+                total={certificatePage.total}
+                onPageChange={setCertificatePageNumber}
+                disabled={loading}
+                label="Pages des certificats"
+              />
             )}
           </section>
 

@@ -2,6 +2,7 @@ import { Navigate, Outlet, useLocation } from 'react-router';
 
 import { useAuth } from '../../core/auth/AuthContext.js';
 import type { UserRole } from '../../core/auth/types.js';
+import { roleHomePath } from './destinations.js';
 
 export function PublicOnly() {
   const { status, user } = useAuth();
@@ -10,7 +11,9 @@ export function PublicOnly() {
   if (user !== null)
     return (
       <Navigate
-        to={user.mustChangePassword ? '/change-password' : '/app'}
+        to={
+          user.mustChangePassword ? '/change-password' : roleHomePath(user.role)
+        }
         replace
       />
     );
@@ -35,6 +38,6 @@ export function RequireRole({ roles }: { roles: readonly UserRole[] }) {
   return user !== null && roles.includes(user.role) ? (
     <Outlet />
   ) : (
-    <Navigate to="/app" replace />
+    <Navigate to={user === null ? '/login' : roleHomePath(user.role)} replace />
   );
 }

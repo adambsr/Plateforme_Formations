@@ -100,6 +100,6 @@ describe('Phase 10 Certificate and Feedback UI', () => {
     render(<CertificateFeedbackPage />);
     expect(await screen.findByText('Aucun certificat émis.')).toBeVisible();
     expect(request).toHaveBeenCalledTimes(1);
-    expect(request).toHaveBeenCalledWith('/certificates?pageSize=100');
+    expect(request).toHaveBeenCalledWith('/certificates?page=1&pageSize=10');
   });
 });

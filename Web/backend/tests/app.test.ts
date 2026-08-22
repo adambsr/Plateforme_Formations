@@ -27,6 +27,14 @@ describe('HTTP foundation', () => {
     });
     expect(response.headers['x-powered-by']).toBeUndefined();
     expect(response.headers['x-request-id']).toBeTypeOf('string');
+    expect(response.headers['x-content-type-options']).toBe('nosniff');
+    expect(response.headers['x-frame-options']).toBe('DENY');
+    expect(response.headers['referrer-policy']).toBe(
+      'strict-origin-when-cross-origin',
+    );
+    expect(response.headers['permissions-policy']).toBe(
+      'camera=(), microphone=(), geolocation=()',
+    );
   });
 
   it('returns degraded readiness when the database is unavailable', async () => {
@@ -81,6 +89,30 @@ describe('HTTP foundation', () => {
     expect(documentResponse.body.paths['/auth/register']).toBeDefined();
     expect(documentResponse.body.paths['/auth/refresh']).toBeDefined();
     expect(documentResponse.body.paths['/trainers']).toBeDefined();
+    for (const path of [
+      '/trainings',
+      '/trainings/{id}/content',
+      '/sessions',
+      '/payments',
+      '/enrollments',
+      '/progress',
+      '/sessions/{id}/attendance',
+      '/evaluations',
+      '/certificates',
+      '/invoices',
+      '/feedback',
+      '/costs/trainers',
+      '/dashboard/overview',
+      '/dashboard/financial',
+    ]) {
+      expect(documentResponse.body.paths[path], path).toBeDefined();
+    }
+    expect(documentResponse.body.paths['/trainings'].get.parameters).toEqual(
+      expect.arrayContaining([
+        { $ref: '#/components/parameters/Page' },
+        { $ref: '#/components/parameters/PageSize' },
+      ]),
+    );
     expect(uiResponse.status).toBe(200);
     expect(uiResponse.text).toContain('Swagger UI');
   });

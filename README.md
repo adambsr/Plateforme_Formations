@@ -1,17 +1,22 @@
 # Plateforme de Formations
 
+For a realistic local demo dataset and development-only credentials, see
+[`Docs/DEVELOPMENT_SEED.md`](Docs/DEVELOPMENT_SEED.md).
+
 Monorepo for the shared Web/Mobile training platform. The implementation follows
 `Docs/SOURCE_OF_TRUTH.md`, then `PLAN.md`, then the client development prompts.
 
 ## Current implementation phase
 
-Phases 0 through 11 are complete. The repository provides the engineering foundation, shared
+Phases 0 through 12 are complete. The repository provides the engineering foundation, shared
 authentication and user management, the Training catalogue and ownership slice, protected
 training content, in-person Session planning, and the Stripe test-mode payment, Enrollment, and
 Invoice access boundary, self-paced progression, in-person Attendance completion, complete
 Evaluation attempts/grading, bounded Gemini-assisted draft question generation, Certificates, and
 immutable satisfaction Feedback, explicit costs, and the Admin statistics/profitability dashboard.
-Phase 12 (Web completion and hardening) is the next roadmap phase.
+Phase 12 completes the public website, role-specific shell and dashboards, responsive and
+accessible UX states, consistent pagination, security hardening, API verification, critical
+workflow coverage, and production operations documentation.
 
 ## Phase 0 status
 
@@ -369,6 +374,8 @@ billing, and data policy.
 
 ## Quality and CI
 
+Deployment and recovery procedures are in Docs/DEPLOYMENT.md and Docs/BACKUP_RESTORE.md.
+
 Run the complete local quality gate:
 
 ```sh
@@ -387,6 +394,17 @@ To run that transaction-backed integration lifecycle locally after Compose is he
 $env:TEST_MONGODB_URI = 'mongodb://127.0.0.1:27017/plateforme_formations_integration?replicaSet=rs0&directConnection=true'
 npm run test:integration
 ```
+
+To run the consolidated Phase 12 critical Web and real-API workflow suite:
+
+```powershell
+$env:TEST_MONGODB_URI = 'mongodb://127.0.0.1:27017/plateforme_formations_integration?replicaSet=rs0&directConnection=true'
+npm run test:e2e
+```
+
+The suite covers learner online and in-person prerequisites, Trainer management, attendance and
+evaluation duties, and Admin identity, catalogue, Session, payment, statistics, and Certificate
+operations across the phase integration lifecycles.
 
 The integration command accepts only the dedicated
 `plateforme_formations_integration` database name and cleans that test database's phase-specific

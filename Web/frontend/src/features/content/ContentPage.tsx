@@ -3,6 +3,7 @@ import { Link, useParams } from 'react-router';
 
 import { ApiError } from '../../core/api/client.js';
 import { useAuth } from '../../core/auth/AuthContext.js';
+import { Select } from '../../shared/components/Select.js';
 import type {
   ContentLesson,
   ContentModule,
@@ -145,13 +146,13 @@ function ResourceForm({
         <OrderField />
         <label>
           Type
-          <select
+          <Select
             value={type}
             onChange={(event) => setType(event.target.value as ResourceType)}
           >
             <option value="EXTERNAL_URL">Lien HTTP(S)</option>
             <option value="FILE">Fichier protégé</option>
-          </select>
+          </Select>
         </label>
         {type === 'EXTERNAL_URL' ? (
           <label>

@@ -2,6 +2,8 @@ import { useCallback, useEffect, useState, type FormEvent } from 'react';
 
 import { ApiError } from '../../core/api/client.js';
 import { useAuth } from '../../core/auth/AuthContext.js';
+import { Pagination } from '../../shared/components/Pagination.js';
+import { Select } from '../../shared/components/Select.js';
 import { formatTunisDate } from '../sessions/time.js';
 import type {
   AttendanceSessionPage,
@@ -35,6 +37,7 @@ function statusLabel(status: AttendanceStatus | null): string {
 export function AttendancePage() {
   const { user, request } = useAuth();
   const [sessions, setSessions] = useState<AttendanceSessionPage | null>(null);
+  const [pageNumber, setPageNumber] = useState(1);
   const [selected, setSelected] = useState<SessionAttendance | null>(null);
   const [loadingDetail, setLoadingDetail] = useState(false);
   const [savingScheduleId, setSavingScheduleId] = useState<string>();
@@ -64,7 +67,7 @@ export function AttendancePage() {
     try {
       const view = user.role === 'LEARNER' ? 'ENROLLED' : 'MANAGED';
       const result = await request<AttendanceSessionPage>(
-        `/sessions?view=${view}&pageSize=100`,
+        `/sessions?view=${view}&page=${pageNumber}&pageSize=12`,
       );
       const visible =
         user.role === 'TRAINER'
@@ -79,7 +82,7 @@ export function AttendancePage() {
     } catch (caught) {
       setError(message(caught));
     }
-  }, [loadDetail, request, user]);
+  }, [loadDetail, pageNumber, request, user]);
 
   useEffect(() => {
     // Route entry synchronizes role-filtered Sessions and Attendance state.
@@ -163,6 +166,15 @@ export function AttendancePage() {
               </button>
             ))}
           </div>
+          {sessions !== null && (
+            <Pagination
+              page={sessions.page}
+              pageSize={sessions.pageSize}
+              total={sessions.total}
+              onPageChange={setPageNumber}
+              label="Pagination des sessions de présence"
+            />
+          )}
           {loadingDetail ? (
             <p className="muted">Chargement des présences…</p>
           ) : selected !== null ? (
@@ -215,7 +227,7 @@ export function AttendancePage() {
                                 <strong>{learnerName(row.learner)}</strong>
                                 <small>{row.learner.email}</small>
                               </span>
-                              <select
+                              <Select
                                 name={row.enrollmentId}
                                 defaultValue={record?.status ?? ''}
                                 required
@@ -226,7 +238,7 @@ export function AttendancePage() {
                                 </option>
                                 <option value="PRESENT">Présent</option>
                                 <option value="ABSENT">Absent</option>
-                              </select>
+                              </Select>
                             </label>
                           );
                         })}

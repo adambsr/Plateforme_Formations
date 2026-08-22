@@ -9,6 +9,8 @@ import {
 import { ApiError } from '../../core/api/client.js';
 import { useAuth } from '../../core/auth/AuthContext.js';
 import type { PaginatedUsers } from '../../core/auth/types.js';
+import { Pagination } from '../../shared/components/Pagination.js';
+import { Select } from '../../shared/components/Select.js';
 import type { PaginatedSessions } from '../sessions/types.js';
 import type { Training } from '../trainings/types.js';
 import type {
@@ -62,6 +64,11 @@ export function DashboardPage() {
   }>({ trainers: [], trainings: [], sessions: [] });
   const [trainerCosts, setTrainerCosts] = useState<TrainerCost[]>([]);
   const [trainingCosts, setTrainingCosts] = useState<TrainingCost[]>([]);
+  const [trainerCostPage, setTrainerCostPage] = useState<Page<TrainerCost>>();
+  const [trainingCostPage, setTrainingCostPage] =
+    useState<Page<TrainingCost>>();
+  const [trainerCostPageNumber, setTrainerCostPageNumber] = useState(1);
+  const [trainingCostPageNumber, setTrainingCostPageNumber] = useState(1);
   const [editing, setEditing] = useState<TrainingCost>();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -82,8 +89,12 @@ export function DashboardPage() {
         request<PaginatedUsers>('/trainers?pageSize=100'),
         request<Page<Training>>('/trainings?view=MANAGED&pageSize=100'),
         request<PaginatedSessions>('/sessions?view=MANAGED&pageSize=100'),
-        request<Page<TrainerCost>>('/costs/trainers?pageSize=100'),
-        request<Page<TrainingCost>>(`/costs/trainings?${query}&pageSize=100`),
+        request<Page<TrainerCost>>(
+          `/costs/trainers?page=${trainerCostPageNumber}&pageSize=8`,
+        ),
+        request<Page<TrainingCost>>(
+          `/costs/trainings?${query}&page=${trainingCostPageNumber}&pageSize=8`,
+        ),
       ]);
       setData({
         overview: results[0],
@@ -99,12 +110,14 @@ export function DashboardPage() {
       });
       setTrainerCosts(results[8].items);
       setTrainingCosts(results[9].items);
+      setTrainerCostPage(results[8]);
+      setTrainingCostPage(results[9]);
     } catch (caught) {
       setError(message(caught));
     } finally {
       setLoading(false);
     }
-  }, [range, request]);
+  }, [range, request, trainerCostPageNumber, trainingCostPageNumber]);
   useEffect(() => {
     // Route entry and range changes synchronize backend-owned aggregates.
     // oxlint-disable-next-line react/set-state-in-effect
@@ -231,7 +244,7 @@ export function DashboardPage() {
           <h2>Coût mensuel formateur</h2>
           <label>
             Formateur
-            <select name="trainerId" required>
+            <Select name="trainerId" required>
               <option value="">Choisir</option>
               {options.trainers.map((trainer) => (
                 <option key={trainer.id} value={trainer.id}>
@@ -240,7 +253,7 @@ export function DashboardPage() {
                     .join(' ') || trainer.email}
                 </option>
               ))}
-            </select>
+            </Select>
           </label>
           <div className="form-grid">
             <label>
@@ -297,6 +310,15 @@ export function DashboardPage() {
               ))}
             </div>
           )}
+          {trainerCostPage !== undefined && (
+            <Pagination
+              page={trainerCostPage.page}
+              pageSize={trainerCostPage.pageSize}
+              total={trainerCostPage.total}
+              onPageChange={setTrainerCostPageNumber}
+              label="Pagination des coûts formateurs"
+            />
+          )}
         </form>
         <form
           className="content-card"
@@ -308,7 +330,7 @@ export function DashboardPage() {
           </h2>
           <label>
             Formation
-            <select
+            <Select
               name="trainingId"
               defaultValue={editing?.training.id ?? ''}
               required
@@ -319,18 +341,18 @@ export function DashboardPage() {
                   {training.title}
                 </option>
               ))}
-            </select>
+            </Select>
           </label>
           <label>
             Session facultative
-            <select name="sessionId" defaultValue={editing?.session?.id ?? ''}>
+            <Select name="sessionId" defaultValue={editing?.session?.id ?? ''}>
               <option value="">Aucune</option>
               {options.sessions.map((session) => (
                 <option key={session.id} value={session.id}>
                   {session.training.title} · {session.title}
                 </option>
               ))}
-            </select>
+            </Select>
           </label>
           <div className="form-grid">
             <label>
@@ -408,6 +430,15 @@ export function DashboardPage() {
               ))}
             </div>
           )}
+          {trainingCostPage !== undefined && (
+            <Pagination
+              page={trainingCostPage.page}
+              pageSize={trainingCostPage.pageSize}
+              total={trainingCostPage.total}
+              onPageChange={setTrainingCostPageNumber}
+              label="Pagination des dépenses de formation"
+            />
+          )}
         </form>
       </div>
     </section>
@@ -478,8 +509,126 @@ function DashboardResults({ data }: { data: DashboardData }) {
           <small>{percent(data.profitability.profitabilityPercent)}</small>
         </article>
       </div>
+      <DashboardCharts data={data} />
       <TrainingResults rows={data.profitability.byTraining} />
     </>
+  );
+}
+
+function DashboardCharts({ data }: { data: DashboardData }) {
+  const satisfaction = Object.entries(data.satisfaction.global.distribution);
+  const popular = [...data.profitability.byTraining]
+    .sort((left, right) => right.revenueMinor - left.revenueMinor)
+    .slice(0, 5);
+  const maxRevenue = Math.max(1, ...popular.map((row) => row.revenueMinor));
+  const financialMax = Math.max(
+    1,
+    data.profitability.revenueMinor,
+    data.profitability.totalCostsMinor,
+  );
+  return (
+    <div className="chart-grid">
+      <figure className="content-card">
+        <figcaption>Revenus et coûts</figcaption>
+        <Bar
+          label="Revenus payés"
+          value={data.profitability.revenueMinor}
+          max={financialMax}
+          shown={money(data.profitability.revenueMinor)}
+        />
+        <Bar
+          label="Coûts totaux"
+          value={data.profitability.totalCostsMinor}
+          max={financialMax}
+          shown={money(data.profitability.totalCostsMinor)}
+          tone="cost"
+        />
+        <Bar
+          label="Résultat"
+          value={Math.max(0, data.profitability.resultMinor)}
+          max={financialMax}
+          shown={money(data.profitability.resultMinor)}
+          tone="result"
+        />
+      </figure>
+      <figure className="content-card">
+        <figcaption>Satisfaction (1 à 5)</figcaption>
+        {satisfaction.map(([rating, count]) => (
+          <Bar
+            key={rating}
+            label={`${rating} étoile${rating === '1' ? '' : 's'}`}
+            value={count}
+            max={Math.max(1, data.satisfaction.global.count)}
+            shown={String(count)}
+          />
+        ))}
+      </figure>
+      <figure className="content-card">
+        <figcaption>Participation par formation</figcaption>
+        {data.participation.byTraining.length === 0 ? (
+          <p className="muted">Aucune présence attendue sur la période.</p>
+        ) : (
+          data.participation.byTraining
+            .slice(0, 5)
+            .map((row) => (
+              <Bar
+                key={row.training.id}
+                label={row.training.title}
+                value={row.participationPercent ?? 0}
+                max={100}
+                shown={percent(row.participationPercent)}
+              />
+            ))
+        )}
+      </figure>
+      <figure className="content-card">
+        <figcaption>Formations par revenus confirmés</figcaption>
+        {popular.length === 0 ? (
+          <p className="muted">Aucun revenu confirmé sur la période.</p>
+        ) : (
+          popular.map((row) => (
+            <Bar
+              key={row.training.id}
+              label={row.training.title}
+              value={row.revenueMinor}
+              max={maxRevenue}
+              shown={money(row.revenueMinor)}
+            />
+          ))
+        )}
+      </figure>
+    </div>
+  );
+}
+
+function Bar({
+  label,
+  value,
+  max,
+  shown,
+  tone = 'primary',
+}: {
+  label: string;
+  value: number;
+  max: number;
+  shown: string;
+  tone?: 'primary' | 'cost' | 'result';
+}) {
+  const width = `${Math.max(0, Math.min(100, (value / max) * 100))}%`;
+  return (
+    <div className="chart-row">
+      <div>
+        <span>{label}</span>
+        <strong>{shown}</strong>
+      </div>
+      <div
+        className="chart-track"
+        role="img"
+        aria-label={`${label} : ${shown}`}
+      >
+        <span className={`chart-bar chart-${tone}`} style={{ width }} />
+      </div>
+    </div>
   );
 }
 

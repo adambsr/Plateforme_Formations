@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react';
 import { ApiError } from '../../core/api/client.js';
 import { useAuth } from '../../core/auth/AuthContext.js';
+import { Pagination } from '../../shared/components/Pagination.js';
+import { Select } from '../../shared/components/Select.js';
 import type { Enrollment } from '../payments/types.js';
 import type {
   Attempt,
@@ -19,6 +21,7 @@ function message(error: unknown) {
 export function EvaluationPage() {
   const { user, request } = useAuth();
   const [page, setPage] = useState<Page<Evaluation> | null>(null);
+  const [pageNumber, setPageNumber] = useState(1);
   const [selected, setSelected] = useState<Evaluation | null>(null);
   const [enrollments, setEnrollments] = useState<Enrollment[]>([]);
   const [managedTrainings, setManagedTrainings] = useState<
@@ -26,6 +29,8 @@ export function EvaluationPage() {
   >([]);
   const [attempt, setAttempt] = useState<Attempt | null>(null);
   const [results, setResults] = useState<ResultPage | null>(null);
+  const [editingEvaluation, setEditingEvaluation] = useState(false);
+  const [editingQuestionId, setEditingQuestionId] = useState<string>();
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
   const [busy, setBusy] = useState(false);
@@ -54,7 +59,7 @@ export function EvaluationPage() {
     try {
       const view = user.role === 'LEARNER' ? 'ACCESSIBLE' : 'MANAGED';
       const values = await request<Page<Evaluation>>(
-        `/evaluations?view=${view}&pageSize=100`,
+        `/evaluations?view=${view}&page=${pageNumber}&pageSize=12`,
       );
       setPage(values);
       if (user.role === 'TRAINER') {
@@ -72,7 +77,7 @@ export function EvaluationPage() {
     } catch (caught) {
       setError(message(caught));
     }
-  }, [detail, request, user]);
+  }, [detail, pageNumber, request, user]);
 
   useEffect(() => {
     // Route entry synchronizes role-filtered Evaluation state with the backend.
@@ -194,26 +199,20 @@ export function EvaluationPage() {
       );
     }, 'Questions IA importées.');
   }
-  async function editQuestion(question: Question) {
+  async function editQuestion(
+    question: Question,
+    event: FormEvent<HTMLFormElement>,
+  ) {
+    event.preventDefault();
     if (selected === null) return;
-    const prompt = window.prompt('Énoncé', question.prompt);
-    if (prompt === null) return;
-    const optionText = window.prompt(
-      'Options, séparées par |',
-      question.options.map(({ text }) => text).join('|'),
-    );
-    if (optionText === null) return;
-    const correct = window.prompt(
-      'Identifiants corrects, séparés par ,',
-      question.correctOptionIds?.join(',') ?? '',
-    );
-    if (correct === null) return;
-    const points = window.prompt('Points', String(question.points));
-    if (points === null) return;
+    const form = new FormData(event.currentTarget);
+    const prompt = String(form.get('prompt'));
+    const optionText = String(form.get('options'));
+    const correct = String(form.get('correct'));
     const options =
       question.type === 'TRUE_FALSE'
         ? question.options
-        : optionText.split('|').map((text, index) => ({
+        : optionText.split('\n').map((text, index) => ({
             id: String.fromCharCode(65 + index),
             text: text.trim(),
           }));
@@ -227,37 +226,29 @@ export function EvaluationPage() {
             .split(',')
             .map((value) => value.trim().toUpperCase())
             .filter(Boolean),
-          points: Number(points),
+          points: Number(form.get('points')),
         }),
       });
       await detail(selected.id);
+      setEditingQuestionId(undefined);
     }, 'Question mise à jour.');
   }
-  async function editEvaluation() {
+  async function editEvaluation(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
     if (selected === null) return;
-    const title = window.prompt('Titre', selected.title);
-    if (title === null) return;
-    const threshold = window.prompt(
-      'Seuil de réussite',
-      String(selected.passPercentage),
-    );
-    if (threshold === null) return;
-    const limit = window.prompt(
-      'Nombre maximal de tentatives',
-      String(selected.maxAttempts),
-    );
-    if (limit === null) return;
+    const form = new FormData(event.currentTarget);
     await action(async () => {
       await request(`/evaluations/${selected.id}`, {
         method: 'PUT',
         body: JSON.stringify({
-          title,
-          passPercentage: Number(threshold),
-          maxAttempts: Number(limit),
+          title: String(form.get('title')),
+          passPercentage: Number(form.get('passPercentage')),
+          maxAttempts: Number(form.get('maxAttempts')),
         }),
       });
       await load();
       await detail(selected.id);
+      setEditingEvaluation(false);
     }, 'Évaluation mise à jour.');
   }
   async function deleteEvaluation() {
@@ -393,14 +384,14 @@ export function EvaluationPage() {
           <h2>Nouvelle évaluation</h2>
           <label>
             Formation
-            <select name="trainingId" required>
+            <Select name="trainingId" required>
               <option value="">Sélectionner</option>
               {trainings.map((training) => (
                 <option key={training.id} value={training.id}>
                   {training.title}
                 </option>
               ))}
-            </select>
+            </Select>
           </label>
           <label>
             Titre
@@ -469,6 +460,15 @@ export function EvaluationPage() {
                 </small>
               </button>
             ))}
+            {page !== null && (
+              <Pagination
+                page={page.page}
+                pageSize={page.pageSize}
+                total={page.total}
+                onPageChange={setPageNumber}
+                label="Pagination des évaluations"
+              />
+            )}
           </aside>
           {selected !== null && (
             <div className="evaluation-detail">
@@ -498,7 +498,7 @@ export function EvaluationPage() {
                       <button
                         className="secondary-button compact-button"
                         disabled={busy}
-                        onClick={() => void editEvaluation()}
+                        onClick={() => setEditingEvaluation(true)}
                       >
                         Modifier les réglages
                       </button>
@@ -556,6 +556,57 @@ export function EvaluationPage() {
                     Voir les résultats
                   </button>
                 </div>
+              )}
+              {owner && selected.status === 'DRAFT' && editingEvaluation && (
+                <form
+                  className="content-card evaluation-question-form"
+                  onSubmit={(event) => void editEvaluation(event)}
+                >
+                  <h3>Modifier les réglages</h3>
+                  <label>
+                    Titre
+                    <input
+                      name="title"
+                      defaultValue={selected.title}
+                      required
+                    />
+                  </label>
+                  <div className="form-grid">
+                    <label>
+                      Seuil de réussite (%)
+                      <input
+                        name="passPercentage"
+                        type="number"
+                        min="1"
+                        max="100"
+                        defaultValue={selected.passPercentage}
+                        required
+                      />
+                    </label>
+                    <label>
+                      Nombre maximal de tentatives
+                      <input
+                        name="maxAttempts"
+                        type="number"
+                        min="1"
+                        defaultValue={selected.maxAttempts}
+                        required
+                      />
+                    </label>
+                  </div>
+                  <div className="management-actions">
+                    <button className="primary-button" disabled={busy}>
+                      Enregistrer
+                    </button>
+                    <button
+                      type="button"
+                      className="secondary-button"
+                      onClick={() => setEditingEvaluation(false)}
+                    >
+                      Annuler
+                    </button>
+                  </div>
+                </form>
               )}
               {results !== null && (
                 <section className="content-card">
@@ -615,11 +666,11 @@ export function EvaluationPage() {
                     <h3>Ajouter une question</h3>
                     <label>
                       Type
-                      <select name="type">
+                      <Select name="type">
                         <option value="SINGLE_CHOICE">Choix unique</option>
                         <option value="MULTIPLE_CHOICE">Choix multiple</option>
                         <option value="TRUE_FALSE">Vrai / faux</option>
-                      </select>
+                      </Select>
                     </label>
                     <label>
                       Énoncé
@@ -696,12 +747,69 @@ export function EvaluationPage() {
                         Réponse : {question.correctOptionIds.join(', ')}
                       </p>
                     )}
+                    {editingQuestionId === question.id && (
+                      <form
+                        className="evaluation-question-form"
+                        onSubmit={(event) => void editQuestion(question, event)}
+                      >
+                        <label>
+                          Énoncé
+                          <textarea
+                            name="prompt"
+                            defaultValue={question.prompt}
+                            required
+                          />
+                        </label>
+                        <label>
+                          Options, une par ligne
+                          <textarea
+                            name="options"
+                            defaultValue={question.options
+                              .map(({ text }) => text)
+                              .join('\n')}
+                            required
+                          />
+                        </label>
+                        <label>
+                          Réponses correctes
+                          <input
+                            name="correct"
+                            defaultValue={
+                              question.correctOptionIds?.join(',') ?? ''
+                            }
+                            required
+                          />
+                        </label>
+                        <label>
+                          Points
+                          <input
+                            name="points"
+                            type="number"
+                            min="1"
+                            defaultValue={question.points}
+                            required
+                          />
+                        </label>
+                        <div className="management-actions">
+                          <button className="primary-button" disabled={busy}>
+                            Enregistrer
+                          </button>
+                          <button
+                            type="button"
+                            className="secondary-button"
+                            onClick={() => setEditingQuestionId(undefined)}
+                          >
+                            Annuler
+                          </button>
+                        </div>
+                      </form>
+                    )}
                     {owner && selected.status === 'DRAFT' && (
                       <div className="management-actions">
                         <button
                           className="secondary-button compact-button"
                           disabled={busy}
-                          onClick={() => void editQuestion(question)}
+                          onClick={() => setEditingQuestionId(question.id)}
                         >
                           Modifier
                         </button>
