@@ -481,11 +481,11 @@ export class TrainingService {
     trainingId: string,
   ): Promise<void> {
     const training = await this.#managedTraining(principal, trainingId);
-    if (training.status !== 'DRAFT') {
+    if (!['DRAFT', 'ARCHIVED'].includes(training.status)) {
       throw new AppError(
         409,
         'TRAINING_MUST_BE_ARCHIVED',
-        'Only an unused draft Training can be deleted.',
+        'Only an unused draft or archived Training can be deleted.',
       );
     }
     if (await this.#lifecycle.hasBusinessHistory(training._id)) {
@@ -497,7 +497,7 @@ export class TrainingService {
     }
     const deleted = await TrainingModel.deleteOne({
       _id: training._id,
-      status: 'DRAFT',
+      status: { $in: ['DRAFT', 'ARCHIVED'] },
     });
     if (deleted.deletedCount !== 1) {
       throw new AppError(

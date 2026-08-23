@@ -381,6 +381,9 @@ suite('Phase 8 Evaluations and Phase 9 AI generation', () => {
       'A',
       'B',
     ]);
+    const retake = await start();
+    expect(retake.status).toBe(409);
+    expect(retake.body.error.code).toBe('EVALUATION_ALREADY_COMPLETED');
     expect(
       (
         await request(app)

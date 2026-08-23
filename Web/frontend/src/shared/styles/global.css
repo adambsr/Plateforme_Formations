@@ -408,6 +408,19 @@ label,
   appearance: none;
   cursor: pointer;
 }
+.content-select {
+  width: 100%;
+  min-height: 2.9rem;
+  background: linear-gradient(135deg, #ffffff 0%, #f5f8fb 100%);
+  transition: background 160ms ease;
+}
+.content-select:hover {
+  background: #ffffff;
+}
+.content-select:focus-visible {
+  outline: 3px solid rgba(31, 111, 145, 0.2);
+  outline-offset: 1px;
+}
 .select-control:hover {
   border-color: #98a5b7;
   background: #fcfdff;
@@ -820,6 +833,26 @@ label,
   height: 76px;
   margin: 0;
   border-radius: 10px;
+}
+.thumbnail-editor {
+  display: grid;
+  gap: 0.65rem;
+}
+.thumbnail-editor .field-label {
+  color: #344054;
+  font-size: 0.9rem;
+  font-weight: 650;
+}
+.thumbnail-editor .training-thumbnail {
+  width: min(100%, 420px);
+  height: 220px;
+  margin: 0;
+  border-radius: 12px;
+}
+.thumbnail-editor-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
 }
 .visually-hidden {
   position: absolute !important;
@@ -1544,6 +1577,12 @@ textarea:focus {
 .status-completed {
   color: #17643a;
   background: #eaf8f0;
+}
+.evaluation-list-action {
+  display: block;
+  margin-top: 0.55rem;
+  color: #17643a;
+  font-weight: 700;
 }
 .status-cancelled {
   color: #7b3440;

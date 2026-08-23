@@ -285,6 +285,10 @@ export function EvaluationPage() {
     );
   }
   async function startAttempt(evaluation: Evaluation) {
+    if (evaluation.completed) {
+      setError('Cette évaluation est déjà terminée.');
+      return;
+    }
     const enrollment = enrollments.find(
       ({ training }) => training.id === evaluation.training.id,
     );
@@ -318,6 +322,10 @@ export function EvaluationPage() {
       );
       if (inProgress !== undefined) {
         setAttempt(inProgress);
+        return;
+      }
+      if (value.completed) {
+        setAttempt(value.attempts?.at(-1) ?? null);
         return;
       }
       const enrollment = enrollments.find(
@@ -434,6 +442,11 @@ export function EvaluationPage() {
                     ? ''
                     : ` · ${evaluation.durationMinutes} min`}
                 </small>
+                <span className="evaluation-list-action">
+                  {user.role === 'LEARNER' && evaluation.completed
+                    ? 'Terminé'
+                    : 'Ouvrir →'}
+                </span>
               </button>
             ))}
             {page !== null && (
@@ -490,6 +503,11 @@ export function EvaluationPage() {
                           ARCHIVED: 'Archivée',
                         }[selected.status]
                       }
+                    </span>
+                  )}
+                  {user.role === 'LEARNER' && selected.completed && (
+                    <span className="status-pill status-completed">
+                      Terminé
                     </span>
                   )}
                   <h2 id="evaluation-modal-title">{selected.title}</h2>
@@ -846,7 +864,9 @@ export function EvaluationPage() {
                     </article>
                   ))}
                 </div>
-                {user.role === 'LEARNER' && attempt === null && (
+                {user.role === 'LEARNER' &&
+                  attempt === null &&
+                  !selected.completed && (
                   <button
                     className="primary-button"
                     disabled={busy}
@@ -854,7 +874,7 @@ export function EvaluationPage() {
                   >
                     Démarrer une nouvelle tentative
                   </button>
-                )}
+                  )}
                 {user.role === 'LEARNER' && attempt !== null && (
                   <div className="attempt-panel content-card">
                     <div className="managed-training-heading">

@@ -9,7 +9,7 @@ export const Select = forwardRef<
       <select
         {...props}
         ref={ref}
-        className={className}
+        className={`content-select ${className}`.trim()}
         aria-invalid={invalid}
       />
       <svg viewBox="0 0 20 20" aria-hidden="true">

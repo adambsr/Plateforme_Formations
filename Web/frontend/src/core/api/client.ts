@@ -43,6 +43,10 @@ function localizedApiMessage(
       'Le backend de développement doit utiliser une clé secrète Stripe sk_test_.',
     AI_PROVIDER_BUSY:
       'Gemini est temporairement très sollicité. Réessayez dans un instant.',
+    TRAINING_HAS_HISTORY:
+      'Cette formation possède un historique et ne peut pas être supprimée. Archivez-la pour conserver les inscriptions, paiements et résultats.',
+    EVALUATION_ALREADY_COMPLETED:
+      'Cette évaluation est déjà complétée. Une évaluation réussie ne peut pas être recommencée.',
   };
   if (known[code] !== undefined) return known[code];
   const appearsEnglish =

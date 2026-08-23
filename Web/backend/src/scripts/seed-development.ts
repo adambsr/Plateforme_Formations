@@ -402,13 +402,24 @@ export async function seedDevelopmentData(environment = process.env) {
         });
       }),
     );
-    const evaluationIds = trainingIds.map((_, index) => objectId(9, index + 1));
+    const onlineTrainingIndexes = trainingData.flatMap((training, index) =>
+      training[3] === 'SELF_PACED_ONLINE' ? [index] : [],
+    );
+    const evaluationIds = onlineTrainingIndexes.map((_, index) =>
+      objectId(9, index + 1),
+    );
+    const evaluationIdByTrainingIndex = new Map(
+      onlineTrainingIndexes.map((trainingIndex, index) => [
+        trainingIndex,
+        evaluationIds[index]!,
+      ]),
+    );
     await EvaluationModel.insertMany(
-      trainingIds.map((trainingId, index) => ({
+      onlineTrainingIndexes.map((trainingIndex, index) => ({
         _id: evaluationIds[index],
-        trainingId,
-        ownerTrainerId: trainerIds[index % trainerIds.length],
-        title: `Évaluation finale — ${trainingData[index]![0]}`,
+        trainingId: trainingIds[trainingIndex],
+        ownerTrainerId: trainerIds[trainingIndex % trainerIds.length],
+        title: `Évaluation finale — ${trainingData[trainingIndex]![0]}`,
         instructions: 'Sélectionnez la meilleure réponse pour chaque question.',
         status: 'PUBLISHED' as const,
         passPercentage: 70,
@@ -418,10 +429,16 @@ export async function seedDevelopmentData(environment = process.env) {
       })),
     );
     await TrainingModel.bulkWrite(
-      trainingIds.map((trainingId, index) => ({
+      onlineTrainingIndexes.map((trainingIndex) => ({
         updateOne: {
-          filter: { _id: trainingId },
-          update: { $set: { certifyingEvaluationId: evaluationIds[index]! } },
+          filter: { _id: trainingIds[trainingIndex]! },
+          update: {
+            $set: {
+              certifyingEvaluationId: evaluationIds[
+                onlineTrainingIndexes.indexOf(trainingIndex)
+              ]!,
+            },
+          },
         },
       })),
     );
@@ -433,17 +450,21 @@ export async function seedDevelopmentData(environment = process.env) {
         [0, 1, 2].map((question) => ({
           _id: questionIds[index * 3 + question],
           evaluationId,
-          trainingId: trainingIds[index],
+          trainingId: trainingIds[onlineTrainingIndexes[index]!]!,
           order: question + 1,
           points: 1,
-          prompt: `Question ${question + 1} sur les principes de ${trainingData[index]![0]}`,
+          prompt: [
+            `Quel est le rôle principal de la structure étudiée dans ${trainingData[onlineTrainingIndexes[index]!]![0]} ?`,
+            `Quelle pratique améliore directement la qualité d'un projet ${trainingData[onlineTrainingIndexes[index]!]![0]} ?`,
+            `Quel contrôle permet de valider les acquis en ${trainingData[onlineTrainingIndexes[index]!]![0]} ?`,
+          ][question],
           explanation:
-            'La réponse attendue correspond à la méthode présentée dans le parcours.',
+            'La réponse attendue correspond aux notions et pratiques présentées dans le parcours.',
           type: 'SINGLE_CHOICE' as const,
           options: [
-            { id: 'a', text: 'Appliquer une démarche structurée' },
-            { id: 'b', text: 'Ignorer le contexte' },
-            { id: 'c', text: 'Éviter toute vérification' },
+            { id: 'a', text: ['Organiser les données et les responsabilités', 'Tester le comportement attendu', 'Comparer le résultat aux critères définis'][question]! },
+            { id: 'b', text: ['Supprimer les contrôles', 'Modifier le code sans vérification', 'Ignorer les critères de réussite'][question]! },
+            { id: 'c', text: ['Travailler sans objectif', 'Éviter les cas limites', 'Reporter toute validation'][question]! },
           ],
           correctOptionIds: ['a'],
         })),
@@ -650,18 +671,24 @@ export async function seedDevelopmentData(environment = process.env) {
       );
       return sessionIndex % 2 === 0 && purchase.learnerIndex % 7 !== 0;
     });
+    const evaluatedOutcomePurchases = outcomePurchases.filter(
+      (purchase) => purchase.purchaseType === 'SELF_PACED_ONLINE',
+    );
     const outcomeIndexes = outcomePurchases.map((purchase) =>
       paidPurchases.indexOf(purchase),
     );
-    const attemptIds = outcomePurchases.map((_, index) =>
+    const evaluatedOutcomeIndexes = evaluatedOutcomePurchases.map((purchase) =>
+      paidPurchases.indexOf(purchase),
+    );
+    const attemptIds = evaluatedOutcomePurchases.map((_, index) =>
       objectId(17, index + 1),
     );
     await EvaluationAttemptModel.insertMany(
-      outcomePurchases.map((purchase, index) => {
-        const purchaseIndex = outcomeIndexes[index]!;
+      evaluatedOutcomePurchases.map((purchase, index) => {
+        const purchaseIndex = evaluatedOutcomeIndexes[index]!;
         return {
           _id: attemptIds[index],
-          evaluationId: evaluationIds[purchase.trainingIndex],
+          evaluationId: evaluationIdByTrainingIndex.get(purchase.trainingIndex)!,
           trainingId: purchase.trainingId,
           enrollmentId: enrollmentIds[purchaseIndex],
           learnerId: purchase.learnerId,
@@ -677,7 +704,7 @@ export async function seedDevelopmentData(environment = process.env) {
       }),
     );
     await EvaluationAnswerModel.insertMany(
-      outcomePurchases.flatMap((purchase, outcomeIndex) =>
+      evaluatedOutcomePurchases.flatMap((purchase, outcomeIndex) =>
         [0, 1, 2].map((questionIndex) => ({
           _id: objectId(18, outcomeIndex * 3 + questionIndex + 1),
           attemptId: attemptIds[outcomeIndex],
@@ -687,14 +714,18 @@ export async function seedDevelopmentData(environment = process.env) {
           snapshot: {
             order: questionIndex + 1,
             points: 1,
-            prompt: `Question ${questionIndex + 1} sur les principes de ${trainingData[purchase.trainingIndex]![0]}`,
+            prompt: [
+              `Quel est le rôle principal de la structure étudiée dans ${trainingData[purchase.trainingIndex]![0]} ?`,
+              `Quelle pratique améliore directement la qualité d'un projet ${trainingData[purchase.trainingIndex]![0]} ?`,
+              `Quel contrôle permet de valider les acquis en ${trainingData[purchase.trainingIndex]![0]} ?`,
+            ][questionIndex],
             explanation:
-              'La réponse attendue correspond à la méthode présentée.',
+              'La réponse attendue correspond aux notions et pratiques présentées.',
             type: 'SINGLE_CHOICE' as const,
             options: [
-              { id: 'a', text: 'Appliquer une démarche structurée' },
-              { id: 'b', text: 'Ignorer le contexte' },
-              { id: 'c', text: 'Éviter toute vérification' },
+              { id: 'a', text: ['Organiser les données et les responsabilités', 'Tester le comportement attendu', 'Comparer le résultat aux critères définis'][questionIndex]! },
+              { id: 'b', text: ['Supprimer les contrôles', 'Modifier le code sans vérification', 'Ignorer les critères de réussite'][questionIndex]! },
+              { id: 'c', text: ['Travailler sans objectif', 'Éviter les cas limites', 'Reporter toute validation'][questionIndex]! },
             ],
             correctOptionIds: ['a'],
           },
@@ -743,8 +774,16 @@ export async function seedDevelopmentData(environment = process.env) {
           eligibility: {
             completionPercentage: 100,
             completedAt: date(-1),
-            certifyingEvaluationId: evaluationIds[purchase.trainingIndex],
-            passedAttemptId: attemptIds[index],
+            ...(purchase.purchaseType === 'SELF_PACED_ONLINE'
+              ? {
+                  certifyingEvaluationId: evaluationIdByTrainingIndex.get(
+                    purchase.trainingIndex,
+                  ),
+                  passedAttemptId: attemptIds[
+                    evaluatedOutcomePurchases.indexOf(purchase)
+                  ],
+                }
+              : {}),
             passedAt: date(-1),
           },
           issuer,

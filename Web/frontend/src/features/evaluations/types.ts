@@ -47,6 +47,7 @@ export interface Evaluation {
   maxAttempts: number;
   durationMinutes?: number;
   questionCount: number;
+  completed?: boolean;
   isCertifying: boolean;
   questions?: Question[];
   attempts?: Attempt[];

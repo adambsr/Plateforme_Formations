@@ -36,7 +36,12 @@ function parseEur(value: FormDataEntryValue | null): number | undefined {
 
 const typeLabel = (type: TrainingType) =>
   type === 'SELF_PACED_ONLINE' ? 'En ligne autonome' : 'Présentiel';
-const trainingLevels = ['Débutant', 'Intermédiaire', 'Avancé', 'Tous niveaux'] as const;
+const trainingLevels = [
+  'Débutant',
+  'Intermédiaire',
+  'Avancé',
+  'Tous niveaux',
+] as const;
 const statusLabel = (status: Training['status']) =>
   ({ DRAFT: 'Brouillon', PUBLISHED: 'Publiée', ARCHIVED: 'Archivée' })[status];
 const price = (minor: number) =>
@@ -338,23 +343,18 @@ export function TrainingEditorPage() {
   const navigate = useNavigate();
   const editing = trainingId !== undefined;
   const [training, setTraining] = useState<Training>();
+  const [thumbnailFile, setThumbnailFile] = useState<File>();
+  const [thumbnailPreviewUrl, setThumbnailPreviewUrl] = useState<string>();
+  const [thumbnailRemoved, setThumbnailRemoved] = useState(false);
   const [categories, setCategories] = useState<TrainingCategory[]>([]);
   const [trainers, setTrainers] = useState<User[]>([]);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
-  const [thumbnailFile, setThumbnailFile] = useState<File>();
-  const [thumbnailPreviewUrl, setThumbnailPreviewUrl] = useState<string>();
-  const [removeThumbnail, setRemoveThumbnail] = useState(false);
 
   useEffect(() => {
-    if (thumbnailFile === undefined) {
-      setThumbnailPreviewUrl(undefined);
-      return;
-    }
-    const url = URL.createObjectURL(thumbnailFile);
-    setThumbnailPreviewUrl(url);
-    return () => URL.revokeObjectURL(url);
-  }, [thumbnailFile]);
+    if (thumbnailPreviewUrl !== undefined)
+      return () => URL.revokeObjectURL(thumbnailPreviewUrl);
+  }, [thumbnailPreviewUrl]);
 
   useEffect(() => {
     if (user === null) return;
@@ -404,7 +404,7 @@ export function TrainingEditorPage() {
             }
           : {}),
       };
-      let saved = await request<Training>(
+      const savedTraining = await request<Training>(
         editing ? `/trainings/${trainingId}` : '/trainings',
         {
           method: editing ? 'PUT' : 'POST',
@@ -421,18 +421,18 @@ export function TrainingEditorPage() {
           ),
         },
       );
-      if (removeThumbnail && saved.thumbnailUrl !== undefined) {
-        saved = await request<Training>(`/trainings/${saved.id}/thumbnail`, {
-          method: 'DELETE',
-        });
-      }
       if (thumbnailFile !== undefined) {
-        const upload = new FormData();
-        upload.append('thumbnail', thumbnailFile);
-        saved = await request<Training>(`/trainings/${saved.id}/thumbnail`, {
-          method: 'PUT',
-          body: upload,
-        });
+        const body = new FormData();
+        body.append('thumbnail', thumbnailFile);
+        await request<Training>(
+          `/trainings/${savedTraining.id}/thumbnail`,
+          { method: 'PUT', body },
+        );
+      } else if (editing && thumbnailRemoved && value?.thumbnailUrl !== undefined) {
+        await request<Training>(
+          `/trainings/${savedTraining.id}/thumbnail`,
+          { method: 'DELETE' },
+        );
       }
       navigate('/app/trainings', { replace: true });
     } catch (caught) {
@@ -445,9 +445,6 @@ export function TrainingEditorPage() {
   if (editing && training === undefined && error === '')
     return <p className="muted">Chargement de la formation…</p>;
   const value = training;
-  const visibleThumbnailUrl = removeThumbnail
-    ? undefined
-    : thumbnailPreviewUrl ?? value?.thumbnailUrl;
   return (
     <section className="management-editor-page">
       <Link to="/app/trainings">← Retour aux formations</Link>
@@ -501,7 +498,14 @@ export function TrainingEditorPage() {
           </label>
           <label>
             Niveau
-            <input name="level" defaultValue={value?.level ?? ''} required />
+            <Select name="level" defaultValue={value?.level ?? ''} required>
+              <option value="">Sélectionner un niveau</option>
+              {trainingLevels.map((level) => (
+                <option key={level} value={level}>
+                  {level}
+                </option>
+              ))}
+            </Select>
           </label>
           <label>
             Type immuable
@@ -581,6 +585,57 @@ export function TrainingEditorPage() {
             defaultValue={value?.prerequisites.join('\n') ?? ''}
           />
         </label>
+        <div className="thumbnail-editor">
+          <span className="field-label">Miniature</span>
+          {(thumbnailPreviewUrl ??
+            (value?.thumbnailUrl !== undefined && !thumbnailRemoved
+              ? apiAssetUrl(value.thumbnailUrl)
+              : undefined)) !== undefined && (
+            <img
+              className="training-thumbnail"
+              src={
+                thumbnailPreviewUrl ??
+                apiAssetUrl(value?.thumbnailUrl as string)
+              }
+              alt="Aperçu de la miniature de la formation"
+            />
+          )}
+          <div className="thumbnail-editor-actions">
+            <label className="secondary-button compact-button">
+              {thumbnailPreviewUrl === undefined && value?.thumbnailUrl === undefined
+                ? 'Ajouter une miniature'
+                : 'Remplacer la miniature'}
+              <input
+                className="visually-hidden"
+                type="file"
+                accept="image/png,image/jpeg,image/gif,image/webp"
+                onChange={(event) => {
+                  const file = event.target.files?.[0];
+                  if (file !== undefined) {
+                    setThumbnailFile(file);
+                    setThumbnailPreviewUrl(URL.createObjectURL(file));
+                    setThumbnailRemoved(false);
+                  }
+                  event.target.value = '';
+                }}
+              />
+            </label>
+            {(thumbnailPreviewUrl !== undefined ||
+              (value?.thumbnailUrl !== undefined && !thumbnailRemoved)) && (
+              <button
+                type="button"
+                className="danger-button"
+                onClick={() => {
+                  setThumbnailFile(undefined);
+                  setThumbnailPreviewUrl(undefined);
+                  setThumbnailRemoved(true);
+                }}
+              >
+                Supprimer la miniature
+              </button>
+            )}
+          </div>
+        </div>
         <div className="form-actions">
           <button className="primary-button" disabled={busy}>
             {busy

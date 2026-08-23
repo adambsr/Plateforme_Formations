@@ -321,7 +321,7 @@ integrationDescribe(
             .delete(`/api/trainings/${inPersonId}`)
             .set('authorization', `Bearer ${nextOwnerToken}`)
         ).status,
-      ).toBe(409);
+      ).toBe(204);
 
       const deletableDraft = await request(app)
         .post('/api/trainings')

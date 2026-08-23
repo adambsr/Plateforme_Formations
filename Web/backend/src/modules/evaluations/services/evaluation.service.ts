@@ -152,6 +152,20 @@ export class EvaluationService {
       EvaluationModel.countDocuments(filter),
     ]);
     const trainingIds = items.map(({ trainingId }) => trainingId);
+    const completedEvaluationIds =
+      principal.role === 'LEARNER'
+        ? new Set(
+            (
+              await EvaluationAttemptModel.find({
+                learnerId: principal.userId,
+                evaluationId: { $in: items.map(({ _id }) => _id) },
+                status: 'PASSED',
+              })
+                .select('evaluationId')
+                .exec()
+            ).map(({ evaluationId }) => String(evaluationId)),
+          )
+        : new Set<string>();
     const [trainings, questionCounts] = await Promise.all([
       TrainingModel.find({ _id: { $in: trainingIds } })
         .select('title certifyingEvaluationId')
@@ -176,6 +190,7 @@ export class EvaluationService {
           evaluation,
           trainingById.get(String(evaluation.trainingId)),
           countById.get(String(evaluation._id)) ?? 0,
+          completedEvaluationIds.has(String(evaluation._id)),
         ),
       ),
       page: input.page,
@@ -233,8 +248,9 @@ export class EvaluationService {
       .sort({ attemptNumber: 1 })
       .exec();
     for (const attempt of attempts) await this.#expireIfNeeded(attempt);
+    const completed = attempts.some(({ status }) => status === 'PASSED');
     return {
-      ...this.#summary(evaluation, training, questions.length),
+      ...this.#summary(evaluation, training, questions.length, completed),
       questions: questions.map((question) => this.#question(question, false)),
       attempts: await Promise.all(
         attempts.map((attempt) => this.#attemptView(attempt)),
@@ -424,11 +440,11 @@ export class EvaluationService {
         'EVALUATION_ARCHIVE_FORBIDDEN',
         'Only the owner or an Admin can archive this Evaluation.',
       );
-    if (evaluation.status !== 'PUBLISHED')
+    if (!['DRAFT', 'PUBLISHED'].includes(evaluation.status))
       throw new AppError(
         409,
         'EVALUATION_NOT_PUBLISHED',
-        'Only a published Evaluation can be archived.',
+        'Only a draft or published Evaluation can be archived.',
       );
     if (
       (await TrainingModel.exists({
@@ -530,6 +546,17 @@ export class EvaluationService {
       enrollmentId: enrollment._id,
       status: { $in: ['PASSED', 'FAILED'] },
     });
+    const passed = await EvaluationAttemptModel.exists({
+      evaluationId: evaluation._id,
+      enrollmentId: enrollment._id,
+      status: 'PASSED',
+    });
+    if (passed !== null)
+      throw new AppError(
+        409,
+        'EVALUATION_ALREADY_COMPLETED',
+        'This Evaluation has already been completed successfully.',
+      );
     if (consumed >= evaluation.maxAttempts)
       throw new AppError(
         409,
@@ -828,6 +855,7 @@ export class EvaluationService {
       | { _id: unknown; title: string; certifyingEvaluationId?: unknown }
       | undefined,
     questionCount: number,
+    completed = false,
   ) {
     return {
       id: String(evaluation._id),
@@ -845,6 +873,7 @@ export class EvaluationService {
         ? {}
         : { durationMinutes: evaluation.durationMinutes }),
       questionCount,
+      completed,
       isCertifying:
         training?.certifyingEvaluationId !== undefined &&
         String(training.certifyingEvaluationId) === String(evaluation._id),
