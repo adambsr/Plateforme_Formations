@@ -5,7 +5,7 @@ import type { AuthenticatedPrincipal } from '../../../shared/auth/principal.js';
 import { isDuplicateKeyError } from '../../../shared/database/mongo-errors.js';
 import { AppError } from '../../../shared/errors/app-error.js';
 import { UserModel, type User } from '../../users/models/user.model.js';
-import { publicationBlockReason, TND_CURRENCY } from '../domain/training.js';
+import { publicationBlockReason, EUR_CURRENCY } from '../domain/training.js';
 import type {
   CreateCategoryInput,
   CreateTrainingInput,
@@ -43,7 +43,7 @@ export interface PublicTraining {
   prerequisites: string[];
   type: Training['type'];
   priceMinor: number;
-  currency: typeof TND_CURRENCY;
+  currency: typeof EUR_CURRENCY;
   ownerTrainer: {
     id: string;
     firstName?: string;
@@ -282,7 +282,7 @@ export class TrainingService {
       prerequisites: input.prerequisites,
       type: input.type,
       priceMinor: input.priceMinor,
-      currency: TND_CURRENCY,
+      currency: EUR_CURRENCY,
       ownerTrainerId: owner._id,
       status: 'DRAFT',
       ...(input.type === 'IN_PERSON'
@@ -428,6 +428,7 @@ export class TrainingService {
         checksumSha256: stored.checksumSha256,
         uploadedAt: stored.uploadedAt,
       };
+      training.set('thumbnailExternalUrl', undefined);
       await training.save();
     } catch (error) {
       await this.#fileStorage.remove(stored.relativePath);
@@ -445,6 +446,7 @@ export class TrainingService {
     const training = await this.#managedTraining(principal, trainingId);
     const previousPath = training.thumbnail?.relativePath;
     training.set('thumbnail', undefined);
+    training.set('thumbnailExternalUrl', undefined);
     await training.save();
     if (previousPath !== undefined && this.#fileStorage !== undefined) {
       await this.#fileStorage.remove(previousPath);
@@ -707,11 +709,13 @@ export class TrainingService {
             : { lastName: owner.profile.lastName }),
         },
         status: training.status,
-        ...(training.thumbnail === undefined
-          ? {}
-          : {
-              thumbnailUrl: `/trainings/${String(training._id)}/thumbnail?v=${training.thumbnail.uploadedAt.getTime()}`,
-            }),
+        ...(training.thumbnailExternalUrl !== undefined
+          ? { thumbnailUrl: training.thumbnailExternalUrl }
+          : training.thumbnail === undefined
+            ? {}
+            : {
+                thumbnailUrl: `/trainings/${String(training._id)}/thumbnail?v=${training.thumbnail.uploadedAt.getTime()}`,
+              }),
         ...(training.minimumAttendancePercent === undefined
           ? {}
           : {

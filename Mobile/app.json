@@ -3,9 +3,11 @@
     "name": "Plateforme de Formations",
     "slug": "plateforme-formations",
     "version": "0.1.0",
+    "scheme": "plateforme-formations",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
+    "plugins": ["expo-secure-store"],
     "ios": {
       "supportsTablet": true
     },

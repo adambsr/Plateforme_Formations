@@ -16,9 +16,11 @@ const publishedTraining: Training = {
   prerequisites: ['JavaScript'],
   type: 'SELF_PACED_ONLINE',
   priceMinor: 12550,
-  currency: 'TND',
+  currency: 'EUR',
   ownerTrainer: { id: 'trainer-1', firstName: 'Amina', lastName: 'Ben Ali' },
   status: 'PUBLISHED',
+  thumbnailUrl:
+    'https://images.unsplash.com/photo-1553877522-43269d4ea984?auto=format&fit=crop&w=1200&q=80',
   createdAt: '2026-08-21T10:00:00.000Z',
   updatedAt: '2026-08-21T10:00:00.000Z',
 };
@@ -101,6 +103,11 @@ describe('Phase 2 public catalogue', () => {
         name: 'Voir la formation TypeScript strict en pratique',
       }),
     ).toHaveAttribute('href', '/trainings/training-1');
+    expect(
+      screen.getByRole('img', {
+        name: 'Miniature de la formation TypeScript strict en pratique',
+      }),
+    ).toHaveAttribute('src', publishedTraining.thumbnailUrl);
   });
 
   it('renders the empty state returned by the API', async () => {

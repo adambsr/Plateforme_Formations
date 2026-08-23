@@ -20,7 +20,7 @@ describe('StripeSdkCheckoutGateway configuration', () => {
         trainingId: 'training-id',
         description: 'Formation de test',
         amountMinor: 12_550,
-        currency: 'TND',
+        currency: 'EUR',
       }),
     ).rejects.toMatchObject({
       status: 503,
@@ -49,7 +49,7 @@ describe('StripeSdkCheckoutGateway configuration', () => {
         trainingId: 'training-id',
         description: 'Formation de test',
         amountMinor: 15_000,
-        currency: 'TND',
+        currency: 'EUR',
       }),
     ).rejects.toMatchObject({
       status: 503,

@@ -6,7 +6,7 @@ export interface InvoiceItem {
   quantity: 1;
   unitAmountMinor: number;
   totalMinor: number;
-  currency: 'TND';
+  currency: 'EUR';
   createdAt: Date;
   updatedAt: Date;
 }
@@ -37,7 +37,7 @@ const invoiceItemSchema = new mongoose.Schema<InvoiceItem>(
       min: 1,
       validate: Number.isSafeInteger,
     },
-    currency: { type: String, required: true, enum: ['TND'] },
+    currency: { type: String, required: true, enum: ['EUR'] },
   },
   {
     collection: 'invoice_items',

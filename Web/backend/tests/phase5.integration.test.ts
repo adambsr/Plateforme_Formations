@@ -199,7 +199,7 @@ integrationDescribe(
         objectives: [],
         prerequisites: [],
         priceMinor: 12_550,
-        currency: 'TND' as const,
+        currency: 'EUR' as const,
         ownerTrainerId: trainer._id,
         status: 'PUBLISHED' as const,
       };
@@ -310,7 +310,7 @@ integrationDescribe(
             payment_status:
               type === 'checkout.session.completed' ? 'paid' : 'unpaid',
             amount_total: payment.amountMinor,
-            currency: 'tnd',
+            currency: 'eur',
             payment_intent: 'pi_test_phase5',
             metadata: {
               paymentId: String(payment._id),
@@ -471,7 +471,7 @@ integrationDescribe(
       expect(parsed.text).toContain(invoice.number);
       expect(parsed.text).toContain('Ali Learner');
       expect(parsed.text).toContain('TypeScript payé');
-      expect(parsed.text).toContain('12.550 TND');
+      expect(parsed.text).toContain('12.550 EUR');
       expect(parsed.text).toContain('Centre Snapshot');
       expect(parsed.text).toContain('High Skills Academy');
       expect(parsed.text).toContain('HS');
@@ -541,7 +541,7 @@ integrationDescribe(
         purchaseType: 'IN_PERSON',
         status: 'PENDING',
         amountMinor: 12_550,
-        currency: 'TND',
+        currency: 'EUR',
         trainingTitle: 'Atelier payé',
         sessionTitle: 'Session expirée',
         stripeCheckoutSessionId: `cs_test_${new mongoose.Types.ObjectId()}`,

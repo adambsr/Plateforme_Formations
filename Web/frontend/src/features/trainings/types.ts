@@ -21,7 +21,7 @@ export interface Training {
   prerequisites: string[];
   type: TrainingType;
   priceMinor: number;
-  currency: 'TND';
+  currency: 'EUR';
   ownerTrainer: { id: string; firstName?: string; lastName?: string };
   status: TrainingStatus;
   minimumAttendancePercent?: number;

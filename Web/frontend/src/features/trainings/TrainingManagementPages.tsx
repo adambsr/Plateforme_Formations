@@ -26,7 +26,7 @@ const lines = (value: FormDataEntryValue | null) =>
     .map((line) => line.trim())
     .filter(Boolean);
 
-function parseTnd(value: FormDataEntryValue | null): number | undefined {
+function parseEur(value: FormDataEntryValue | null): number | undefined {
   const match = /^(\d+)(?:[.,](\d{1,2}))?$/.exec(String(value ?? '').trim());
   if (match === null) return undefined;
   const amount =
@@ -36,12 +36,13 @@ function parseTnd(value: FormDataEntryValue | null): number | undefined {
 
 const typeLabel = (type: TrainingType) =>
   type === 'SELF_PACED_ONLINE' ? 'En ligne autonome' : 'Présentiel';
+const trainingLevels = ['Débutant', 'Intermédiaire', 'Avancé', 'Tous niveaux'] as const;
 const statusLabel = (status: Training['status']) =>
   ({ DRAFT: 'Brouillon', PUBLISHED: 'Publiée', ARCHIVED: 'Archivée' })[status];
 const price = (minor: number) =>
-  new Intl.NumberFormat('fr-TN', {
+  new Intl.NumberFormat('fr-FR', {
     style: 'currency',
-    currency: 'TND',
+    currency: 'EUR',
     minimumFractionDigits: 2,
   }).format(minor / 100);
 
@@ -341,6 +342,19 @@ export function TrainingEditorPage() {
   const [trainers, setTrainers] = useState<User[]>([]);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
+  const [thumbnailFile, setThumbnailFile] = useState<File>();
+  const [thumbnailPreviewUrl, setThumbnailPreviewUrl] = useState<string>();
+  const [removeThumbnail, setRemoveThumbnail] = useState(false);
+
+  useEffect(() => {
+    if (thumbnailFile === undefined) {
+      setThumbnailPreviewUrl(undefined);
+      return;
+    }
+    const url = URL.createObjectURL(thumbnailFile);
+    setThumbnailPreviewUrl(url);
+    return () => URL.revokeObjectURL(url);
+  }, [thumbnailFile]);
 
   useEffect(() => {
     if (user === null) return;
@@ -364,9 +378,9 @@ export function TrainingEditorPage() {
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
-    const priceMinor = parseTnd(form.get('priceTnd'));
+    const priceMinor = parseEur(form.get('priceEur'));
     if (priceMinor === undefined) {
-      setError('Saisissez un prix TND valide avec deux décimales au maximum.');
+      setError('Saisissez un prix EUR valide avec deux décimales au maximum.');
       return;
     }
     const type = String(form.get('type')) as TrainingType;
@@ -390,20 +404,36 @@ export function TrainingEditorPage() {
             }
           : {}),
       };
-      await request(editing ? `/trainings/${trainingId}` : '/trainings', {
-        method: editing ? 'PUT' : 'POST',
-        body: JSON.stringify(
-          editing
-            ? common
-            : {
-                ...common,
-                type,
-                ...(user?.role === 'ADMIN'
-                  ? { ownerTrainerId: String(form.get('ownerTrainerId')) }
-                  : {}),
-              },
-        ),
-      });
+      let saved = await request<Training>(
+        editing ? `/trainings/${trainingId}` : '/trainings',
+        {
+          method: editing ? 'PUT' : 'POST',
+          body: JSON.stringify(
+            editing
+              ? common
+              : {
+                  ...common,
+                  type,
+                  ...(user?.role === 'ADMIN'
+                    ? { ownerTrainerId: String(form.get('ownerTrainerId')) }
+                    : {}),
+                },
+          ),
+        },
+      );
+      if (removeThumbnail && saved.thumbnailUrl !== undefined) {
+        saved = await request<Training>(`/trainings/${saved.id}/thumbnail`, {
+          method: 'DELETE',
+        });
+      }
+      if (thumbnailFile !== undefined) {
+        const upload = new FormData();
+        upload.append('thumbnail', thumbnailFile);
+        saved = await request<Training>(`/trainings/${saved.id}/thumbnail`, {
+          method: 'PUT',
+          body: upload,
+        });
+      }
       navigate('/app/trainings', { replace: true });
     } catch (caught) {
       setError(errorMessage(caught));
@@ -415,6 +445,9 @@ export function TrainingEditorPage() {
   if (editing && training === undefined && error === '')
     return <p className="muted">Chargement de la formation…</p>;
   const value = training;
+  const visibleThumbnailUrl = removeThumbnail
+    ? undefined
+    : thumbnailPreviewUrl ?? value?.thumbnailUrl;
   return (
     <section className="management-editor-page">
       <Link to="/app/trainings">← Retour aux formations</Link>
@@ -435,7 +468,7 @@ export function TrainingEditorPage() {
         onSubmit={(event) => void submit(event)}
       >
         <p className="muted">
-          Le type est définitif dès la création. Le prix est saisi en TND.
+          Le type est définitif dès la création. Le prix est saisi en EUR.
         </p>
         <label>
           Titre
@@ -493,9 +526,9 @@ export function TrainingEditorPage() {
             />
           </label>
           <label>
-            Prix en TND
+            Prix en EUR
             <input
-              name="priceTnd"
+              name="priceEur"
               inputMode="decimal"
               defaultValue={
                 value === undefined ? '' : (value.priceMinor / 100).toFixed(2)

@@ -20,7 +20,7 @@ function message(error: unknown): string {
 }
 
 function date(value: string): string {
-  return new Intl.DateTimeFormat('fr-TN', {
+  return new Intl.DateTimeFormat('fr-FR', {
     timeZone: 'Africa/Tunis',
     dateStyle: 'medium',
   }).format(new Date(value));

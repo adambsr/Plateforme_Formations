@@ -163,7 +163,7 @@ integrationDescribe('Phase 3 and 4 real HTTP integration', () => {
       objectives: ['Appliquer les concepts'],
       prerequisites: ['Bases techniques'],
       priceMinor: 30_000,
-      currency: 'TND' as const,
+      currency: 'EUR' as const,
       ownerTrainerId: owner._id,
     };
     const [selfPaced, inPerson] = await TrainingModel.create([

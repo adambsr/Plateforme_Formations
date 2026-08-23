@@ -34,7 +34,7 @@ describe('Phase 10 Certificate and Feedback UI', () => {
               id: 'enrollment-1',
               learner: { id: 'learner-1', email: 'learner@example.com' },
               training: { id: 'training-1', title: 'TypeScript' },
-              payment: { id: 'payment-1', amountMinor: 1000, currency: 'TND' },
+              payment: { id: 'payment-1', amountMinor: 1000, currency: 'EUR' },
               eligibility: { eligible: true, failures: [] },
               createdAt: '2026-01-01T00:00:00.000Z',
             },
@@ -113,7 +113,7 @@ describe('Phase 10 Certificate and Feedback UI', () => {
               id: 'enrollment-rated',
               learner: { id: 'learner-1', email: 'learner@example.com' },
               training: { id: 'training-1', title: 'React' },
-              payment: { id: 'payment-1', amountMinor: 1000, currency: 'TND' },
+              payment: { id: 'payment-1', amountMinor: 1000, currency: 'EUR' },
               feedback: {
                 rating: 4,
                 createdAt: '2026-01-02T00:00:00.000Z',

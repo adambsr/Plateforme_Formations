@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import {
-  isPositiveTndMinorAmount,
+  isPositiveEurMinorAmount,
   publicationBlockReason,
   TRAINING_STATUSES,
   TRAINING_TYPES,
@@ -19,12 +19,12 @@ describe('Training catalogue foundation', () => {
     expect(TRAINING_STATUSES).toEqual(['DRAFT', 'PUBLISHED', 'ARCHIVED']);
   });
 
-  it('accepts only positive safe integer TND minor amounts', () => {
-    expect(isPositiveTndMinorAmount(1)).toBe(true);
-    expect(isPositiveTndMinorAmount(1_500)).toBe(true);
-    expect(isPositiveTndMinorAmount(0)).toBe(false);
-    expect(isPositiveTndMinorAmount(1.5)).toBe(false);
-    expect(isPositiveTndMinorAmount(Number.MAX_SAFE_INTEGER + 1)).toBe(false);
+  it('accepts only positive safe integer EUR minor amounts', () => {
+    expect(isPositiveEurMinorAmount(1)).toBe(true);
+    expect(isPositiveEurMinorAmount(1_500)).toBe(true);
+    expect(isPositiveEurMinorAmount(0)).toBe(false);
+    expect(isPositiveEurMinorAmount(1.5)).toBe(false);
+    expect(isPositiveEurMinorAmount(Number.MAX_SAFE_INTEGER + 1)).toBe(false);
   });
 
   it('blocks self-paced publication without a Module containing a Lesson', () => {

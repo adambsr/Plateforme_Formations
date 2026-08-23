@@ -235,6 +235,24 @@ export async function seedDevelopmentData(environment = process.env) {
       ['Cybersécurité au quotidien', 0, 'Tous niveaux', 'IN_PERSON', 22900],
     ] as const;
     const trainingIds = trainingData.map((_, index) => objectId(3, index + 1));
+    const trainingThumbnails = [
+      'https://images.unsplash.com/photo-1498050108023-c5249f4df085?auto=format&fit=crop&w=1200&q=80',
+      'https://images.unsplash.com/photo-1555066931-4365d14bab8c?auto=format&fit=crop&w=1200&q=80',
+      'https://images.unsplash.com/photo-1516321318423-f06f85e504b3?auto=format&fit=crop&w=1200&q=80',
+      'https://images.unsplash.com/photo-1515879218367-8466d910aaa4?auto=format&fit=crop&w=1200&q=80',
+      'https://images.unsplash.com/photo-1551288049-bebda4e38f71?auto=format&fit=crop&w=1200&q=80',
+      'https://images.unsplash.com/photo-1677442136019-21780ecad995?auto=format&fit=crop&w=1200&q=80',
+      'https://images.unsplash.com/photo-1543286386-713bdd548da4?auto=format&fit=crop&w=1200&q=80',
+      'https://images.unsplash.com/photo-1552664730-d307ca884978?auto=format&fit=crop&w=1200&q=80',
+      'https://images.unsplash.com/photo-1517245386807-bb43f82c33c4?auto=format&fit=crop&w=1200&q=80',
+      'https://images.unsplash.com/photo-1542744173-8e7e53415bb0?auto=format&fit=crop&w=1200&q=80',
+      'https://images.unsplash.com/photo-1556761175-b413da4baf72?auto=format&fit=crop&w=1200&q=80',
+      'https://images.unsplash.com/photo-1559028012-481c04fa702d?auto=format&fit=crop&w=1200&q=80',
+      'https://images.unsplash.com/photo-1587614382346-4ec70e388b28?auto=format&fit=crop&w=1200&q=80',
+      'https://images.unsplash.com/photo-1475721027785-f74eccf877e2?auto=format&fit=crop&w=1200&q=80',
+      'https://images.unsplash.com/photo-1553877522-43269d4ea984?auto=format&fit=crop&w=1200&q=80',
+      'https://images.unsplash.com/photo-1563013544-824ae1b704d3?auto=format&fit=crop&w=1200&q=80',
+    ] as const;
     await TrainingModel.insertMany(
       trainingData.map(([title, category, level, type, priceMinor], index) => ({
         _id: trainingIds[index],
@@ -250,7 +268,8 @@ export async function seedDevelopmentData(environment = process.env) {
         prerequisites: ['Aucun prérequis technique obligatoire'],
         type,
         priceMinor,
-        currency: 'TND' as const,
+        currency: 'EUR' as const,
+        thumbnailExternalUrl: trainingThumbnails[index],
         ownerTrainerId: trainerIds[index % trainerIds.length],
         status: 'PUBLISHED' as const,
         ...(type === 'IN_PERSON' ? { minimumAttendancePercent: 75 } : {}),
@@ -319,6 +338,10 @@ export async function seedDevelopmentData(environment = process.env) {
       })),
     );
     const inPersonTrainingIds = trainingIds.slice(10);
+    const sessionTitle = (trainingIndex: number, occurrence: number) =>
+      `${trainingData[trainingIndex]![0]} — ${
+        occurrence === 0 ? 'promotion printemps terminée' : 'promotion automne à venir'
+      }`;
     const sessionIds = inPersonTrainingIds.flatMap((_, index) => [
       objectId(7, index * 2 + 1),
       objectId(7, index * 2 + 2),
@@ -328,10 +351,7 @@ export async function seedDevelopmentData(environment = process.env) {
         [0, 1].map((occurrence) => ({
           _id: sessionIds[index * 2 + occurrence],
           trainingId,
-          title:
-            occurrence === 0
-              ? 'Session de démonstration terminée'
-              : 'Prochaine session',
+          title: sessionTitle(10 + index, occurrence),
           identifier: `DEV-${index + 1}-${occurrence + 1}`,
           capacity: 14,
           enrolledCount: occurrence === 0 ? 3 : 2,
@@ -465,14 +485,14 @@ export async function seedDevelopmentData(environment = process.env) {
         purchaseType: purchase.purchaseType,
         status: 'PAID' as const,
         amountMinor: trainingData[purchase.trainingIndex]![4],
-        currency: 'TND' as const,
+        currency: 'EUR' as const,
         trainingTitle: trainingData[purchase.trainingIndex]![0],
         ...(purchase.sessionId
           ? {
-              sessionTitle:
-                sessionIds.indexOf(purchase.sessionId) % 2 === 0
-                  ? 'Session de démonstration terminée'
-                  : 'Prochaine session',
+              sessionTitle: sessionTitle(
+                purchase.trainingIndex,
+                sessionIds.indexOf(purchase.sessionId) % 2,
+              ),
             }
           : {}),
         stripeCheckoutSessionId: `cs_test_seed_paid_${index + 1}`,
@@ -492,7 +512,7 @@ export async function seedDevelopmentData(environment = process.env) {
           purchaseType: trainingData[trainingIndex]![3],
           status,
           amountMinor: trainingData[trainingIndex]![4],
-          currency: 'TND' as const,
+          currency: 'EUR' as const,
           trainingTitle: trainingData[trainingIndex]![0],
           stripeCheckoutSessionId: `cs_test_seed_${status.toLowerCase()}_${index + 1}`,
           ...(status === 'FAILED'
@@ -562,7 +582,7 @@ export async function seedDevelopmentData(environment = process.env) {
           purchaseDescription: trainingData[purchase.trainingIndex]![0],
           subtotalMinor: amountMinor,
           totalMinor: amountMinor,
-          currency: 'TND' as const,
+          currency: 'EUR' as const,
         };
       }),
     );
@@ -576,7 +596,7 @@ export async function seedDevelopmentData(environment = process.env) {
           quantity: 1 as const,
           unitAmountMinor: amountMinor,
           totalMinor: amountMinor,
-          currency: 'TND' as const,
+          currency: 'EUR' as const,
         };
       }),
     );
@@ -714,7 +734,7 @@ export async function seedDevelopmentData(environment = process.env) {
             enrolledAt: date(-3),
             ...(purchase.sessionId
               ? {
-                  sessionTitle: 'Session de démonstration terminée',
+                  sessionTitle: sessionTitle(purchase.trainingIndex, 0),
                   startsAt: date(-2, 8 + sessionIndex),
                   endsAt: date(-2, 9 + sessionIndex),
                 }
@@ -752,8 +772,8 @@ export async function seedDevelopmentData(environment = process.env) {
             trainerId,
             year: period.getUTCFullYear(),
             month: period.getUTCMonth() + 1,
-            amountMinor: 145000 + trainerIndex * 15000,
-            currency: 'TND' as const,
+            amountMinor: 12_000 + trainerIndex * 1_500,
+            currency: 'EUR' as const,
             note: 'Coût mensuel de démonstration',
           };
         }),
@@ -765,8 +785,8 @@ export async function seedDevelopmentData(environment = process.env) {
         trainingId,
         ...(index >= 10 ? { sessionId: sessionIds[(index - 10) * 2] } : {}),
         incurredOn: date(-2 + (index % 3), 10),
-        amountMinor: 12000 + index * 700,
-        currency: 'TND' as const,
+        amountMinor: 3_000 + index * 500,
+        currency: 'EUR' as const,
         label:
           index >= 10
             ? 'Location de salle et supports'

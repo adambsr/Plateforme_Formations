@@ -66,7 +66,7 @@ beforeEach(() => {
     if (path.startsWith('/dashboard/profitability'))
       return Promise.resolve({
         period,
-        currency: 'TND',
+        currency: 'EUR',
         includedTrainerMonths: [],
         revenueMinor: 0,
         trainerCostsMinor: 0,

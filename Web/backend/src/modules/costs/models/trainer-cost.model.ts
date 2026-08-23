@@ -5,7 +5,7 @@ export interface TrainerCost {
   year: number;
   month: number;
   amountMinor: number;
-  currency: 'TND';
+  currency: 'EUR';
   note?: string;
   createdAt: Date;
   updatedAt: Date;
@@ -38,7 +38,7 @@ const schema = new mongoose.Schema<TrainerCost>(
       min: 1,
       validate: Number.isSafeInteger,
     },
-    currency: { type: String, required: true, enum: ['TND'], default: 'TND' },
+    currency: { type: String, required: true, enum: ['EUR'], default: 'EUR' },
     note: { type: String, trim: true, minlength: 1, maxlength: 1_000 },
   },
   { collection: 'trainer_costs', strict: 'throw', timestamps: true },

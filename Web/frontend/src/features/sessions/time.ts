@@ -45,7 +45,7 @@ export function tunisInputToUtc(value: string): string {
 }
 
 export function formatTunisDate(value: string): string {
-  return new Intl.DateTimeFormat('fr-TN', {
+  return new Intl.DateTimeFormat('fr-FR', {
     timeZone: TUNIS_TIME_ZONE,
     dateStyle: 'full',
     timeStyle: 'short',

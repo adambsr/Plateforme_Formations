@@ -37,8 +37,8 @@ function localizedApiMessage(
     INTERNAL_ERROR: 'Une erreur interne est survenue.',
     STRIPE_CHECKOUT_FAILED:
       'Le paiement n’a pas pu être préparé. Veuillez réessayer.',
-    STRIPE_TND_NOT_ENABLED:
-      'La Sandbox Stripe configurée refuse le TND. Vérifiez que la clé backend appartient à la Sandbox où le TND est activé.',
+    STRIPE_EUR_NOT_ENABLED:
+      'La Sandbox Stripe configurée refuse le EUR. Vérifiez que la clé backend appartient à la Sandbox où le EUR est activé.',
     STRIPE_TEST_KEY_REQUIRED:
       'Le backend de développement doit utiliser une clé secrète Stripe sk_test_.',
     AI_PROVIDER_BUSY:
@@ -67,7 +67,7 @@ const API_BASE_URL =
   import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:3000/api';
 
 export function apiAssetUrl(path: string): string {
-  return `${API_BASE_URL}${path}`;
+  return /^https?:\/\//i.test(path) ? path : `${API_BASE_URL}${path}`;
 }
 
 export async function apiRequest<T>(

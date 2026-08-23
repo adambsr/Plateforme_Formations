@@ -164,7 +164,7 @@ integrationDescribe(
         objectives: [],
         prerequisites: [],
         priceMinor: 10_000,
-        currency: 'TND' as const,
+        currency: 'EUR' as const,
         ownerTrainerId: owner._id,
         status: 'PUBLISHED' as const,
       };
@@ -262,7 +262,7 @@ integrationDescribe(
             targetSession === undefined ? 'SELF_PACED_ONLINE' : 'IN_PERSON',
           status: 'PAID',
           amountMinor: training.priceMinor,
-          currency: 'TND',
+          currency: 'EUR',
           trainingTitle: training.title,
           ...(targetSession === undefined
             ? {}

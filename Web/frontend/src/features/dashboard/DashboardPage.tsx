@@ -25,9 +25,9 @@ import type {
 } from './types.js';
 
 const money = (value: number) =>
-  new Intl.NumberFormat('fr-TN', {
+  new Intl.NumberFormat('fr-FR', {
     style: 'currency',
-    currency: 'TND',
+    currency: 'EUR',
     minimumFractionDigits: 2,
   }).format(value / 100);
 const percent = (value: number | null) =>
@@ -270,7 +270,7 @@ export function DashboardPage() {
             </label>
           </div>
           <label>
-            Montant TND
+            Montant EUR
             <input
               name="amount"
               type="number"
@@ -355,7 +355,7 @@ export function DashboardPage() {
               />
             </label>
             <label>
-              Montant TND
+              Montant EUR
               <input
                 name="amount"
                 type="number"

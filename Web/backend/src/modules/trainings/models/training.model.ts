@@ -1,7 +1,7 @@
 import mongoose, { type Model, type Types } from 'mongoose';
 
 import {
-  TND_CURRENCY,
+  EUR_CURRENCY,
   TRAINING_STATUSES,
   TRAINING_TYPES,
   type TrainingStatus,
@@ -18,7 +18,7 @@ export interface Training {
   prerequisites: string[];
   type: TrainingType;
   priceMinor: number;
-  currency: typeof TND_CURRENCY;
+  currency: typeof EUR_CURRENCY;
   ownerTrainerId: Types.ObjectId;
   status: TrainingStatus;
   minimumAttendancePercent?: number;
@@ -31,6 +31,7 @@ export interface Training {
     checksumSha256: string;
     uploadedAt: Date;
   };
+  thumbnailExternalUrl?: string;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -89,7 +90,7 @@ const trainingSchema = new mongoose.Schema<Training>(
     currency: {
       type: String,
       required: true,
-      enum: [TND_CURRENCY],
+      enum: [EUR_CURRENCY],
       immutable: true,
     },
     ownerTrainerId: {
@@ -125,6 +126,15 @@ const trainingSchema = new mongoose.Schema<Training>(
         { _id: false, strict: 'throw' },
       ),
       required: false,
+    },
+    thumbnailExternalUrl: {
+      type: String,
+      required: false,
+      trim: true,
+      validate: {
+        validator: (value: string) => /^https:\/\/.+/i.test(value),
+        message: 'thumbnailExternalUrl must be an HTTPS URL.',
+      },
     },
   },
   {

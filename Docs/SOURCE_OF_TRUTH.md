@@ -476,7 +476,7 @@ Une Formation possède notamment :
 - description ;
 - catégorie ;
 - niveau ;
-- prix strictement positif en dinar tunisien (`TND`) ;
+- prix strictement positif en euro (`EUR`) ;
 - durée ;
 - objectifs ;
 - prérequis ;
@@ -915,7 +915,7 @@ Le paiement en ligne doit utiliser **Stripe en mode test/développement** pendan
 
 Aucun paiement réel ne doit être traité pendant le développement.
 
-La devise `TND` est utilisée pour les paiements de test. La disponibilité future d'un compte Stripe de production pour une entité établie en Tunisie ne fait pas partie des garanties de cette version et devra être vérifiée auprès de Stripe avant tout passage en production.
+La devise `EUR` est utilisée pour les paiements de test. La disponibilité future d'un compte Stripe de production pour une entité établie en Tunisie ne fait pas partie des garanties de cette version et devra être vérifiée auprès de Stripe avant tout passage en production.
 
 Architecture cible :
 
@@ -959,9 +959,9 @@ Le backend doit :
 
 ## 15.5 Factures
 
-La plateforme utilise une seule devise : le dinar tunisien, code ISO 4217 `TND`. Les requêtes Stripe utilisent le code `tnd`.
+La plateforme utilise une seule devise : le euro, code ISO 4217 `EUR`. Les requêtes Stripe utilisent le code `eur`.
 
-Pour rester compatible avec le traitement des paiements Stripe, les montants payables utilisent une précision de `0,01 TND` et sont stockés sous forme d'entiers dans l'unité mineure attendue par Stripe. Aucun montant monétaire n'est stocké ou calculé avec un type flottant.
+Pour rester compatible avec le traitement des paiements Stripe, les montants payables utilisent une précision de `0,01 EUR` et sont stockés sous forme d'entiers dans l'unité mineure attendue par Stripe. Aucun montant monétaire n'est stocké ou calculé avec un type flottant.
 
 Le backend lit le prix de référence de la Formation lors de la création du Checkout. Le frontend ne fournit jamais le montant faisant autorité. Le `Payment` conserve un instantané du montant, de la devise, du titre de la Formation et, si applicable, de la Session ciblée.
 
@@ -1314,7 +1314,7 @@ PUT    /api/costs/trainings/{id}
 DELETE /api/costs/trainings/{id}
 ```
 
-Ces endpoints sont réservés à l'Admin et n'acceptent que des montants explicitement saisis en TND.
+Ces endpoints sont réservés à l'Admin et n'acceptent que des montants explicitement saisis en EUR.
 
 ## 20.11 Dashboard
 
@@ -1742,12 +1742,12 @@ Aucun écran obligatoire `SiteSettings` ou `CompanySettings`.
 60. Un `TrainingCost` est une dépense explicite rattachée à une Formation et, si pertinent, à une Session.
 61. Le résultat global correspond aux revenus confirmés diminués des `TrainerCost` et `TrainingCost` enregistrés pour la période.
 62. La rentabilité correspond au résultat global divisé par les revenus confirmés ; son pourcentage vaut `null` lorsque les revenus sont nuls.
-63. La devise unique de la plateforme est le dinar tunisien (`TND`) avec une précision de paiement de `0,01 TND` compatible avec Stripe.
+63. La devise unique de la plateforme est le euro (`EUR`) avec une précision de paiement de `0,01 EUR` compatible avec Stripe.
 64. Tous les montants sont stockés sous forme d'entiers dans l'unité mineure attendue par Stripe ; aucun calcul monétaire n'utilise de nombre flottant.
 65. La plateforme ne calcule aucune taxe ; le sous-total et le total d'une Facture sont identiques.
 66. Un paiement réussi génère automatiquement et de manière idempotente une Facture unique contenant une ligne d'inscription.
 67. Une Facture conserve des instantanés immuables des identités, de la description, du montant et de la devise au moment de son émission.
-68. Chaque Formation possède un prix strictement positif en TND ; aucune Formation gratuite n'est prévue.
+68. Chaque Formation possède un prix strictement positif en EUR ; aucune Formation gratuite n'est prévue.
 69. Le type d'une Formation est obligatoire et définitivement immuable dès sa création.
 70. Aucun workflow de conversion ou de migration entre `SELF_PACED_ONLINE` et `IN_PERSON` n'est prévu ; une autre modalité exige une nouvelle Formation.
 71. La timezone métier unique est `Africa/Tunis` ; les instants sont stockés en UTC et échangés au format ISO 8601 avec offset explicite ou `Z`.

@@ -72,7 +72,7 @@ export class PaymentService {
       throw new AppError(
         409,
         'INVALID_TRAINING_PRICE',
-        'The Training does not have a valid payable TND price.',
+        'The Training does not have a valid payable EUR price.',
       );
     }
 
@@ -134,7 +134,7 @@ export class PaymentService {
       purchaseType: training.type,
       status: 'PENDING',
       amountMinor: training.priceMinor,
-      currency: 'TND',
+      currency: 'EUR',
       trainingTitle: training.title,
       ...(session === null ? {} : { sessionTitle: session.title }),
     });

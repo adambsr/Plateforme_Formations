@@ -108,7 +108,7 @@ export class CostService {
       {
         $set: {
           amountMinor: input.amountMinor,
-          currency: 'TND',
+          currency: 'EUR',
           ...(input.note === undefined ? {} : { note: input.note }),
         },
         ...(input.note === undefined ? { $unset: { note: 1 } } : {}),
@@ -176,7 +176,7 @@ export class CostService {
       ...(input.sessionId === undefined ? {} : { sessionId: input.sessionId }),
       incurredOn: tunisDateRange(input.date, input.date).startAt,
       amountMinor: input.amountMinor,
-      currency: 'TND',
+      currency: 'EUR',
       label: input.label,
     });
     return (await this.#trainingCostViews([cost]))[0];

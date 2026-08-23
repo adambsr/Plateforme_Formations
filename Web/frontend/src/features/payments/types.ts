@@ -7,7 +7,7 @@ export interface Payment {
   purchaseType: 'SELF_PACED_ONLINE' | 'IN_PERSON';
   status: PaymentStatus;
   amountMinor: number;
-  currency: 'TND';
+  currency: 'EUR';
   failure?: { code: string; message: string };
   enrollmentId?: string;
   invoiceId?: string;
@@ -26,7 +26,7 @@ export interface Enrollment {
   };
   training: { id: string; title: string };
   session?: { id: string; title: string };
-  payment: { id: string; amountMinor: number; currency: 'TND' };
+  payment: { id: string; amountMinor: number; currency: 'EUR' };
   feedback?: { rating: number; createdAt: string };
   eligibility?: { eligible: boolean; failures: string[] };
   createdAt: string;
@@ -49,14 +49,14 @@ export interface Invoice {
   purchaseDescription: string;
   subtotalMinor: number;
   totalMinor: number;
-  currency: 'TND';
+  currency: 'EUR';
   item: {
     id: string;
     description: string;
     quantity: 1;
     unitAmountMinor: number;
     totalMinor: number;
-    currency: 'TND';
+    currency: 'EUR';
   };
   pdfDownloadUrl: string;
   createdAt: string;

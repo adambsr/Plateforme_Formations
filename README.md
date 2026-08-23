@@ -63,7 +63,7 @@ Phase 2 includes:
 - archived-capable Training categories and strict Training persistence with catalogue/owner
   indexes;
 - the exact immutable `SELF_PACED_ONLINE` and `IN_PERSON` types, strictly positive integer minor
-  unit TND prices, and the in-person attendance threshold default of 80 percent;
+  unit EUR prices, and the in-person attendance threshold default of 80 percent;
 - backend-enforced ownership: Trainer creators own their Training, Admin creators select an active
   Trainer, and only an Admin can transfer ownership;
 - `DRAFT` to `PUBLISHED` to `ARCHIVED` lifecycle rules, public visibility limited to published
@@ -125,7 +125,7 @@ Phase 5 includes:
 - Payment, Enrollment, Invoice, and InvoiceItem persistence with explicit uniqueness, lookup, and
   financial-reporting indexes initialized during backend startup;
 - Learner-only hosted Stripe Checkout created from published Training and available Session data,
-  with the positive integer TND price sourced exclusively from the backend;
+  with the positive integer EUR price sourced exclusively from the backend;
 - raw-body Stripe signature verification and transaction-backed, idempotent webhook fulfillment;
 - duplicate-Enrollment protection and an atomic in-person capacity gate without seat reservations;
 - Enrollment-backed paid content access, with Admin-wide and Learner-own payment, Enrollment, and
@@ -221,7 +221,7 @@ current eligibility is recalculated. Generated PDFs live below the persistent co
 
 Phase 11 adds Admin-only monthly `TrainerCost` upserts, unique by Trainer/year/month, and explicit
 dated `TrainingCost` records optionally linked to a matching Session. All money remains positive
-integer TND millimes. The backend calculates operational counts, schedule-based participation,
+integer EUR centimes. The backend calculates operational counts, schedule-based participation,
 self-paced progression, Evaluation results, satisfaction, paid revenue, costs, result, and
 profitability through MongoDB aggregations over explicit inclusive `Africa/Tunis` calendar-date
 ranges. Trainer costs apply only when the selected range contains their complete calendar month.

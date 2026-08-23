@@ -19,10 +19,10 @@ describe('Phase 11 OpenAPI contract', () => {
       expect(openApiDocument.paths[path]).toBeDefined();
   });
 
-  it('documents integer TND minor units and null zero-revenue semantics', () => {
+  it('documents integer EUR minor units and null zero-revenue semantics', () => {
     expect(openApiDocument.components?.schemas?.TrainerCostWrite).toBeDefined();
     expect(JSON.stringify(openApiDocument)).toContain(
-      'TND millimes; integer only.',
+      'EUR centimes; integer only.',
     );
     expect(JSON.stringify(openApiDocument)).toContain(
       'pre-fixed-cost Training results',

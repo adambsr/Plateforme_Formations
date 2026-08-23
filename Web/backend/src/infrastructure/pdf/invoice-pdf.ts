@@ -5,7 +5,7 @@ import type { InvoiceItem } from '../../modules/invoices/models/invoice-item.mod
 import { drawDocumentBrand, loadDocumentLogo } from './document-brand.js';
 
 function money(value: number): string {
-  return `${(value / 1000).toFixed(3)} TND`;
+  return `${(value / 100).toFixed(2)} EUR`;
 }
 
 export async function renderInvoicePdf(

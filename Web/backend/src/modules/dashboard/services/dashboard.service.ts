@@ -653,7 +653,7 @@ export class DashboardService {
     const trainingCostsMinor = trainingCosts[0]?.total ?? 0;
     return {
       period: period(range),
-      currency: 'TND' as const,
+      currency: 'EUR' as const,
       includedTrainerMonths: range.fullMonths,
       revenueMinor: revenue[0]?.total ?? 0,
       trainerCostsMinor,

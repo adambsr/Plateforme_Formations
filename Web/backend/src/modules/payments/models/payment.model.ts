@@ -13,7 +13,7 @@ export interface Payment {
   purchaseType: PurchaseType;
   status: PaymentStatus;
   amountMinor: number;
-  currency: 'TND';
+  currency: 'EUR';
   trainingTitle: string;
   sessionTitle?: string;
   stripeCheckoutSessionId?: string;
@@ -54,7 +54,7 @@ const paymentSchema = new mongoose.Schema<Payment>(
       min: 1,
       validate: Number.isSafeInteger,
     },
-    currency: { type: String, required: true, enum: ['TND'] },
+    currency: { type: String, required: true, enum: ['EUR'] },
     trainingTitle: {
       type: String,
       required: true,

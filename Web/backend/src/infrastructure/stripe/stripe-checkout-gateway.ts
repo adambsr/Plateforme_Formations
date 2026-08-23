@@ -12,7 +12,7 @@ export interface CreateHostedCheckoutInput {
   sessionId?: string;
   description: string;
   amountMinor: number;
-  currency: 'TND';
+  currency: 'EUR';
 }
 
 export interface HostedCheckout {
@@ -170,12 +170,12 @@ export class StripeSdkCheckoutGateway implements StripeCheckoutGateway {
       if (
         error instanceof Stripe.errors.StripeInvalidRequestError &&
         error.param?.endsWith('[currency]') === true &&
-        /invalid currency:\s*tnd/i.test(error.message)
+        /invalid currency:\s*eur/i.test(error.message)
       ) {
         throw new AppError(
           503,
-          'STRIPE_TND_NOT_ENABLED',
-          'La Sandbox Stripe configurée refuse actuellement les paiements en TND. Vérifiez que STRIPE_SECRET_KEY appartient à la Sandbox où le TND est activé.',
+          'STRIPE_EUR_NOT_ENABLED',
+          'La Sandbox Stripe configurée refuse actuellement les paiements en EUR. Vérifiez que STRIPE_SECRET_KEY appartient à la Sandbox où le EUR est activé.',
         );
       }
       if (error instanceof Stripe.errors.StripeError) {

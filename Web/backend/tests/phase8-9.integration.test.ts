@@ -118,7 +118,7 @@ suite('Phase 8 Evaluations and Phase 9 AI generation', () => {
       prerequisites: [],
       type: 'SELF_PACED_ONLINE',
       priceMinor: 1000,
-      currency: 'TND',
+      currency: 'EUR',
       ownerTrainerId: owner._id,
       status: 'PUBLISHED',
     });
@@ -132,7 +132,7 @@ suite('Phase 8 Evaluations and Phase 9 AI generation', () => {
       prerequisites: [],
       type: 'SELF_PACED_ONLINE',
       priceMinor: 1000,
-      currency: 'TND',
+      currency: 'EUR',
       ownerTrainerId: owner._id,
       status: 'PUBLISHED',
     });
@@ -179,7 +179,7 @@ suite('Phase 8 Evaluations and Phase 9 AI generation', () => {
       purchaseType: 'SELF_PACED_ONLINE',
       status: 'PAID',
       amountMinor: 1000,
-      currency: 'TND',
+      currency: 'EUR',
       trainingTitle: training.title,
       stripeCheckoutSessionId: `cs_test_${new mongoose.Types.ObjectId()}`,
       stripePaymentIntentId: `pi_test_${new mongoose.Types.ObjectId()}`,

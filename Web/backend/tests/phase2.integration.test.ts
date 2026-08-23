@@ -204,7 +204,7 @@ integrationDescribe(
       expect(selfPacedCreation.status).toBe(201);
       expect(selfPacedCreation.body).toMatchObject({
         type: 'SELF_PACED_ONLINE',
-        currency: 'TND',
+        currency: 'EUR',
         status: 'DRAFT',
         ownerTrainer: { id: String(owner._id) },
       });

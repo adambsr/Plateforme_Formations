@@ -23,7 +23,7 @@ The following decisions are resolved and must not be reopened during ordinary im
 - each Training has exactly one owner Trainer;
 - a Session can have multiple assigned Trainers;
 - exactly two immutable Training types: `SELF_PACED_ONLINE` and `IN_PERSON`;
-- every Training has a strictly positive price in TND;
+- every Training has a strictly positive price in EUR;
 - an Enrollment exists only after a successful Stripe webhook confirmation;
 - Enrollment has no payment status, pending state, cancellation state, or refund state;
 - no `SeatReservation`, unpaid entity, or separate overdue-payment concept;
@@ -36,7 +36,7 @@ The following decisions are resolved and must not be reopened during ordinary im
 - business timezone is `Africa/Tunis`, while instants are persisted in UTC;
 - local persistent file storage is used for the MVP;
 - AI extracts supported documents on demand and creates drafts only;
-- TND is the only currency, taxes are not calculated, and an Invoice is created automatically for a paid Payment;
+- EUR is the only currency, taxes are not calculated, and an Invoice is created automatically for a paid Payment;
 - Trainer salary costs are monthly centre-level costs and are not allocated to Trainings;
 - historical business records are retained; destructive deletion is limited to unused drafts;
 - centre identity comes from environment configuration, not a settings entity or UI.
@@ -153,7 +153,7 @@ Important indexes:
 
 - title, description, category, level, duration, objectives, prerequisites;
 - immutable `type`;
-- strictly positive `priceMinor` and fixed currency `TND`;
+- strictly positive `priceMinor` and fixed currency `EUR`;
 - exactly one `ownerTrainerId`;
 - lifecycle `DRAFT`, `PUBLISHED`, `ARCHIVED`;
 - `minimumAttendancePercent` only for `IN_PERSON`, default 80;
@@ -248,7 +248,7 @@ The Session cannot become `COMPLETED` until every Enrollment has Attendance for 
 **Invoice**
 
 - exactly one successful Payment;
-- unique number, issue date, amount totals and `TND`;
+- unique number, issue date, amount totals and `EUR`;
 - immutable Learner, centre, purchase-description, and amount snapshots;
 - PDF storage reference when materialized.
 
@@ -334,12 +334,12 @@ Important indexes:
 
 **TrainerCost**
 
-- Trainer, year, month, amount in TND minor units, optional note;
+- Trainer, year, month, amount in EUR minor units, optional note;
 - unique `(trainerId, year, month)`.
 
 **TrainingCost**
 
-- Training, optional Session, date, amount in TND minor units, category/label.
+- Training, optional Session, date, amount in EUR minor units, category/label.
 
 All monetary calculations use integer minor units. There are no tax fields or floating-point financial calculations.
 
@@ -584,7 +584,7 @@ The seed script uses `INITIAL_ADMIN_EMAIL` and `INITIAL_ADMIN_PASSWORD`, creates
 1. Authenticate the Learner.
 2. Load the published Training and, for in-person, the selected planned Session.
 3. Reject an equivalent existing Enrollment.
-4. Validate positive server-owned TND price.
+4. Validate positive server-owned EUR price.
 5. For in-person, pre-check non-cancelled status and available capacity.
 6. Create one `PENDING` Payment with immutable purchase snapshots.
 7. Create a Stripe Checkout Session using the server amount and internal Payment ID metadata.
@@ -752,7 +752,7 @@ Frontend rules:
 - every list/detail handles loading, empty, error, retry, and pagination states;
 - forms use API-compatible validation but display backend conflict errors;
 - times are entered/displayed in `Africa/Tunis`; API values include an offset or `Z`;
-- all money is formatted as TND from integer minor units;
+- all money is formatted as EUR from integer minor units;
 - protected downloads use authenticated requests rather than public file URLs;
 - Checkout redirects to Stripe's hosted URL, then return screens query backend state;
 - feedback UI appears only after backend-reported eligibility;
@@ -911,7 +911,7 @@ Run against MongoDB configured for transactions and exercise real HTTP middlewar
 - Learner registration and privileged-role rejection;
 - Admin seed idempotence and Trainer creation/first password change;
 - login, refresh rotation/reuse rejection, logout, reset, and deactivation;
-- Training ownership, immutable type, positive TND price, and publication constraints;
+- Training ownership, immutable type, positive EUR price, and publication constraints;
 - protected uploads/downloads and extraction fixtures;
 - multi-date Session planning, overlap detection, assignment, and status transitions;
 - duplicate Enrollment and capacity constraints;
@@ -993,7 +993,7 @@ Deliver:
 
 - categories and Training model;
 - owner policy and Admin ownership transfer;
-- immutable type and positive TND price;
+- immutable type and positive EUR price;
 - draft/publication/archive and deletion rules;
 - public catalogue/detail and Admin/owner management UI.
 

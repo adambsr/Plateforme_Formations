@@ -57,10 +57,13 @@ import {
   RequireAuthentication,
   RequireRole,
 } from './routes/guards.js';
+import { ScrollToTop } from '../shared/components/ScrollToTop.js';
 
 export function App() {
   return (
-    <Routes>
+    <>
+      <ScrollToTop />
+      <Routes>
       <Route element={<PublicLayout />}>
         <Route index element={<LandingPage />} />
         <Route path="/catalogue" element={<CataloguePage />} />
@@ -132,6 +135,7 @@ export function App() {
         </Route>
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
-    </Routes>
+      </Routes>
+    </>
   );
 }

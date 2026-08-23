@@ -4,6 +4,12 @@ The development seed resets and repopulates the dedicated **local**
 `plateforme_formations` database. It is intended for demos, manual workflow
 checks, pagination, charts, and end-to-end development only.
 
+The current seed is the EUR seed. Every monetary record uses `EUR`, with
+integer cent amounts (`150.00 EUR` is stored as `15000`). It also assigns each
+formation a distinct HTTPS training-thumbnail URL, gives in-person sessions
+distinct descriptive names, and keeps generated costs below seeded paid
+revenue so profitability dashboards show a positive result.
+
 ## Safety
 
 The command is destructive. It deletes application records before recreating
@@ -52,11 +58,15 @@ environment.
 
 ## Dataset coverage
 
-The seed creates 27 users, 5 categories, 16 published formations, 32 modules,
+The seed creates 27 users, 5 categories, 16 published EUR formations, 32 modules,
 64 lessons/resources, 12 in-person sessions, 24 schedule entries, 56 payments
 across all supported statuses, 44 paid enrollments and invoices, progress and
 attendance histories, published evaluations with attempts, eligible
 certificates and feedback, plus six months of trainer and training costs.
+
+Session titles are generated from the formation title and promotion/period, so
+different session occurrences do not share a generic duplicate name. Seeded
+thumbnail URLs are checked as HTTPS image URLs before release.
 
 Paid enrollments are backed by seeded paid Payment records and invoices.
 Certificates are created only for demonstrations that satisfy completion or

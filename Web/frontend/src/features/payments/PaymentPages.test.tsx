@@ -62,7 +62,7 @@ describe('Phase 5 webhook-confirmed Web state', () => {
       purchaseType: 'SELF_PACED_ONLINE',
       status: 'PAID',
       amountMinor: 12_550,
-      currency: 'TND',
+      currency: 'EUR',
       enrollmentId: 'enrollment-1',
       invoiceId: 'invoice-1',
       paidAt: '2026-08-21T10:00:00.000Z',

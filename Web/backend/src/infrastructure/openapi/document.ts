@@ -2174,7 +2174,7 @@ export const openApiDocument: OpenAPIV3.Document = {
           amountMinor: {
             type: 'integer',
             minimum: 1,
-            description: 'TND millimes; integer only.',
+            description: 'EUR centimes; integer only.',
           },
           note: { type: 'string', minLength: 1, maxLength: 1000 },
         },
@@ -2198,7 +2198,7 @@ export const openApiDocument: OpenAPIV3.Document = {
           amountMinor: {
             type: 'integer',
             minimum: 1,
-            description: 'TND millimes; integer only.',
+            description: 'EUR centimes; integer only.',
           },
           label: { type: 'string', minLength: 1, maxLength: 200 },
         },
@@ -2795,9 +2795,9 @@ export const openApiDocument: OpenAPIV3.Document = {
           priceMinor: {
             type: 'integer',
             minimum: 1,
-            description: 'Authoritative TND amount in 0.01 TND minor units.',
+            description: 'Authoritative EUR amount in 0.01 EUR minor units.',
           },
-          currency: { type: 'string', enum: ['TND'] },
+          currency: { type: 'string', enum: ['EUR'] },
           ownerTrainer: { $ref: '#/components/schemas/TrainingOwner' },
           status: { $ref: '#/components/schemas/TrainingStatus' },
           minimumAttendancePercent: {
@@ -3557,7 +3557,7 @@ export const openApiDocument: OpenAPIV3.Document = {
           purchaseType: { $ref: '#/components/schemas/TrainingType' },
           status: { $ref: '#/components/schemas/PaymentStatus' },
           amountMinor: { type: 'integer', minimum: 1 },
-          currency: { type: 'string', enum: ['TND'] },
+          currency: { type: 'string', enum: ['EUR'] },
           failure: {
             type: 'object',
             required: ['code', 'message'],
@@ -3618,7 +3618,7 @@ export const openApiDocument: OpenAPIV3.Document = {
             properties: {
               id: { type: 'string' },
               amountMinor: { type: 'integer', minimum: 1 },
-              currency: { type: 'string', enum: ['TND'] },
+              currency: { type: 'string', enum: ['EUR'] },
             },
           },
           feedback: {
@@ -3656,7 +3656,7 @@ export const openApiDocument: OpenAPIV3.Document = {
           quantity: { type: 'integer', enum: [1] },
           unitAmountMinor: { type: 'integer', minimum: 1 },
           totalMinor: { type: 'integer', minimum: 1 },
-          currency: { type: 'string', enum: ['TND'] },
+          currency: { type: 'string', enum: ['EUR'] },
         },
       },
       Invoice: {
@@ -3707,7 +3707,7 @@ export const openApiDocument: OpenAPIV3.Document = {
           purchaseDescription: { type: 'string' },
           subtotalMinor: { type: 'integer', minimum: 1 },
           totalMinor: { type: 'integer', minimum: 1 },
-          currency: { type: 'string', enum: ['TND'] },
+          currency: { type: 'string', enum: ['EUR'] },
           item: { $ref: '#/components/schemas/InvoiceItem' },
           pdfDownloadUrl: { type: 'string' },
           createdAt: { type: 'string', format: 'date-time' },

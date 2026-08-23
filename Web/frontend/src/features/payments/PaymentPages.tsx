@@ -13,15 +13,15 @@ function message(error: unknown): string {
 }
 
 function money(value: number): string {
-  return new Intl.NumberFormat('fr-TN', {
+  return new Intl.NumberFormat('fr-FR', {
     style: 'currency',
-    currency: 'TND',
+    currency: 'EUR',
     minimumFractionDigits: 2,
   }).format(value / 100);
 }
 
 function date(value: string): string {
-  return new Intl.DateTimeFormat('fr-TN', {
+  return new Intl.DateTimeFormat('fr-FR', {
     timeZone: 'Africa/Tunis',
     dateStyle: 'medium',
     timeStyle: 'short',
@@ -184,7 +184,7 @@ export function PaymentCenterPage() {
     <section>
       <div className="section-heading">
         <div>
-          <span className="eyebrow">Stripe test · TND</span>
+          <span className="eyebrow">Stripe test · EUR</span>
           <h1>
             {user.role === 'ADMIN' ? 'Paiements et factures' : 'Mes achats'}
           </h1>

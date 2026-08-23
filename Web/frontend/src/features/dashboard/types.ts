@@ -60,7 +60,7 @@ export interface Satisfaction {
 
 export interface Profitability {
   period: Period;
-  currency: 'TND';
+  currency: 'EUR';
   includedTrainerMonths: Array<{ year: number; month: number }>;
   revenueMinor: number;
   trainerCostsMinor: number;
@@ -82,7 +82,7 @@ export interface TrainerCost {
   year: number;
   month: number;
   amountMinor: number;
-  currency: 'TND';
+  currency: 'EUR';
   note?: string;
 }
 
@@ -92,7 +92,7 @@ export interface TrainingCost {
   session?: { id: string; title: string };
   date: string;
   amountMinor: number;
-  currency: 'TND';
+  currency: 'EUR';
   label: string;
 }
 

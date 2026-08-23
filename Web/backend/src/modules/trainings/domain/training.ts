@@ -4,7 +4,7 @@ export type TrainingType = (typeof TRAINING_TYPES)[number];
 export const TRAINING_STATUSES = ['DRAFT', 'PUBLISHED', 'ARCHIVED'] as const;
 export type TrainingStatus = (typeof TRAINING_STATUSES)[number];
 
-export const TND_CURRENCY = 'TND' as const;
+export const EUR_CURRENCY = 'EUR' as const;
 
 export interface PublicationFacts {
   type: TrainingType;
@@ -20,6 +20,6 @@ export function publicationBlockReason(
   return undefined;
 }
 
-export function isPositiveTndMinorAmount(value: number): boolean {
+export function isPositiveEurMinorAmount(value: number): boolean {
   return Number.isSafeInteger(value) && value > 0;
 }

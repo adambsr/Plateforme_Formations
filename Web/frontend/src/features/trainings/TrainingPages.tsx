@@ -22,9 +22,9 @@ function errorMessage(error: unknown): string {
 }
 
 function formatPrice(priceMinor: number): string {
-  return new Intl.NumberFormat('fr-TN', {
+  return new Intl.NumberFormat('fr-FR', {
     style: 'currency',
-    currency: 'TND',
+    currency: 'EUR',
     minimumFractionDigits: 2,
   }).format(priceMinor / 100);
 }
@@ -76,7 +76,7 @@ function lines(value: string): string[] {
     .filter(Boolean);
 }
 
-function parseTndMinor(value: string): number | undefined {
+function parseEurMinor(value: string): number | undefined {
   const match = /^(\d+)(?:[.,](\d{1,2}))?$/.exec(value.trim());
   if (match === null) return undefined;
   const units = Number(match[1]);
@@ -425,7 +425,7 @@ interface TrainingFormValues {
   objectives: string;
   prerequisites: string;
   type: TrainingType;
-  priceTnd: string;
+  priceEur: string;
   ownerTrainerId: string;
   minimumAttendancePercent: string;
 }
@@ -439,7 +439,7 @@ const emptyTrainingForm: TrainingFormValues = {
   objectives: '',
   prerequisites: '',
   type: 'SELF_PACED_ONLINE',
-  priceTnd: '',
+  priceEur: '',
   ownerTrainerId: '',
   minimumAttendancePercent: '80',
 };
@@ -563,7 +563,7 @@ export function TrainingManagementPage() {
       objectives: training.objectives.join('\n'),
       prerequisites: training.prerequisites.join('\n'),
       type: training.type,
-      priceTnd: (training.priceMinor / 100).toFixed(2),
+      priceEur: (training.priceMinor / 100).toFixed(2),
       ownerTrainerId: training.ownerTrainer.id,
       minimumAttendancePercent: String(training.minimumAttendancePercent ?? 80),
     });
@@ -613,11 +613,11 @@ export function TrainingManagementPage() {
             {editing === null ? 'Créer une formation' : 'Modifier la formation'}
           </h2>
           <p className="muted">
-            Le type est définitif dès la création. Le prix est saisi en TND.
+            Le type est définitif dès la création. Le prix est saisi en EUR.
           </p>
           <form
             onSubmit={form.handleSubmit(async (values) => {
-              const priceMinor = parseTndMinor(values.priceTnd);
+              const priceMinor = parseEurMinor(values.priceEur);
               const durationMinutes = Number(values.durationMinutes);
               const minimumAttendancePercent = Number(
                 values.minimumAttendancePercent,
@@ -627,7 +627,7 @@ export function TrainingManagementPage() {
                 !Number.isSafeInteger(durationMinutes) ||
                 durationMinutes <= 0
               ) {
-                setError('Saisissez un prix TND et une durée valides.');
+                setError('Saisissez un prix EUR et une durée valides.');
                 return;
               }
               const common = {
@@ -717,12 +717,12 @@ export function TrainingManagementPage() {
                 />
               </label>
               <label>
-                Prix en TND
+                Prix en EUR
                 <input
                   inputMode="decimal"
                   placeholder="250,00"
                   required
-                  {...form.register('priceTnd')}
+                  {...form.register('priceEur')}
                 />
               </label>
               {selectedType === 'IN_PERSON' && (

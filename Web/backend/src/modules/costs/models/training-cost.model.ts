@@ -5,7 +5,7 @@ export interface TrainingCost {
   sessionId?: Types.ObjectId;
   incurredOn: Date;
   amountMinor: number;
-  currency: 'TND';
+  currency: 'EUR';
   label: string;
   createdAt: Date;
   updatedAt: Date;
@@ -29,7 +29,7 @@ const schema = new mongoose.Schema<TrainingCost>(
       min: 1,
       validate: Number.isSafeInteger,
     },
-    currency: { type: String, required: true, enum: ['TND'], default: 'TND' },
+    currency: { type: String, required: true, enum: ['EUR'], default: 'EUR' },
     label: {
       type: String,
       required: true,
