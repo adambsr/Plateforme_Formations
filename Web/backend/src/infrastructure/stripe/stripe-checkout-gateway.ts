@@ -1,4 +1,5 @@
 import Stripe from 'stripe';
+import type { Logger } from 'pino';
 
 import type { AppConfig } from '../../config/environment.js';
 import { AppError } from '../../shared/errors/app-error.js';
@@ -68,17 +69,48 @@ export class StripeSdkCheckoutGateway implements StripeCheckoutGateway {
   readonly #webhookSecret: string;
   readonly #successUrl: string;
   readonly #cancelUrl: string;
+  readonly #configured: boolean;
+  readonly #logger: Logger | undefined;
+  readonly #rejectLiveKey: boolean;
 
-  constructor(config: AppConfig['stripe']) {
+  constructor(
+    config: AppConfig['stripe'],
+    runtime?: {
+      nodeEnv: AppConfig['application']['nodeEnv'];
+      logger: Logger;
+    },
+  ) {
     this.#stripe = new Stripe(config.secretKey);
     this.#webhookSecret = config.webhookSecret;
     this.#successUrl = config.successUrl;
     this.#cancelUrl = config.cancelUrl;
+    this.#configured =
+      !config.secretKey.toLowerCase().includes('replace') &&
+      !config.webhookSecret.toLowerCase().includes('replace');
+    this.#logger = runtime?.logger;
+    this.#rejectLiveKey =
+      runtime !== undefined &&
+      runtime.nodeEnv !== 'production' &&
+      config.secretKey.startsWith('sk_live_');
   }
 
   async createHostedCheckout(
     input: CreateHostedCheckoutInput,
   ): Promise<HostedCheckout> {
+    if (!this.#configured) {
+      throw new AppError(
+        503,
+        'STRIPE_CONFIGURATION_REQUIRED',
+        'Le paiement en ligne n’est pas encore configuré. Renseignez les identifiants Stripe de test du backend.',
+      );
+    }
+    if (this.#rejectLiveKey) {
+      throw new AppError(
+        503,
+        'STRIPE_TEST_KEY_REQUIRED',
+        'Le backend de développement doit utiliser la clé secrète sk_test_ de la Sandbox Stripe.',
+      );
+    }
     const metadata = {
       paymentId: input.paymentId,
       learnerId: input.learnerId,
@@ -87,25 +119,74 @@ export class StripeSdkCheckoutGateway implements StripeCheckoutGateway {
     };
     const separator = this.#successUrl.includes('?') ? '&' : '?';
     const cancelSeparator = this.#cancelUrl.includes('?') ? '&' : '?';
-    const session = await this.#stripe.checkout.sessions.create({
-      mode: 'payment',
-      client_reference_id: input.paymentId,
-      customer_email: input.learnerEmail,
-      success_url: `${this.#successUrl}${separator}paymentId=${input.paymentId}&session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${this.#cancelUrl}${cancelSeparator}paymentId=${input.paymentId}`,
-      metadata,
-      payment_intent_data: { metadata },
-      line_items: [
-        {
-          quantity: 1,
-          price_data: {
-            currency: input.currency.toLowerCase(),
-            unit_amount: input.amountMinor,
-            product_data: { name: input.description },
+    let session: Stripe.Checkout.Session;
+    try {
+      session = await this.#stripe.checkout.sessions.create({
+        mode: 'payment',
+        client_reference_id: input.paymentId,
+        customer_email: input.learnerEmail,
+        success_url: `${this.#successUrl}${separator}paymentId=${input.paymentId}&session_id={CHECKOUT_SESSION_ID}`,
+        cancel_url: `${this.#cancelUrl}${cancelSeparator}paymentId=${input.paymentId}`,
+        metadata,
+        payment_intent_data: { metadata },
+        line_items: [
+          {
+            quantity: 1,
+            price_data: {
+              currency: input.currency.toLowerCase(),
+              unit_amount: input.amountMinor,
+              product_data: { name: input.description },
+            },
           },
-        },
-      ],
-    });
+        ],
+      });
+    } catch (error) {
+      if (error instanceof Stripe.errors.StripeError) {
+        this.#logger?.error(
+          {
+            stripeError: {
+              type: error.type,
+              code: error.code,
+              param: error.param,
+              requestId: error.requestId,
+              statusCode: error.statusCode,
+              message: error.message,
+            },
+            checkout: {
+              currency: input.currency,
+              amountMinor: input.amountMinor,
+            },
+          },
+          'Stripe Checkout Session creation rejected',
+        );
+      }
+      if (error instanceof Stripe.errors.StripeAuthenticationError) {
+        throw new AppError(
+          503,
+          'STRIPE_CONFIGURATION_REQUIRED',
+          'La configuration Stripe de test est invalide. Vérifiez la clé secrète du backend.',
+        );
+      }
+      if (
+        error instanceof Stripe.errors.StripeInvalidRequestError &&
+        error.param?.endsWith('[currency]') === true &&
+        /invalid currency:\s*tnd/i.test(error.message)
+      ) {
+        throw new AppError(
+          503,
+          'STRIPE_TND_NOT_ENABLED',
+          'La Sandbox Stripe configurée refuse actuellement les paiements en TND. Vérifiez que STRIPE_SECRET_KEY appartient à la Sandbox où le TND est activé.',
+        );
+      }
+      if (error instanceof Stripe.errors.StripeError) {
+        throw new AppError(
+          502,
+          'STRIPE_CHECKOUT_FAILED',
+          'Stripe a refusé la création de la session de paiement. Consultez le journal backend avec la référence de la requête.',
+        );
+      }
+      throw error;
+    }
     if (session.url === null) {
       throw new AppError(
         502,

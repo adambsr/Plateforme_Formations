@@ -2,8 +2,10 @@ import type { QueryFilter } from 'mongoose';
 
 import type { AuthenticatedPrincipal } from '../../../shared/auth/principal.js';
 import { AppError } from '../../../shared/errors/app-error.js';
+import { EligibilityService } from '../../completion/services/eligibility.service.js';
 import type { EnrollmentListInput } from '../../payments/dto/payment.dto.js';
 import { PaymentModel } from '../../payments/models/payment.model.js';
+import { FeedbackModel } from '../../feedback/models/feedback.model.js';
 import { TrainingSessionModel } from '../../sessions/models/training-session.model.js';
 import { TrainingModel } from '../../trainings/models/training.model.js';
 import { UserModel } from '../../users/models/user.model.js';
@@ -23,6 +25,12 @@ function passwordReady(principal: AuthenticatedPrincipal): void {
 }
 
 export class EnrollmentService {
+  readonly #eligibility: EligibilityService;
+
+  constructor(eligibility = new EligibilityService()) {
+    this.#eligibility = eligibility;
+  }
+
   async list(principal: AuthenticatedPrincipal, input: EnrollmentListInput) {
     passwordReady(principal);
     if (principal.role === 'TRAINER') {
@@ -90,12 +98,15 @@ export class EnrollmentService {
       sessionId === undefined || sessionId === null ? [] : [String(sessionId)],
     );
     const paymentIds = enrollments.map(({ paymentId }) => paymentId);
-    const [learners, trainings, sessions, payments] = await Promise.all([
-      UserModel.find({ _id: { $in: learnerIds } }).exec(),
-      TrainingModel.find({ _id: { $in: trainingIds } }).exec(),
-      TrainingSessionModel.find({ _id: { $in: sessionIds } }).exec(),
-      PaymentModel.find({ _id: { $in: paymentIds } }).exec(),
-    ]);
+    const enrollmentIds = enrollments.map(({ _id }) => _id);
+    const [learners, trainings, sessions, payments, feedback] =
+      await Promise.all([
+        UserModel.find({ _id: { $in: learnerIds } }).exec(),
+        TrainingModel.find({ _id: { $in: trainingIds } }).exec(),
+        TrainingSessionModel.find({ _id: { $in: sessionIds } }).exec(),
+        PaymentModel.find({ _id: { $in: paymentIds } }).exec(),
+        FeedbackModel.find({ enrollmentId: { $in: enrollmentIds } }).exec(),
+      ]);
     const learnerMap = new Map(
       learners.map((value) => [String(value._id), value]),
     );
@@ -108,10 +119,25 @@ export class EnrollmentService {
     const paymentMap = new Map(
       payments.map((value) => [String(value._id), value]),
     );
+    const feedbackMap = new Map(
+      feedback.map((value) => [String(value.enrollmentId), value]),
+    );
+    const eligibilityMap = new Map(
+      await Promise.all(
+        enrollments.map(async (enrollment) => {
+          const result = await this.#eligibility.evaluate(
+            String(enrollment._id),
+          );
+          return [String(enrollment._id), result] as const;
+        }),
+      ),
+    );
     return enrollments.map((enrollment) => {
       const learner = learnerMap.get(String(enrollment.learnerId));
       const training = trainingMap.get(String(enrollment.trainingId));
       const payment = paymentMap.get(String(enrollment.paymentId));
+      const enrollmentFeedback = feedbackMap.get(String(enrollment._id));
+      const eligibility = eligibilityMap.get(String(enrollment._id));
       if (
         learner === undefined ||
         training === undefined ||
@@ -138,6 +164,18 @@ export class EnrollmentService {
           id: String(payment._id),
           amountMinor: payment.amountMinor,
           currency: payment.currency,
+        },
+        ...(enrollmentFeedback === undefined
+          ? {}
+          : {
+              feedback: {
+                rating: enrollmentFeedback.rating,
+                createdAt: enrollmentFeedback.createdAt.toISOString(),
+              },
+            }),
+        eligibility: {
+          eligible: eligibility?.eligible ?? false,
+          failures: eligibility?.failures ?? ['TRAINING_INCOMPLETE'],
         },
         createdAt: enrollment.createdAt.toISOString(),
       };

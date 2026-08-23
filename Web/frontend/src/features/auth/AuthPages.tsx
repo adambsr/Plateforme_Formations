@@ -75,7 +75,7 @@ function AuthCard({
   return (
     <div className="auth-page">
       <section className="auth-card">
-        <span className="eyebrow">Plateforme de Formations</span>
+        <span className="eyebrow">High Skills Academy</span>
         <h1>{title}</h1>
         <p className="muted">{subtitle}</p>
         {children}

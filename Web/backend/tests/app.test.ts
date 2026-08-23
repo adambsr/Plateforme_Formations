@@ -1,6 +1,6 @@
 import pino from 'pino';
 import request from 'supertest';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import { createApp } from '../src/app.js';
 import { loadAppConfig } from '../src/config/environment.js';
@@ -104,6 +104,8 @@ describe('HTTP foundation', () => {
       '/costs/trainers',
       '/dashboard/overview',
       '/dashboard/financial',
+      '/contact',
+      '/trainings/{id}/thumbnail',
     ]) {
       expect(documentResponse.body.paths[path], path).toBeDefined();
     }
@@ -135,6 +137,58 @@ describe('HTTP foundation', () => {
 
     expect(response.status).toBe(401);
     expect(response.body.error.code).toBe('AUTHENTICATION_REQUIRED');
+  });
+
+  it('validates and delivers public contact messages without exposing mail internals', async () => {
+    const sendContactMessage = vi.fn().mockResolvedValue(undefined);
+    const app = createApp({
+      config: loadAppConfig(validEnvironment()),
+      logger: pino({ level: 'silent' }),
+      databaseReady: () => true,
+      contactMailService: { sendContactMessage },
+    });
+    const valid = await request(app).post('/api/contact').send({
+      name: 'Amira Ben Salah',
+      email: 'amira@example.com',
+      subject: 'Formation en présentiel',
+      message: 'Je souhaite obtenir davantage d’informations.',
+    });
+    expect(valid.status).toBe(202);
+    expect(valid.body.message).toBe('Votre message a bien été envoyé.');
+    expect(sendContactMessage).toHaveBeenCalledOnce();
+
+    const invalid = await request(app).post('/api/contact').send({
+      name: 'A',
+      email: 'invalide',
+      subject: '',
+      message: 'Court',
+    });
+    expect(invalid.status).toBe(422);
+    expect(invalid.body.error.code).toBe('VALIDATION_FAILED');
+  });
+
+  it('returns a safe French contact error when SMTP delivery fails', async () => {
+    const app = createApp({
+      config: loadAppConfig(validEnvironment()),
+      logger: pino({ level: 'silent' }),
+      databaseReady: () => true,
+      contactMailService: {
+        sendContactMessage: vi.fn().mockRejectedValue(new Error('SMTP secret')),
+      },
+    });
+    const response = await request(app).post('/api/contact').send({
+      name: 'Amira Ben Salah',
+      email: 'amira@example.com',
+      subject: 'Question',
+      message: 'Voici une question suffisamment longue.',
+    });
+    expect(response.status).toBe(503);
+    expect(response.body.error).toEqual({
+      code: 'CONTACT_DELIVERY_FAILED',
+      message:
+        'Votre message n’a pas pu être envoyé pour le moment. Veuillez réessayer plus tard.',
+    });
+    expect(JSON.stringify(response.body)).not.toContain('SMTP secret');
   });
 
   it('rate-limits repeated login attempts before persistence', async () => {

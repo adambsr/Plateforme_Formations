@@ -118,23 +118,33 @@ export class CompletionService {
       .sort({ order: 1, _id: 1 })
       .exec();
     const moduleIds = modules.map(({ _id }) => _id);
-    const lessons = await LessonModel.find({
+    const allActiveLessons = await LessonModel.find({
       trainingId: training._id,
       moduleId: { $in: moduleIds },
       isArchived: false,
-      ...(certificateCutoff === undefined
-        ? {}
-        : { createdAt: { $lte: certificateCutoff } }),
     })
       .sort({ moduleId: 1, order: 1, _id: 1 })
       .exec();
-    const progress = await LessonProgressModel.find({
+    const allProgress = await LessonProgressModel.find({
       enrollmentId: enrollment._id,
-      lessonId: { $in: lessons.map(({ _id }) => _id) },
+      lessonId: { $in: allActiveLessons.map(({ _id }) => _id) },
     }).exec();
     const progressByLesson = new Map(
-      progress.map((entry) => [String(entry.lessonId), entry]),
+      allProgress.map((entry) => [String(entry.lessonId), entry]),
     );
+    const lessons =
+      certificateCutoff === undefined
+        ? allActiveLessons
+        : allActiveLessons.filter((lesson) => {
+            if (lesson.createdAt <= certificateCutoff) return true;
+            const entry = progressByLesson.get(String(lesson._id));
+            return (
+              entry?.completed === true &&
+              entry.completedAt !== null &&
+              entry.completedAt !== undefined &&
+              entry.completedAt <= certificateCutoff
+            );
+          });
     const modulesById = new Map(
       modules.map((module) => [String(module._id), module]),
     );

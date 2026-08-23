@@ -25,6 +25,7 @@ export interface Training {
   ownerTrainer: { id: string; firstName?: string; lastName?: string };
   status: TrainingStatus;
   minimumAttendancePercent?: number;
+  thumbnailUrl?: string;
   createdAt: string;
   updatedAt: string;
 }

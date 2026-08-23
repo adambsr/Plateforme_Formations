@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react';
+import { Link, useNavigate } from 'react-router';
 import { ApiError } from '../../core/api/client.js';
 import { useAuth } from '../../core/auth/AuthContext.js';
 import { Pagination } from '../../shared/components/Pagination.js';
@@ -18,15 +19,21 @@ function message(error: unknown) {
     : 'Une erreur inattendue est survenue.';
 }
 
+const attemptStatusLabel = (status: Attempt['status']) =>
+  ({ IN_PROGRESS: 'En cours', PASSED: 'Réussie', FAILED: 'Échouée' })[status];
+const questionTypeLabel = (type: Question['type']) =>
+  ({
+    SINGLE_CHOICE: 'Choix unique',
+    MULTIPLE_CHOICE: 'Choix multiple',
+    TRUE_FALSE: 'Vrai ou faux',
+  })[type];
+
 export function EvaluationPage() {
   const { user, request } = useAuth();
   const [page, setPage] = useState<Page<Evaluation> | null>(null);
   const [pageNumber, setPageNumber] = useState(1);
   const [selected, setSelected] = useState<Evaluation | null>(null);
   const [enrollments, setEnrollments] = useState<Enrollment[]>([]);
-  const [managedTrainings, setManagedTrainings] = useState<
-    Array<{ id: string; title: string }>
-  >([]);
   const [attempt, setAttempt] = useState<Attempt | null>(null);
   const [results, setResults] = useState<ResultPage | null>(null);
   const [editingEvaluation, setEditingEvaluation] = useState(false);
@@ -47,8 +54,10 @@ export function EvaluationPage() {
             value.attempts?.at(-1) ??
             null,
         );
+        return value;
       } catch (caught) {
         setError(message(caught));
+        return null;
       }
     },
     [request],
@@ -59,25 +68,19 @@ export function EvaluationPage() {
     try {
       const view = user.role === 'LEARNER' ? 'ACCESSIBLE' : 'MANAGED';
       const values = await request<Page<Evaluation>>(
-        `/evaluations?view=${view}&page=${pageNumber}&pageSize=12`,
+        `/evaluations?view=${view}${user.role === 'LEARNER' ? '&status=PUBLISHED' : ''}&page=${pageNumber}&pageSize=12`,
       );
       setPage(values);
-      if (user.role === 'TRAINER') {
-        const trainingPage = await request<Page<{ id: string; title: string }>>(
-          '/trainings?view=MANAGED&pageSize=100',
-        );
-        setManagedTrainings(trainingPage.items);
-      }
       if (user.role === 'LEARNER')
         setEnrollments(
           (await request<Page<Enrollment>>('/enrollments?pageSize=100')).items,
         );
-      if (values.items[0] !== undefined) await detail(values.items[0].id);
-      else setSelected(null);
+      setSelected(null);
+      setAttempt(null);
     } catch (caught) {
       setError(message(caught));
     }
-  }, [detail, pageNumber, request, user]);
+  }, [pageNumber, request, user]);
 
   useEffect(() => {
     // Route entry synchronizes role-filtered Evaluation state with the backend.
@@ -90,6 +93,17 @@ export function EvaluationPage() {
     const timer = window.setInterval(() => setNow(Date.now()), 1000);
     return () => window.clearInterval(timer);
   }, [attempt]);
+  useEffect(() => {
+    if (selected === null) return;
+    const escape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape' && attempt?.status !== 'IN_PROGRESS') {
+        setSelected(null);
+        setResults(null);
+      }
+    };
+    document.addEventListener('keydown', escape);
+    return () => document.removeEventListener('keydown', escape);
+  }, [attempt?.status, selected]);
 
   async function action(run: () => Promise<void>, success: string) {
     setBusy(true);
@@ -103,27 +117,6 @@ export function EvaluationPage() {
     } finally {
       setBusy(false);
     }
-  }
-  async function createEvaluation(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const form = new FormData(event.currentTarget);
-    await action(async () => {
-      await request('/evaluations', {
-        method: 'POST',
-        body: JSON.stringify({
-          trainingId: String(form.get('trainingId')),
-          title: String(form.get('title')),
-          instructions: String(form.get('instructions')),
-          passPercentage: Number(form.get('passPercentage')),
-          maxAttempts: Number(form.get('maxAttempts')),
-          ...(String(form.get('durationMinutes')) === ''
-            ? {}
-            : { durationMinutes: Number(form.get('durationMinutes')) }),
-        }),
-      });
-      event.currentTarget.reset();
-      await load();
-    }, 'Évaluation créée.');
   }
   async function addQuestion(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -193,6 +186,7 @@ export function EvaluationPage() {
           questionTypes: ['SINGLE_CHOICE', 'MULTIPLE_CHOICE', 'TRUE_FALSE'],
         }),
       });
+      await load();
       await detail(selected.id);
       setNotice(
         `Questions IA importées en brouillon. ${response.extraction.skippedResources.length} ressource(s) ignorée(s).`,
@@ -290,10 +284,9 @@ export function EvaluationPage() {
       'Résultats actualisés.',
     );
   }
-  async function startAttempt() {
-    if (selected === null) return;
+  async function startAttempt(evaluation: Evaluation) {
     const enrollment = enrollments.find(
-      ({ training }) => training.id === selected.training.id,
+      ({ training }) => training.id === evaluation.training.id,
     );
     if (enrollment === undefined) {
       setError('Aucune inscription payée ne correspond à cette formation.');
@@ -302,13 +295,52 @@ export function EvaluationPage() {
     await action(
       async () =>
         setAttempt(
-          await request<Attempt>(`/evaluations/${selected.id}/attempts`, {
+          await request<Attempt>(`/evaluations/${evaluation.id}/attempts`, {
             method: 'POST',
             body: JSON.stringify({ enrollmentId: enrollment.id }),
           }),
         ),
       'Tentative démarrée.',
     );
+  }
+  async function selectEvaluation(evaluation: Evaluation) {
+    if (user?.role !== 'LEARNER') {
+      await detail(evaluation.id);
+      return;
+    }
+    setBusy(true);
+    setError('');
+    try {
+      const value = await request<Evaluation>(`/evaluations/${evaluation.id}`);
+      setSelected(value);
+      const inProgress = value.attempts?.find(
+        ({ status }) => status === 'IN_PROGRESS',
+      );
+      if (inProgress !== undefined) {
+        setAttempt(inProgress);
+        return;
+      }
+      const enrollment = enrollments.find(
+        ({ training }) => training.id === value.training.id,
+      );
+      if (enrollment === undefined) {
+        throw new Error(
+          'Aucune inscription payée ne correspond à cette formation.',
+        );
+      }
+      setAttempt(
+        await request<Attempt>(`/evaluations/${value.id}/attempts`, {
+          method: 'POST',
+          body: JSON.stringify({ enrollmentId: enrollment.id }),
+        }),
+      );
+    } catch (caught) {
+      setSelected(null);
+      setAttempt(null);
+      setError(message(caught));
+    } finally {
+      setBusy(false);
+    }
   }
   async function saveAnswer(
     answer: Attempt['answers'][number],
@@ -350,13 +382,6 @@ export function EvaluationPage() {
           0,
           Math.ceil((new Date(attempt.expiresAt).getTime() - now) / 1000),
         );
-  const trainings = owner
-    ? managedTrainings
-    : Array.from(
-        new Map(
-          page?.items.map(({ training }) => [training.id, training]),
-        ).values(),
-      );
   return (
     <section>
       <div className="section-heading">
@@ -369,69 +394,17 @@ export function EvaluationPage() {
           </h1>
         </div>
         {page !== null && <span className="count-badge">{page.total}</span>}
+        {owner && (
+          <Link className="primary-button" to="/app/evaluations/new">
+            Créer une nouvelle évaluation
+          </Link>
+        )}
       </div>
       {notice !== '' && <p className="success-message">{notice}</p>}
       {error !== '' && (
         <p className="form-error" role="alert">
           {error}
         </p>
-      )}
-      {owner && (
-        <form
-          className="content-card"
-          onSubmit={(event) => void createEvaluation(event)}
-        >
-          <h2>Nouvelle évaluation</h2>
-          <label>
-            Formation
-            <Select name="trainingId" required>
-              <option value="">Sélectionner</option>
-              {trainings.map((training) => (
-                <option key={training.id} value={training.id}>
-                  {training.title}
-                </option>
-              ))}
-            </Select>
-          </label>
-          <label>
-            Titre
-            <input name="title" required />
-          </label>
-          <label>
-            Instructions
-            <textarea name="instructions" />
-          </label>
-          <div className="form-grid">
-            <label>
-              Seuil %
-              <input
-                name="passPercentage"
-                type="number"
-                min="1"
-                max="100"
-                defaultValue="70"
-                required
-              />
-            </label>
-            <label>
-              Tentatives
-              <input
-                name="maxAttempts"
-                type="number"
-                min="1"
-                defaultValue="3"
-                required
-              />
-            </label>
-            <label>
-              Durée
-              <input name="durationMinutes" type="number" min="1" />
-            </label>
-          </div>
-          <button className="primary-button compact-button" disabled={busy}>
-            Créer
-          </button>
-        </form>
       )}
       {page === null && error === '' ? (
         <p className="muted">Chargement des évaluations…</p>
@@ -451,12 +424,15 @@ export function EvaluationPage() {
                     ? 'content-card selected-card'
                     : 'content-card'
                 }
-                onClick={() => void detail(evaluation.id)}
+                onClick={() => void selectEvaluation(evaluation)}
               >
+                <span className="eyebrow">{evaluation.training.title}</span>
                 <strong>{evaluation.title}</strong>
-                <span>{evaluation.training.title}</span>
                 <small>
-                  {evaluation.status} · {evaluation.questionCount} question(s)
+                  {evaluation.questionCount} question(s)
+                  {evaluation.durationMinutes === undefined
+                    ? ''
+                    : ` · ${evaluation.durationMinutes} min`}
                 </small>
               </button>
             ))}
@@ -471,459 +447,627 @@ export function EvaluationPage() {
             )}
           </aside>
           {selected !== null && (
-            <div className="evaluation-detail">
-              <article className="content-card">
-                <span
-                  className={`status-pill status-${selected.status.toLowerCase()}`}
+            <div
+              className="evaluation-modal-backdrop"
+              role="presentation"
+              onMouseDown={(event) => {
+                if (
+                  event.target === event.currentTarget &&
+                  attempt?.status !== 'IN_PROGRESS'
+                ) {
+                  setSelected(null);
+                  setResults(null);
+                }
+              }}
+            >
+              <div
+                className="evaluation-detail evaluation-modal"
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="evaluation-modal-title"
+              >
+                <button
+                  type="button"
+                  className="modal-close"
+                  aria-label="Fermer l’évaluation"
+                  disabled={attempt?.status === 'IN_PROGRESS'}
+                  onClick={() => {
+                    setSelected(null);
+                    setResults(null);
+                  }}
                 >
-                  {selected.status}
-                </span>
-                <h2>{selected.title}</h2>
-                <p>{selected.instructions}</p>
-                <p>
-                  <strong>{selected.passPercentage}%</strong> requis ·{' '}
-                  {selected.maxAttempts} tentative(s)
-                  {selected.durationMinutes === undefined
-                    ? ''
-                    : ` · ${selected.durationMinutes} min`}
-                </p>
-                {selected.isCertifying && (
-                  <p className="success-message">Évaluation certifiante</p>
-                )}
-              </article>
-              {user.role !== 'LEARNER' && (
-                <div className="management-actions">
-                  {owner && selected.status === 'DRAFT' && (
-                    <>
+                  ×
+                </button>
+                <article className="content-card">
+                  {user.role !== 'LEARNER' && (
+                    <span
+                      className={`status-pill status-${selected.status.toLowerCase()}`}
+                    >
+                      {
+                        {
+                          DRAFT: 'Brouillon',
+                          PUBLISHED: 'Publiée',
+                          ARCHIVED: 'Archivée',
+                        }[selected.status]
+                      }
+                    </span>
+                  )}
+                  <h2 id="evaluation-modal-title">{selected.title}</h2>
+                  <p>{selected.instructions}</p>
+                  <p>
+                    <strong>{selected.passPercentage}%</strong> requis ·{' '}
+                    {selected.maxAttempts} tentative(s)
+                    {selected.durationMinutes === undefined
+                      ? ''
+                      : ` · ${selected.durationMinutes} min`}
+                  </p>
+                  {selected.isCertifying && (
+                    <p className="success-message">Évaluation certifiante</p>
+                  )}
+                </article>
+                {user.role !== 'LEARNER' && (
+                  <div className="management-actions">
+                    {owner && selected.status === 'DRAFT' && (
+                      <>
+                        <button
+                          className="secondary-button compact-button"
+                          disabled={busy}
+                          onClick={() => setEditingEvaluation(true)}
+                        >
+                          Modifier les réglages
+                        </button>
+                        <button
+                          className="primary-button compact-button"
+                          disabled={busy}
+                          onClick={() =>
+                            void evaluationAction(
+                              `/evaluations/${selected.id}/publish`,
+                              'Évaluation publiée.',
+                            )
+                          }
+                        >
+                          Publier
+                        </button>
+                        <button
+                          className="danger-button compact-button"
+                          disabled={busy}
+                          onClick={() => void deleteEvaluation()}
+                        >
+                          Supprimer le brouillon
+                        </button>
+                      </>
+                    )}
+                    {owner && selected.status === 'PUBLISHED' && (
                       <button
                         className="secondary-button compact-button"
                         disabled={busy}
-                        onClick={() => setEditingEvaluation(true)}
+                        onClick={() => void designate()}
                       >
-                        Modifier les réglages
+                        {selected.isCertifying
+                          ? 'Retirer la certification'
+                          : 'Rendre certifiante'}
                       </button>
-                      <button
-                        className="primary-button compact-button"
-                        disabled={busy}
-                        onClick={() =>
-                          void evaluationAction(
-                            `/evaluations/${selected.id}/publish`,
-                            'Évaluation publiée.',
-                          )
-                        }
-                      >
-                        Publier
-                      </button>
+                    )}
+                    {selected.status === 'PUBLISHED' && (
                       <button
                         className="danger-button compact-button"
                         disabled={busy}
-                        onClick={() => void deleteEvaluation()}
+                        onClick={() =>
+                          void evaluationAction(
+                            `/evaluations/${selected.id}/archive`,
+                            'Évaluation archivée.',
+                          )
+                        }
                       >
-                        Supprimer le brouillon
+                        Archiver
                       </button>
-                    </>
-                  )}
-                  {owner && selected.status === 'PUBLISHED' && (
+                    )}
                     <button
                       className="secondary-button compact-button"
                       disabled={busy}
-                      onClick={() => void designate()}
+                      onClick={() => void showResults()}
                     >
-                      {selected.isCertifying
-                        ? 'Retirer certification'
-                        : 'Rendre certifiante'}
-                    </button>
-                  )}
-                  {selected.status === 'PUBLISHED' && (
-                    <button
-                      className="danger-button compact-button"
-                      disabled={busy}
-                      onClick={() =>
-                        void evaluationAction(
-                          `/evaluations/${selected.id}/archive`,
-                          'Évaluation archivée.',
-                        )
-                      }
-                    >
-                      Archiver
-                    </button>
-                  )}
-                  <button
-                    className="secondary-button compact-button"
-                    disabled={busy}
-                    onClick={() => void showResults()}
-                  >
-                    Voir les résultats
-                  </button>
-                </div>
-              )}
-              {owner && selected.status === 'DRAFT' && editingEvaluation && (
-                <form
-                  className="content-card evaluation-question-form"
-                  onSubmit={(event) => void editEvaluation(event)}
-                >
-                  <h3>Modifier les réglages</h3>
-                  <label>
-                    Titre
-                    <input
-                      name="title"
-                      defaultValue={selected.title}
-                      required
-                    />
-                  </label>
-                  <div className="form-grid">
-                    <label>
-                      Seuil de réussite (%)
-                      <input
-                        name="passPercentage"
-                        type="number"
-                        min="1"
-                        max="100"
-                        defaultValue={selected.passPercentage}
-                        required
-                      />
-                    </label>
-                    <label>
-                      Nombre maximal de tentatives
-                      <input
-                        name="maxAttempts"
-                        type="number"
-                        min="1"
-                        defaultValue={selected.maxAttempts}
-                        required
-                      />
-                    </label>
-                  </div>
-                  <div className="management-actions">
-                    <button className="primary-button" disabled={busy}>
-                      Enregistrer
-                    </button>
-                    <button
-                      type="button"
-                      className="secondary-button"
-                      onClick={() => setEditingEvaluation(false)}
-                    >
-                      Annuler
+                      Voir les résultats
                     </button>
                   </div>
-                </form>
-              )}
-              {results !== null && (
-                <section className="content-card">
-                  <h2>Résultats</h2>
-                  <p>
-                    {results.passedAttempts}/{results.totalAttempts}{' '}
-                    tentative(s) réussie(s)
-                  </p>
-                  {results.items.length === 0 ? (
-                    <p className="muted">Aucun résultat soumis.</p>
-                  ) : (
-                    <ul className="financial-list">
-                      {results.items.map((result) => (
-                        <li key={result.id}>
-                          <div>
-                            <strong>
-                              {result.learner.firstName ?? result.learner.email}
-                            </strong>
-                            <span>Tentative {result.attemptNumber}</span>
-                          </div>
-                          <span>
-                            {result.scorePercentage}% · {result.status}
-                          </span>
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                </section>
-              )}
-              {owner && selected.status === 'DRAFT' && (
-                <>
-                  <form
-                    className="content-card inline-action"
-                    onSubmit={(event) => void generate(event)}
-                  >
-                    <label>
-                      Questions IA
-                      <input
-                        name="count"
-                        type="number"
-                        min="1"
-                        max="20"
-                        defaultValue="5"
-                      />
-                    </label>
-                    <button
-                      className="secondary-button compact-button"
-                      disabled={busy}
-                    >
-                      Générer avec Gemini
-                    </button>
-                  </form>
+                )}
+                {owner && selected.status === 'DRAFT' && editingEvaluation && (
                   <form
                     className="content-card evaluation-question-form"
-                    onSubmit={(event) => void addQuestion(event)}
+                    onSubmit={(event) => void editEvaluation(event)}
                   >
-                    <h3>Ajouter une question</h3>
+                    <h3>Modifier les réglages</h3>
                     <label>
-                      Type
-                      <Select name="type">
-                        <option value="SINGLE_CHOICE">Choix unique</option>
-                        <option value="MULTIPLE_CHOICE">Choix multiple</option>
-                        <option value="TRUE_FALSE">Vrai / faux</option>
-                      </Select>
-                    </label>
-                    <label>
-                      Énoncé
-                      <textarea name="prompt" required />
-                    </label>
-                    <label>
-                      Options, une par ligne
-                      <textarea
-                        name="options"
-                        placeholder="Option A&#10;Option B"
-                      />
-                    </label>
-                    <label>
-                      Réponses correctes
+                      Titre
                       <input
-                        name="correct"
-                        placeholder="A,B ou TRUE"
+                        name="title"
+                        defaultValue={selected.title}
                         required
                       />
                     </label>
                     <div className="form-grid">
                       <label>
-                        Points
+                        Seuil de réussite (%)
                         <input
-                          name="points"
+                          name="passPercentage"
                           type="number"
                           min="1"
-                          defaultValue="1"
+                          max="100"
+                          defaultValue={selected.passPercentage}
                           required
                         />
                       </label>
                       <label>
-                        Ordre
+                        Nombre maximal de tentatives
                         <input
-                          name="order"
+                          name="maxAttempts"
                           type="number"
                           min="1"
-                          defaultValue={selected.questionCount + 1}
+                          defaultValue={selected.maxAttempts}
                           required
                         />
                       </label>
                     </div>
-                    <label>
-                      Explication
-                      <textarea name="explanation" />
-                    </label>
-                    <button
-                      className="primary-button compact-button"
-                      disabled={busy}
-                    >
-                      Ajouter
-                    </button>
-                  </form>
-                </>
-              )}
-              <div className="evaluation-questions">
-                {selected.questions?.map((question) => (
-                  <article className="content-card" key={question.id}>
-                    <small>
-                      {question.type} · {question.points} point(s)
-                    </small>
-                    <h3>
-                      {question.order}. {question.prompt}
-                    </h3>
-                    <ul>
-                      {question.options.map((option) => (
-                        <li key={option.id}>
-                          <strong>{option.id}</strong> — {option.text}
-                        </li>
-                      ))}
-                    </ul>
-                    {question.correctOptionIds !== undefined && (
-                      <p className="muted">
-                        Réponse : {question.correctOptionIds.join(', ')}
-                      </p>
-                    )}
-                    {editingQuestionId === question.id && (
-                      <form
-                        className="evaluation-question-form"
-                        onSubmit={(event) => void editQuestion(question, event)}
+                    <div className="management-actions">
+                      <button className="primary-button" disabled={busy}>
+                        Enregistrer
+                      </button>
+                      <button
+                        type="button"
+                        className="secondary-button"
+                        onClick={() => setEditingEvaluation(false)}
                       >
-                        <label>
-                          Énoncé
-                          <textarea
-                            name="prompt"
-                            defaultValue={question.prompt}
-                            required
-                          />
-                        </label>
-                        <label>
-                          Options, une par ligne
-                          <textarea
-                            name="options"
-                            defaultValue={question.options
-                              .map(({ text }) => text)
-                              .join('\n')}
-                            required
-                          />
-                        </label>
-                        <label>
-                          Réponses correctes
-                          <input
-                            name="correct"
-                            defaultValue={
-                              question.correctOptionIds?.join(',') ?? ''
-                            }
-                            required
-                          />
-                        </label>
+                        Annuler
+                      </button>
+                    </div>
+                  </form>
+                )}
+                {results !== null && (
+                  <section className="content-card">
+                    <h2>Résultats</h2>
+                    <p>
+                      {results.passedAttempts}/{results.totalAttempts}{' '}
+                      tentative(s) réussie(s)
+                    </p>
+                    {results.items.length === 0 ? (
+                      <p className="muted">Aucun résultat soumis.</p>
+                    ) : (
+                      <ul className="financial-list">
+                        {results.items.map((result) => (
+                          <li key={result.id}>
+                            <div>
+                              <strong>
+                                {result.learner.firstName ??
+                                  result.learner.email}
+                              </strong>
+                              <span>Tentative {result.attemptNumber}</span>
+                            </div>
+                            <span>
+                              {result.scorePercentage}% ·{' '}
+                              {attemptStatusLabel(result.status)}
+                            </span>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </section>
+                )}
+                {owner && selected.status === 'DRAFT' && (
+                  <>
+                    <form
+                      className="content-card inline-action"
+                      onSubmit={(event) => void generate(event)}
+                    >
+                      <label>
+                        Questions IA
+                        <input
+                          name="count"
+                          type="number"
+                          min="1"
+                          max="20"
+                          defaultValue="5"
+                        />
+                      </label>
+                      <button
+                        className="secondary-button compact-button"
+                        disabled={busy}
+                      >
+                        Générer avec Gemini
+                      </button>
+                    </form>
+                    <form
+                      className="content-card evaluation-question-form"
+                      onSubmit={(event) => void addQuestion(event)}
+                    >
+                      <h3>Ajouter une question</h3>
+                      <label>
+                        Type
+                        <Select name="type">
+                          <option value="SINGLE_CHOICE">Choix unique</option>
+                          <option value="MULTIPLE_CHOICE">
+                            Choix multiple
+                          </option>
+                          <option value="TRUE_FALSE">Vrai / faux</option>
+                        </Select>
+                      </label>
+                      <label>
+                        Énoncé
+                        <textarea name="prompt" required />
+                      </label>
+                      <label>
+                        Options, une par ligne
+                        <textarea
+                          name="options"
+                          placeholder="Option A&#10;Option B"
+                        />
+                      </label>
+                      <label>
+                        Réponses correctes
+                        <input
+                          name="correct"
+                          placeholder="A,B ou TRUE"
+                          required
+                        />
+                      </label>
+                      <div className="form-grid">
                         <label>
                           Points
                           <input
                             name="points"
                             type="number"
                             min="1"
-                            defaultValue={question.points}
+                            defaultValue="1"
                             required
                           />
                         </label>
+                        <label>
+                          Ordre
+                          <input
+                            name="order"
+                            type="number"
+                            min="1"
+                            defaultValue={selected.questionCount + 1}
+                            required
+                          />
+                        </label>
+                      </div>
+                      <label>
+                        Explication
+                        <textarea name="explanation" />
+                      </label>
+                      <button
+                        className="primary-button compact-button"
+                        disabled={busy}
+                      >
+                        Ajouter
+                      </button>
+                    </form>
+                  </>
+                )}
+                <div className="evaluation-questions">
+                  {selected.questions?.map((question) => (
+                    <article className="content-card" key={question.id}>
+                      <small>
+                        {questionTypeLabel(question.type)} · {question.points}{' '}
+                        point(s)
+                      </small>
+                      <h3>
+                        {question.order}. {question.prompt}
+                      </h3>
+                      <ul>
+                        {question.options.map((option) => (
+                          <li key={option.id}>
+                            <strong>{option.id}</strong> — {option.text}
+                          </li>
+                        ))}
+                      </ul>
+                      {question.correctOptionIds !== undefined && (
+                        <p className="muted">
+                          Réponse : {question.correctOptionIds.join(', ')}
+                        </p>
+                      )}
+                      {editingQuestionId === question.id && (
+                        <form
+                          className="evaluation-question-form"
+                          onSubmit={(event) =>
+                            void editQuestion(question, event)
+                          }
+                        >
+                          <label>
+                            Énoncé
+                            <textarea
+                              name="prompt"
+                              defaultValue={question.prompt}
+                              required
+                            />
+                          </label>
+                          <label>
+                            Options, une par ligne
+                            <textarea
+                              name="options"
+                              defaultValue={question.options
+                                .map(({ text }) => text)
+                                .join('\n')}
+                              required
+                            />
+                          </label>
+                          <label>
+                            Réponses correctes
+                            <input
+                              name="correct"
+                              defaultValue={
+                                question.correctOptionIds?.join(',') ?? ''
+                              }
+                              required
+                            />
+                          </label>
+                          <label>
+                            Points
+                            <input
+                              name="points"
+                              type="number"
+                              min="1"
+                              defaultValue={question.points}
+                              required
+                            />
+                          </label>
+                          <div className="management-actions">
+                            <button className="primary-button" disabled={busy}>
+                              Enregistrer
+                            </button>
+                            <button
+                              type="button"
+                              className="secondary-button"
+                              onClick={() => setEditingQuestionId(undefined)}
+                            >
+                              Annuler
+                            </button>
+                          </div>
+                        </form>
+                      )}
+                      {owner && selected.status === 'DRAFT' && (
                         <div className="management-actions">
-                          <button className="primary-button" disabled={busy}>
-                            Enregistrer
+                          <button
+                            className="secondary-button compact-button"
+                            disabled={busy}
+                            onClick={() => setEditingQuestionId(question.id)}
+                          >
+                            Modifier
                           </button>
                           <button
-                            type="button"
-                            className="secondary-button"
-                            onClick={() => setEditingQuestionId(undefined)}
+                            className="danger-button compact-button"
+                            disabled={busy}
+                            onClick={() => void deleteQuestion(question)}
                           >
-                            Annuler
+                            Supprimer
                           </button>
                         </div>
-                      </form>
-                    )}
-                    {owner && selected.status === 'DRAFT' && (
-                      <div className="management-actions">
-                        <button
-                          className="secondary-button compact-button"
-                          disabled={busy}
-                          onClick={() => setEditingQuestionId(question.id)}
-                        >
-                          Modifier
-                        </button>
-                        <button
-                          className="danger-button compact-button"
-                          disabled={busy}
-                          onClick={() => void deleteQuestion(question)}
-                        >
-                          Supprimer
-                        </button>
-                      </div>
-                    )}
-                  </article>
-                ))}
-              </div>
-              {user.role === 'LEARNER' &&
-                attempt === null &&
-                selected.status === 'PUBLISHED' && (
+                      )}
+                    </article>
+                  ))}
+                </div>
+                {user.role === 'LEARNER' && attempt === null && (
                   <button
                     className="primary-button"
                     disabled={busy}
-                    onClick={() => void startAttempt()}
+                    onClick={() => void startAttempt(selected)}
                   >
-                    Commencer une tentative
+                    Démarrer une nouvelle tentative
                   </button>
                 )}
-              {user.role === 'LEARNER' && attempt !== null && (
-                <div className="attempt-panel content-card">
-                  <div className="managed-training-heading">
-                    <h2>Tentative {attempt.attemptNumber}</h2>
-                    <span
-                      className={`status-pill status-${attempt.status.toLowerCase()}`}
-                    >
-                      {attempt.status}
-                    </span>
-                  </div>
-                  {remaining !== undefined &&
-                    attempt.status === 'IN_PROGRESS' && (
-                      <p role="timer">
-                        Temps serveur restant : {Math.floor(remaining / 60)}:
-                        {String(remaining % 60).padStart(2, '0')}
-                      </p>
-                    )}
-                  {attempt.answers.map((answer) => (
-                    <fieldset
-                      key={answer.questionId}
-                      disabled={busy || attempt.status !== 'IN_PROGRESS'}
-                    >
-                      <legend>
-                        {answer.question.order}. {answer.question.prompt}
-                      </legend>
-                      {answer.question.options.map((option) => {
-                        const multiple =
-                          answer.question.type === 'MULTIPLE_CHOICE';
-                        return (
-                          <label key={option.id}>
-                            <input
-                              type={multiple ? 'checkbox' : 'radio'}
-                              name={answer.questionId}
-                              checked={answer.selectedOptionIds.includes(
-                                option.id,
-                              )}
-                              onChange={(event) => {
-                                const values = multiple
-                                  ? event.target.checked
-                                    ? [...answer.selectedOptionIds, option.id]
-                                    : answer.selectedOptionIds.filter(
-                                        (id) => id !== option.id,
-                                      )
-                                  : [option.id];
-                                void saveAnswer(answer, values);
-                              }}
-                            />
-                            {option.text}
-                          </label>
-                        );
-                      })}
-                      {answer.question.correctOptionIds !== undefined && (
-                        <p className="success-message">
-                          Bonne réponse :{' '}
-                          {answer.question.correctOptionIds.join(', ')}
-                          {answer.question.explanation === undefined
-                            ? ''
-                            : ` — ${answer.question.explanation}`}
+                {user.role === 'LEARNER' && attempt !== null && (
+                  <div className="attempt-panel content-card">
+                    <div className="managed-training-heading">
+                      <h2>Tentative {attempt.attemptNumber}</h2>
+                      <span
+                        className={`status-pill status-${attempt.status.toLowerCase()}`}
+                      >
+                        {attemptStatusLabel(attempt.status)}
+                      </span>
+                    </div>
+                    {remaining !== undefined &&
+                      attempt.status === 'IN_PROGRESS' && (
+                        <p role="timer">
+                          Temps serveur restant : {Math.floor(remaining / 60)}:
+                          {String(remaining % 60).padStart(2, '0')}
                         </p>
                       )}
-                    </fieldset>
-                  ))}
-                  {attempt.status === 'IN_PROGRESS' ? (
-                    <button
-                      className="primary-button"
-                      disabled={busy}
-                      onClick={() => void submitAttempt()}
-                    >
-                      Soumettre
-                    </button>
-                  ) : (
-                    <p
-                      className={
-                        attempt.status === 'PASSED'
-                          ? 'success-message'
-                          : 'form-error'
-                      }
-                    >
-                      Score : {attempt.scorePercentage}% —{' '}
-                      {attempt.status === 'PASSED' ? 'Réussi' : 'Échoué'}
-                    </p>
-                  )}
-                </div>
-              )}
+                    {attempt.answers.map((answer) => (
+                      <fieldset
+                        key={answer.questionId}
+                        disabled={busy || attempt.status !== 'IN_PROGRESS'}
+                      >
+                        <legend>
+                          {answer.question.order}. {answer.question.prompt}
+                        </legend>
+                        {answer.question.options.map((option) => {
+                          const multiple =
+                            answer.question.type === 'MULTIPLE_CHOICE';
+                          return (
+                            <label key={option.id}>
+                              <input
+                                type={multiple ? 'checkbox' : 'radio'}
+                                name={answer.questionId}
+                                checked={answer.selectedOptionIds.includes(
+                                  option.id,
+                                )}
+                                onChange={(event) => {
+                                  const values = multiple
+                                    ? event.target.checked
+                                      ? [...answer.selectedOptionIds, option.id]
+                                      : answer.selectedOptionIds.filter(
+                                          (id) => id !== option.id,
+                                        )
+                                    : [option.id];
+                                  void saveAnswer(answer, values);
+                                }}
+                              />
+                              {option.text}
+                            </label>
+                          );
+                        })}
+                        {answer.question.correctOptionIds !== undefined && (
+                          <p className="success-message">
+                            Bonne réponse :{' '}
+                            {answer.question.correctOptionIds.join(', ')}
+                            {answer.question.explanation === undefined
+                              ? ''
+                              : ` — ${answer.question.explanation}`}
+                          </p>
+                        )}
+                      </fieldset>
+                    ))}
+                    {attempt.status === 'IN_PROGRESS' ? (
+                      <button
+                        className="primary-button"
+                        disabled={busy}
+                        onClick={() => void submitAttempt()}
+                      >
+                        Terminer la tentative
+                      </button>
+                    ) : (
+                      <p
+                        className={
+                          attempt.status === 'PASSED'
+                            ? 'success-message'
+                            : 'form-error'
+                        }
+                      >
+                        Score : {attempt.scorePercentage}% —{' '}
+                        {attempt.status === 'PASSED' ? 'Réussi' : 'Échoué'}
+                      </p>
+                    )}
+                  </div>
+                )}
+              </div>
             </div>
           )}
         </div>
       )}
+    </section>
+  );
+}
+
+export function EvaluationCreatePage() {
+  const { request } = useAuth();
+  const navigate = useNavigate();
+  const [trainings, setTrainings] = useState<
+    Array<{ id: string; title: string }>
+  >([]);
+  const [error, setError] = useState('');
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    void request<Page<{ id: string; title: string }>>(
+      '/trainings?view=MANAGED&pageSize=100',
+    )
+      .then((value) => setTrainings(value.items))
+      .catch((caught) => setError(message(caught)));
+  }, [request]);
+
+  async function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const form = new FormData(event.currentTarget);
+    setBusy(true);
+    setError('');
+    try {
+      await request('/evaluations', {
+        method: 'POST',
+        body: JSON.stringify({
+          trainingId: String(form.get('trainingId')),
+          title: String(form.get('title')),
+          instructions: String(form.get('instructions')),
+          passPercentage: Number(form.get('passPercentage')),
+          maxAttempts: Number(form.get('maxAttempts')),
+          ...(String(form.get('durationMinutes')) === ''
+            ? {}
+            : { durationMinutes: Number(form.get('durationMinutes')) }),
+        }),
+      });
+      navigate('/app/evaluations', {
+        replace: true,
+        state: { notice: 'Évaluation créée.' },
+      });
+    } catch (caught) {
+      setError(message(caught));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <section className="management-editor-page">
+      <Link to="/app/evaluations">← Retour aux évaluations</Link>
+      <div className="section-heading">
+        <div>
+          <span className="eyebrow">Évaluation pédagogique</span>
+          <h1>Créer une nouvelle évaluation</h1>
+        </div>
+      </div>
+      {error !== '' && (
+        <p className="form-error" role="alert">
+          {error}
+        </p>
+      )}
+      <form
+        className="content-card editor-form"
+        onSubmit={(event) => void submit(event)}
+      >
+        <label>
+          Formation
+          <Select name="trainingId" required>
+            <option value="">Sélectionner</option>
+            {trainings.map((training) => (
+              <option key={training.id} value={training.id}>
+                {training.title}
+              </option>
+            ))}
+          </Select>
+        </label>
+        <label>
+          Titre
+          <input name="title" required />
+        </label>
+        <label>
+          Instructions
+          <textarea name="instructions" rows={5} />
+        </label>
+        <div className="form-grid">
+          <label>
+            Seuil de réussite (%)
+            <input
+              name="passPercentage"
+              type="number"
+              min="1"
+              max="100"
+              defaultValue="70"
+              required
+            />
+          </label>
+          <label>
+            Nombre maximal de tentatives
+            <input
+              name="maxAttempts"
+              type="number"
+              min="1"
+              defaultValue="3"
+              required
+            />
+          </label>
+          <label>
+            Durée en minutes (facultative)
+            <input name="durationMinutes" type="number" min="1" />
+          </label>
+        </div>
+        <div className="form-actions">
+          <button className="primary-button" disabled={busy}>
+            {busy ? 'Création…' : 'Créer l’évaluation'}
+          </button>
+          <Link className="secondary-button" to="/app/evaluations">
+            Annuler
+          </Link>
+        </div>
+      </form>
     </section>
   );
 }

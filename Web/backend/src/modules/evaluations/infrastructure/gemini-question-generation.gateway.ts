@@ -10,34 +10,37 @@ export interface QuestionGenerationGateway {
 
 const option = {
   type: 'object',
-  additionalProperties: false,
   properties: { id: { type: 'string' }, text: { type: 'string' } },
   required: ['id', 'text'],
 };
 const question = {
   type: 'object',
-  additionalProperties: false,
   properties: {
     type: {
       type: 'string',
       enum: ['SINGLE_CHOICE', 'MULTIPLE_CHOICE', 'TRUE_FALSE'],
     },
     prompt: { type: 'string' },
-    options: { type: 'array', minItems: 2, maxItems: 20, items: option },
-    correctOptionIds: { type: 'array', minItems: 1, items: { type: 'string' } },
+    options: { type: 'array', items: option },
+    correctOptionIds: { type: 'array', items: { type: 'string' } },
     explanation: { type: 'string' },
-    points: { type: 'integer', minimum: 1 },
+    points: { type: 'integer' },
   },
   required: ['type', 'prompt', 'options', 'correctOptionIds', 'points'],
 };
 const responseSchema = {
   type: 'object',
-  additionalProperties: false,
   properties: {
-    questions: { type: 'array', minItems: 1, maxItems: 20, items: question },
+    questions: { type: 'array', items: question },
   },
   required: ['questions'],
 };
+
+function providerStatus(error: unknown): number | undefined {
+  if (typeof error !== 'object' || error === null || !('status' in error))
+    return undefined;
+  return typeof error.status === 'number' ? error.status : undefined;
+}
 
 export class GeminiQuestionGenerationGateway implements QuestionGenerationGateway {
   readonly provider = 'GEMINI';
@@ -70,25 +73,31 @@ export class GeminiQuestionGenerationGateway implements QuestionGenerationGatewa
       );
 
     try {
-      const response = await this.#client.interactions.create({
-        model: this.model,
-        input: input.prompt,
-        store: false,
-        system_instruction:
-          'Generate objective assessment questions using only the supplied training context. Do not invent facts.',
-        response_format: {
-          type: 'text',
-          mime_type: 'application/json',
-          schema: responseSchema,
-        },
-        generation_config: { max_output_tokens: 8192 },
-      });
-      if (
-        response.output_text === undefined ||
-        response.output_text.trim() === ''
-      )
+      let response: Awaited<
+        ReturnType<GoogleGenAI['models']['generateContent']>
+      > | null = null;
+      for (let attempt = 0; attempt < 2 && response === null; attempt += 1) {
+        try {
+          response = await this.#client.models.generateContent({
+            model: this.model,
+            contents: input.prompt,
+            config: {
+              systemInstruction:
+                'Generate objective assessment questions using only the supplied training context. Do not invent facts.',
+              responseMimeType: 'application/json',
+              responseJsonSchema: responseSchema,
+              maxOutputTokens: 8192,
+            },
+          });
+        } catch (error) {
+          if (attempt === 0 && providerStatus(error) === 503) continue;
+          throw error;
+        }
+      }
+      if (response === null) throw new Error('Gemini returned no response.');
+      if (response.text === undefined || response.text.trim() === '')
         throw new Error('Gemini returned no text.');
-      return JSON.parse(response.output_text) as unknown;
+      return JSON.parse(response.text) as unknown;
     } catch (error) {
       if (error instanceof SyntaxError)
         throw new AppError(
@@ -97,6 +106,12 @@ export class GeminiQuestionGenerationGateway implements QuestionGenerationGatewa
           'Gemini returned invalid JSON. No questions were saved.',
         );
       if (error instanceof AppError) throw error;
+      if (providerStatus(error) === 503)
+        throw new AppError(
+          503,
+          'AI_PROVIDER_BUSY',
+          'Gemini is temporarily busy. Please retry in a moment. No questions were saved.',
+        );
       throw new AppError(
         502,
         'AI_PROVIDER_FAILED',

@@ -12,6 +12,7 @@ export interface IssuerInvoiceSnapshot {
   email: string;
   phone?: string;
   registrationId?: string;
+  logoPath?: string;
 }
 
 export interface InvoicePdf {
@@ -57,6 +58,7 @@ const issuerSnapshotSchema = new mongoose.Schema<IssuerInvoiceSnapshot>(
     email: { type: String, required: true },
     phone: { type: String },
     registrationId: { type: String },
+    logoPath: { type: String },
   },
   { _id: false, strict: 'throw' },
 );

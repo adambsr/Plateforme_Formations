@@ -1,8 +1,19 @@
 import { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { Link } from 'react-router';
+import badgeCheckIcon from 'lucide-static/icons/badge-check.svg';
+import bookOpenCheckIcon from 'lucide-static/icons/book-open-check.svg';
+import brainCircuitIcon from 'lucide-static/icons/brain-circuit.svg';
+import briefcaseBusinessIcon from 'lucide-static/icons/briefcase-business.svg';
+import calendarClockIcon from 'lucide-static/icons/calendar-clock.svg';
+import codeIcon from 'lucide-static/icons/code-2.svg';
+import fileSpreadsheetIcon from 'lucide-static/icons/file-spreadsheet.svg';
+import paletteIcon from 'lucide-static/icons/palette.svg';
 
+import academyHero from '../../assets/academy-hero.png';
 import { apiRequest } from '../../core/api/client.js';
+import { Icon } from '../../shared/components/Icon.js';
+import { TrainingCard } from '../trainings/TrainingPages.js';
 import type {
   PaginatedTrainings,
   TrainingCategory,
@@ -71,17 +82,26 @@ export function LandingPage() {
             </div>
           </dl>
         </div>
-        <div className="hero-visual" aria-label="Aperçu de la plateforme">
-          <div className="hero-orbit">Votre parcours</div>
+        <figure className="hero-visual">
+          <img
+            src={academyHero}
+            alt="Apprenants accompagnés par une formatrice dans une salle moderne"
+          />
+          <figcaption className="hero-image-caption">
+            <strong>Apprendre ensemble</strong>
+            <span>Des parcours concrets, en ligne et en présentiel.</span>
+          </figcaption>
           <div className="hero-card hero-card-one">
-            <span>Progression</span>
+            <Icon src={bookOpenCheckIcon} size={22} />
             <strong>À votre rythme</strong>
+            <span>Progression claire</span>
           </div>
           <div className="hero-card hero-card-two">
-            <span>Présentiel</span>
+            <Icon src={calendarClockIcon} size={22} />
             <strong>Planning maîtrisé</strong>
+            <span>Sessions en présentiel</span>
           </div>
-        </div>
+        </figure>
       </section>
       <section className="landing-section">
         <div className="section-copy">
@@ -92,7 +112,7 @@ export function LandingPage() {
         </div>
         <div className="feature-grid">
           <article>
-            <span aria-hidden="true">01</span>
+            <Icon src={bookOpenCheckIcon} size={32} className="feature-icon" />
             <h3>Parcours structurés</h3>
             <p>
               Modules, leçons et ressources organisés pour avancer sans perdre
@@ -100,7 +120,7 @@ export function LandingPage() {
             </p>
           </article>
           <article>
-            <span aria-hidden="true">02</span>
+            <Icon src={calendarClockIcon} size={32} className="feature-icon" />
             <h3>Sessions maîtrisées</h3>
             <p>
               Dates, salles, formateurs et présences réunis dans un planning
@@ -108,7 +128,7 @@ export function LandingPage() {
             </p>
           </article>
           <article>
-            <span aria-hidden="true">03</span>
+            <Icon src={badgeCheckIcon} size={32} className="feature-icon" />
             <h3>Résultats vérifiables</h3>
             <p>
               Évaluations, progression et certificats reposent sur des règles
@@ -136,13 +156,22 @@ export function LandingPage() {
                 { id: 'management', name: 'Management' },
                 { id: 'design', name: 'Design numérique' },
               ]
-          ).map((category, index) => (
-            <Link key={category.id} to="/catalogue">
-              <span aria-hidden="true">{['⌘', '◈', '◎', '✦', '▦'][index]}</span>
-              <strong>{category.name}</strong>
-              <small>Découvrir les parcours</small>
-            </Link>
-          ))}
+          ).map((category, index) => {
+            const categoryIcon = [
+              fileSpreadsheetIcon,
+              brainCircuitIcon,
+              paletteIcon,
+              codeIcon,
+              briefcaseBusinessIcon,
+            ][index % 5]!;
+            return (
+              <Link key={category.id} to="/catalogue">
+                <Icon src={categoryIcon} size={26} />
+                <strong>{category.name}</strong>
+                <small>Découvrir les parcours</small>
+              </Link>
+            );
+          })}
         </div>
       </section>
       <section className="landing-section landing-training-preview">
@@ -169,23 +198,13 @@ export function LandingPage() {
             </Link>
           </div>
         ) : (
-          <div className="preview-grid">
+          <div className="training-grid landing-training-grid">
             {preview.items.map((training) => (
-              <article key={training.id}>
-                <span className="type-badge">
-                  {training.type === 'SELF_PACED_ONLINE'
-                    ? 'En ligne'
-                    : 'Présentiel'}
-                </span>
-                <h3>{training.title}</h3>
-                <p>{training.description}</p>
-                <Link
-                  className="tertiary-link"
-                  to={`/trainings/${training.id}`}
-                >
-                  Découvrir <span aria-hidden="true">→</span>
-                </Link>
-              </article>
+              <TrainingCard
+                key={training.id}
+                training={training}
+                headingLevel={3}
+              />
             ))}
           </div>
         )}
@@ -311,7 +330,7 @@ const questions = [
   ],
   [
     'Quelle différence entre en ligne et présentiel ?',
-    'La formation en ligne se suit à votre rythme avec modules et leçons. En présentiel, vous choisissez une Session avec des dates et un lieu.',
+    'La formation en ligne se suit à votre rythme avec modules et leçons. En présentiel, vous choisissez une session avec des dates et un lieu.',
   ],
   [
     'Quand puis-je obtenir mon certificat ?',
@@ -346,6 +365,7 @@ export function FaqPage() {
 }
 export function ContactPage() {
   const [submissionError, setSubmissionError] = useState('');
+  const [submissionNotice, setSubmissionNotice] = useState('');
   const form = useForm<{
     name: string;
     email: string;
@@ -364,7 +384,7 @@ export function ContactPage() {
         <span className="eyebrow">Contact</span>
         <h1>Parlons de votre projet de formation.</h1>
         <p className="lead">
-          Pour toute question sur un parcours, une Session ou votre espace,
+          Pour toute question sur un parcours, une session ou votre espace,
           notre équipe vous répond avec les informations utiles, sans jamais
           demander de mot de passe ou de données de carte.
         </p>
@@ -396,12 +416,23 @@ export function ContactPage() {
       </div>
       <form
         className="content-card contact-form"
-        onSubmit={form.handleSubmit(async () => {
+        onSubmit={form.handleSubmit(async (values) => {
           setSubmissionError('');
-          await Promise.resolve();
-          setSubmissionError(
-            `L’envoi en ligne n’est pas encore disponible : aucune API Contact n’est définie. Écrivez-nous à ${email}.`,
-          );
+          setSubmissionNotice('');
+          try {
+            const result = await apiRequest<{ message: string }>('/contact', {
+              method: 'POST',
+              body: JSON.stringify(values),
+            });
+            setSubmissionNotice(result.message);
+            form.reset();
+          } catch (caught) {
+            setSubmissionError(
+              caught instanceof Error
+                ? caught.message
+                : 'Votre message n’a pas pu être envoyé.',
+            );
+          }
         })}
       >
         <h2>Envoyer un message</h2>
@@ -432,16 +463,17 @@ export function ContactPage() {
             {submissionError}
           </p>
         )}
+        {submissionNotice && (
+          <p className="success-message" role="status">
+            {submissionNotice}
+          </p>
+        )}
         <button
           className="primary-button"
           disabled={form.formState.isSubmitting}
         >
           {form.formState.isSubmitting ? 'Envoi…' : 'Envoyer le message'}
         </button>
-        <small className="muted">
-          Dépendance manquante : endpoint backend de contact et service de
-          messagerie.
-        </small>
       </form>
     </section>
   );

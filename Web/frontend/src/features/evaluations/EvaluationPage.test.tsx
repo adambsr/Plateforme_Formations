@@ -1,4 +1,4 @@
-import { cleanup, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { EvaluationPage } from './EvaluationPage.js';
@@ -16,7 +16,7 @@ beforeEach(() => {
 afterEach(cleanup);
 
 describe('Phase 8 and 9 Evaluation UI', () => {
-  it('shows loading then the empty owner state while still allowing the first Evaluation', async () => {
+  it('shows loading then the empty owner state with a dedicated creation route', async () => {
     request.mockImplementation((path: string) => {
       if (path.startsWith('/trainings?'))
         return Promise.resolve({
@@ -34,7 +34,9 @@ describe('Phase 8 and 9 Evaluation UI', () => {
     );
     expect(screen.getByText(/Chargement/i)).toBeVisible();
     expect(await screen.findByText(/Aucune évaluation/i)).toBeVisible();
-    expect(screen.getByRole('option', { name: 'TypeScript' })).toBeVisible();
+    expect(
+      screen.getByRole('link', { name: 'Créer une nouvelle évaluation' }),
+    ).toHaveAttribute('href', '/app/evaluations/new');
   });
 
   it('renders AI draft review controls and editable imported questions for the owner', async () => {
@@ -93,6 +95,7 @@ describe('Phase 8 and 9 Evaluation UI', () => {
         <EvaluationPage />
       </MemoryRouter>,
     );
+    fireEvent.click(await screen.findByRole('button', { name: /Quiz/i }));
     expect(
       await screen.findByRole('button', { name: /Générer avec Gemini/i }),
     ).toBeVisible();
@@ -101,7 +104,7 @@ describe('Phase 8 and 9 Evaluation UI', () => {
     expect(screen.getByRole('button', { name: 'Publier' })).toBeVisible();
   });
 
-  it('shows a published enrolled Evaluation and the Learner start action', async () => {
+  it('opens a published enrolled Evaluation and starts the Learner attempt', async () => {
     currentUser = { id: 'learner-1', role: 'LEARNER' };
     request.mockImplementation((path: string) => {
       if (path.startsWith('/evaluations?'))
@@ -131,6 +134,18 @@ describe('Phase 8 and 9 Evaluation UI', () => {
           pageSize: 100,
           total: 1,
         });
+      if (path.endsWith('/attempts'))
+        return Promise.resolve({
+          id: 'attempt-1',
+          evaluationId: 'eval-1',
+          enrollmentId: 'enrollment-1',
+          attemptNumber: 1,
+          status: 'IN_PROGRESS',
+          startedAt: '2026-08-23T10:00:00.000Z',
+          remainingSeconds: 900,
+          answersRevealed: false,
+          answers: [],
+        });
       return Promise.resolve({
         id: 'eval-1',
         training: { id: 'training-1', title: 'TypeScript' },
@@ -151,8 +166,7 @@ describe('Phase 8 and 9 Evaluation UI', () => {
         <EvaluationPage />
       </MemoryRouter>,
     );
-    expect(
-      await screen.findByRole('button', { name: /Commencer une tentative/i }),
-    ).toBeVisible();
+    fireEvent.click(await screen.findByRole('button', { name: /Quiz/i }));
+    expect(await screen.findByText('Tentative 1')).toBeVisible();
   });
 });

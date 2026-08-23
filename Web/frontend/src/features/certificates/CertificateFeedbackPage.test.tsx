@@ -35,6 +35,7 @@ describe('Phase 10 Certificate and Feedback UI', () => {
               learner: { id: 'learner-1', email: 'learner@example.com' },
               training: { id: 'training-1', title: 'TypeScript' },
               payment: { id: 'payment-1', amountMinor: 1000, currency: 'TND' },
+              eligibility: { eligible: true, failures: [] },
               createdAt: '2026-01-01T00:00:00.000Z',
             },
           ],
@@ -66,9 +67,9 @@ describe('Phase 10 Certificate and Feedback UI', () => {
       if (path === '/feedback') {
         return Promise.resolve({
           global: {
-            count: 2,
-            average: 4.5,
-            distribution: { 1: 0, 2: 0, 3: 0, 4: 1, 5: 1 },
+            count: 3,
+            average: 4,
+            distribution: { 1: 0, 2: 0, 3: 1, 4: 1, 5: 1 },
           },
           byTraining: [
             {
@@ -77,6 +78,12 @@ describe('Phase 10 Certificate and Feedback UI', () => {
               average: 4.5,
               distribution: { 1: 0, 2: 0, 3: 0, 4: 1, 5: 1 },
             },
+            {
+              training: { id: 'training-2', title: 'Design UX' },
+              count: 1,
+              average: 3,
+              distribution: { 1: 0, 2: 0, 3: 1, 4: 0, 5: 0 },
+            },
           ],
         });
       }
@@ -84,9 +91,46 @@ describe('Phase 10 Certificate and Feedback UI', () => {
     });
     render(<CertificateFeedbackPage />);
     expect(await screen.findByText('Satisfaction')).toBeVisible();
-    expect(screen.getByText(/2 notes · moyenne/)).toBeVisible();
-    expect(screen.getByText('TypeScript')).toBeVisible();
+    expect(screen.getByText('4.00 / 5').closest('p')).toHaveTextContent(
+      '3 notes · moyenne 4.00 / 5',
+    );
+    fireEvent.change(screen.getByLabelText('Formation'), {
+      target: { value: 'training-1' },
+    });
+    expect(screen.getByText('4.50 / 5').closest('p')).toHaveTextContent(
+      '2 notes · moyenne 4.50 / 5',
+    );
+    expect(screen.getByRole('option', { name: 'TypeScript' })).toBeVisible();
     expect(screen.getByText(/5★ 1/)).toBeVisible();
+  });
+
+  it('shows an existing immutable rating without sending another POST', async () => {
+    request.mockImplementation((path: string) => {
+      if (path.startsWith('/enrollments')) {
+        return Promise.resolve({
+          items: [
+            {
+              id: 'enrollment-rated',
+              learner: { id: 'learner-1', email: 'learner@example.com' },
+              training: { id: 'training-1', title: 'React' },
+              payment: { id: 'payment-1', amountMinor: 1000, currency: 'TND' },
+              feedback: {
+                rating: 4,
+                createdAt: '2026-01-02T00:00:00.000Z',
+              },
+              createdAt: '2026-01-01T00:00:00.000Z',
+            },
+          ],
+          page: 1,
+          pageSize: 10,
+          total: 1,
+        });
+      }
+      return Promise.resolve({ items: [], page: 1, pageSize: 10, total: 0 });
+    });
+    render(<CertificateFeedbackPage />);
+    expect(await screen.findByText('Avis enregistré · 4/5')).toBeVisible();
+    expect(screen.queryByRole('button', { name: /Noter 4 étoile/ })).toBeNull();
   });
 
   it('shows only relevant issued Certificates to a Trainer', async () => {

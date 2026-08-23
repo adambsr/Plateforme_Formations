@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { Link, useParams } from 'react-router';
 
-import { ApiError, apiRequest } from '../../core/api/client.js';
+import { ApiError, apiAssetUrl, apiRequest } from '../../core/api/client.js';
 import { useAuth } from '../../core/auth/AuthContext.js';
 import type { PaginatedUsers, User } from '../../core/auth/types.js';
 import { Pagination } from '../../shared/components/Pagination.js';
@@ -43,6 +43,32 @@ function typeLabel(type: TrainingType): string {
   return type === 'SELF_PACED_ONLINE' ? 'En ligne autonome' : 'Présentiel';
 }
 
+function statusLabel(status: Training['status']): string {
+  return {
+    DRAFT: 'Brouillon',
+    PUBLISHED: 'Publiée',
+    ARCHIVED: 'Archivée',
+  }[status];
+}
+
+function TrainingImage({ training }: { training: Training }) {
+  return training.thumbnailUrl === undefined ? (
+    <div
+      className="training-thumbnail training-thumbnail-fallback"
+      role="img"
+      aria-label="Aucune miniature disponible"
+    >
+      <span aria-hidden="true">HSA</span>
+    </div>
+  ) : (
+    <img
+      className="training-thumbnail"
+      src={apiAssetUrl(training.thumbnailUrl)}
+      alt={`Miniature de la formation ${training.title}`}
+    />
+  );
+}
+
 function lines(value: string): string[] {
   return value
     .split('\n')
@@ -59,33 +85,47 @@ function parseTndMinor(value: string): number | undefined {
   return Number.isSafeInteger(minor) && minor > 0 ? minor : undefined;
 }
 
-function TrainingCard({ training }: { training: Training }) {
+export function TrainingCard({
+  training,
+  headingLevel = 2,
+}: {
+  training: Training;
+  headingLevel?: 2 | 3;
+}) {
+  const Heading = headingLevel === 3 ? 'h3' : 'h2';
   return (
-    <article className="training-card">
-      <div className="training-card-meta">
-        <span className="type-badge">{typeLabel(training.type)}</span>
-        <span>{training.category.name}</span>
-      </div>
-      <h2>{training.title}</h2>
-      <p className="muted training-summary">{training.description}</p>
-      <dl className="training-facts">
-        <div>
-          <dt>Niveau</dt>
-          <dd>{training.level}</dd>
+    <Link
+      className="training-card-link"
+      to={`/trainings/${training.id}`}
+      aria-label={`Voir la formation ${training.title}`}
+    >
+      <article className="training-card">
+        <TrainingImage training={training} />
+        <div className="training-card-meta">
+          <span className={`type-badge type-${training.type.toLowerCase()}`}>
+            {typeLabel(training.type)}
+          </span>
+          <span>{training.category.name}</span>
         </div>
-        <div>
-          <dt>Durée</dt>
-          <dd>{formatDuration(training.durationMinutes)}</dd>
-        </div>
-        <div>
-          <dt>Prix</dt>
-          <dd>{formatPrice(training.priceMinor)}</dd>
-        </div>
-      </dl>
-      <Link className="primary-link" to={`/trainings/${training.id}`}>
-        Voir la formation
-      </Link>
-    </article>
+        <Heading>{training.title}</Heading>
+        <p className="muted training-summary">{training.description}</p>
+        <dl className="training-facts">
+          <div>
+            <dt>Niveau</dt>
+            <dd>{training.level}</dd>
+          </div>
+          <div>
+            <dt>Durée</dt>
+            <dd>{formatDuration(training.durationMinutes)}</dd>
+          </div>
+          <div>
+            <dt>Prix</dt>
+            <dd>{formatPrice(training.priceMinor)}</dd>
+          </div>
+        </dl>
+        <span className="primary-link">Voir la formation</span>
+      </article>
+    </Link>
   );
 }
 
@@ -285,6 +325,7 @@ export function TrainingDetailPage() {
           <div>
             <span className="eyebrow">{training.category.name}</span>
             <h1>{training.title}</h1>
+            <TrainingImage training={training} />
             <p className="lead">{training.description}</p>
           </div>
           <dl className="training-facts training-detail-facts">
@@ -869,7 +910,7 @@ export function TrainingManagementPage() {
                     <span
                       className={`status-pill status-${training.status.toLowerCase()}`}
                     >
-                      {training.status}
+                      {statusLabel(training.status)}
                     </span>
                     <h2>{training.title}</h2>
                     <p className="muted">
@@ -940,7 +981,62 @@ export function TrainingManagementPage() {
                         Archiver
                       </button>
                     )}
+                    {training.status === 'ARCHIVED' && (
+                      <button
+                        className="secondary-button"
+                        onClick={() =>
+                          void mutate(
+                            `/trainings/${training.id}/unarchive`,
+                            { method: 'POST' },
+                            'Formation désarchivée en brouillon.',
+                          )
+                        }
+                      >
+                        Désarchiver
+                      </button>
+                    )}
                   </div>
+                </div>
+                <div className="thumbnail-management">
+                  {training.thumbnailUrl !== undefined && (
+                    <TrainingImage training={training} />
+                  )}
+                  <label className="secondary-button compact-button">
+                    {training.thumbnailUrl === undefined
+                      ? 'Ajouter une miniature'
+                      : 'Remplacer la miniature'}
+                    <input
+                      className="visually-hidden"
+                      type="file"
+                      accept="image/png,image/jpeg,image/gif,image/webp"
+                      onChange={(event) => {
+                        const file = event.target.files?.[0];
+                        if (file === undefined) return;
+                        const body = new FormData();
+                        body.append('thumbnail', file);
+                        void mutate(
+                          `/trainings/${training.id}/thumbnail`,
+                          { method: 'PUT', body },
+                          'Miniature enregistrée.',
+                        );
+                        event.target.value = '';
+                      }}
+                    />
+                  </label>
+                  {training.thumbnailUrl !== undefined && (
+                    <button
+                      className="danger-button"
+                      onClick={() =>
+                        void mutate(
+                          `/trainings/${training.id}/thumbnail`,
+                          { method: 'DELETE' },
+                          'Miniature supprimée.',
+                        )
+                      }
+                    >
+                      Supprimer la miniature
+                    </button>
+                  )}
                 </div>
                 <p>{training.description}</p>
                 <p className="muted">

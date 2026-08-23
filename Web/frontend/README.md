@@ -1,5 +1,5 @@
 # Web frontend
 
-React and TypeScript package for the Plateforme de Formations Web client.
+Client Web React et TypeScript de High Skills Academy.
 
 Run it from the repository root with `npm run dev:frontend`.

@@ -97,7 +97,9 @@ describe('Phase 2 public catalogue', () => {
     ).toBeVisible();
     expect(screen.getAllByText('Développement')).toHaveLength(2);
     expect(
-      screen.getByRole('link', { name: 'Voir la formation' }),
+      screen.getByRole('link', {
+        name: 'Voir la formation TypeScript strict en pratique',
+      }),
     ).toHaveAttribute('href', '/trainings/training-1');
   });
 

@@ -398,6 +398,33 @@ export const openApiDocument: OpenAPIV3.Document = {
         },
       },
     },
+    '/contact': {
+      post: {
+        operationId: 'sendContactMessage',
+        summary: 'Send a validated public contact message',
+        tags: ['Public'],
+        requestBody: {
+          required: true,
+          content: json({
+            type: 'object',
+            additionalProperties: false,
+            required: ['name', 'email', 'subject', 'message'],
+            properties: {
+              name: { type: 'string', minLength: 2, maxLength: 120 },
+              email: { type: 'string', format: 'email', maxLength: 320 },
+              subject: { type: 'string', minLength: 3, maxLength: 200 },
+              message: { type: 'string', minLength: 10, maxLength: 10000 },
+            },
+          }),
+        },
+        responses: {
+          '202': { description: 'Message accepted and delivered by SMTP.' },
+          '422': errorResponse,
+          '429': errorResponse,
+          '503': errorResponse,
+        },
+      },
+    },
     '/categories': {
       get: {
         operationId: 'listTrainingCategories',
@@ -633,6 +660,93 @@ export const openApiDocument: OpenAPIV3.Document = {
           '403': errorResponse,
           '404': errorResponse,
           '409': errorResponse,
+        },
+      },
+    },
+    '/trainings/{id}/unarchive': {
+      post: {
+        operationId: 'unarchiveTraining',
+        summary: 'Restore an archived Training as a draft',
+        tags: ['Training catalogue'],
+        security: secured,
+        parameters: [{ $ref: '#/components/parameters/TrainingId' }],
+        responses: {
+          '200': {
+            description: 'Training restored as a draft.',
+            content: json({ $ref: '#/components/schemas/Training' }),
+          },
+          '401': errorResponse,
+          '403': errorResponse,
+          '404': errorResponse,
+          '409': errorResponse,
+        },
+      },
+    },
+    '/trainings/{id}/thumbnail': {
+      get: {
+        operationId: 'getTrainingThumbnail',
+        summary: 'Stream a published or authorized Training thumbnail',
+        tags: ['Training catalogue'],
+        security: optionallySecured,
+        parameters: [{ $ref: '#/components/parameters/TrainingId' }],
+        responses: {
+          '200': {
+            description: 'Training image.',
+            content: {
+              'image/png': {},
+              'image/jpeg': {},
+              'image/gif': {},
+              'image/webp': {},
+            },
+          },
+          '404': errorResponse,
+        },
+      },
+      put: {
+        operationId: 'uploadTrainingThumbnail',
+        summary: 'Upload or replace a Training thumbnail',
+        tags: ['Training catalogue'],
+        security: secured,
+        parameters: [{ $ref: '#/components/parameters/TrainingId' }],
+        requestBody: {
+          required: true,
+          content: {
+            'multipart/form-data': {
+              schema: {
+                type: 'object',
+                required: ['thumbnail'],
+                properties: {
+                  thumbnail: { type: 'string', format: 'binary' },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          '200': {
+            description: 'Thumbnail saved.',
+            content: json({ $ref: '#/components/schemas/Training' }),
+          },
+          '401': errorResponse,
+          '403': errorResponse,
+          '413': errorResponse,
+          '422': errorResponse,
+        },
+      },
+      delete: {
+        operationId: 'removeTrainingThumbnail',
+        summary: 'Remove a Training thumbnail',
+        tags: ['Training catalogue'],
+        security: secured,
+        parameters: [{ $ref: '#/components/parameters/TrainingId' }],
+        responses: {
+          '200': {
+            description: 'Thumbnail removed.',
+            content: json({ $ref: '#/components/schemas/Training' }),
+          },
+          '401': errorResponse,
+          '403': errorResponse,
+          '404': errorResponse,
         },
       },
     },
@@ -3505,6 +3619,22 @@ export const openApiDocument: OpenAPIV3.Document = {
               id: { type: 'string' },
               amountMinor: { type: 'integer', minimum: 1 },
               currency: { type: 'string', enum: ['TND'] },
+            },
+          },
+          feedback: {
+            type: 'object',
+            required: ['rating', 'createdAt'],
+            properties: {
+              rating: { type: 'integer', minimum: 1, maximum: 5 },
+              createdAt: { type: 'string', format: 'date-time' },
+            },
+          },
+          eligibility: {
+            type: 'object',
+            required: ['eligible', 'failures'],
+            properties: {
+              eligible: { type: 'boolean' },
+              failures: { type: 'array', items: { type: 'string' } },
             },
           },
           createdAt: { type: 'string', format: 'date-time' },

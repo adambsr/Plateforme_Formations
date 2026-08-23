@@ -211,6 +211,7 @@ export class CertificateService {
   ): Promise<{ absolutePath: string; filename: string }> {
     const certificate = await this.#ensurePdf(
       await this.#authorizedCertificate(principal, certificateId),
+      true,
     );
     if (certificate.pdf === undefined) {
       throw new Error('Certificate PDF metadata was not persisted.');
@@ -221,8 +222,12 @@ export class CertificateService {
     };
   }
 
-  async #ensurePdf(certificate: HydratedDocument<Certificate>) {
+  async #ensurePdf(
+    certificate: HydratedDocument<Certificate>,
+    forceRegeneration = false,
+  ) {
     if (
+      !forceRegeneration &&
       certificate.pdf !== undefined &&
       (await this.#storage.isReadable(certificate.pdf.relativePath))
     ) {

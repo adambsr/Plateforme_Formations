@@ -534,7 +534,7 @@ export async function seedDevelopmentData(environment = process.env) {
     );
     const invoiceIds = paidPurchases.map((_, index) => objectId(13, index + 1));
     const issuer = {
-      name: 'Plateforme de Formations — Démonstration',
+      name: 'High Skills Academy — Démonstration',
       address: '12 avenue Habib-Bourguiba, Tunis',
       email: 'contact@formation.test',
       phone: '+216 70 000 000',

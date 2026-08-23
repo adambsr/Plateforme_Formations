@@ -87,7 +87,10 @@ export class LocalFileStorage {
     return this.#maximumBytes;
   }
 
-  async store(file: Express.Multer.File): Promise<StoredFileResult> {
+  async store(
+    file: Express.Multer.File,
+    directory = 'training-resources',
+  ): Promise<StoredFileResult> {
     if (file.size < 1 || file.buffer.length < 1) {
       throw new AppError(422, 'EMPTY_FILE', 'The uploaded file is empty.');
     }
@@ -139,7 +142,7 @@ export class LocalFileStorage {
     const id = randomUUID();
     const storageName = `${id}${extension}`;
     const relativePath = path.posix.join(
-      'training-resources',
+      directory,
       id.slice(0, 2),
       storageName,
     );

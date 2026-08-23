@@ -1,12 +1,10 @@
 import { Link, Outlet } from 'react-router';
+import { Brand } from '../../shared/components/Brand.js';
 
 export function AuthLayout() {
   return (
     <main className="auth-shell">
-      <Link className="auth-brand" to="/" aria-label="Retour au site public">
-        <span aria-hidden="true">PF</span>
-        <span>Plateforme de Formations</span>
-      </Link>
+      <Brand className="auth-brand" />
       <Outlet />
       <Link className="auth-back-link" to="/">
         ← Retour au site

@@ -314,7 +314,8 @@ suite('Phase 10 Certificates and Feedback integration', () => {
     expect(parsed.text).toContain(first.body.number);
     expect(parsed.text).toContain('Leila Ben Salah');
     expect(parsed.text).toContain('TypeScript certifié');
-    expect(parsed.text).toContain('Centre Snapshot');
+    expect(parsed.text).toContain('High Skills Academy');
+    expect(parsed.text).toContain('HS');
     expect(
       (
         await request(app)

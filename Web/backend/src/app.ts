@@ -12,6 +12,10 @@ import { requestLogging } from './infrastructure/http/request-logging.js';
 import { openApiDocument } from './infrastructure/openapi/document.js';
 import { createPasswordResetMailService } from './infrastructure/mail/password-reset-mail.js';
 import type { PasswordResetMailService } from './infrastructure/mail/password-reset-mail.js';
+import {
+  createContactMailService,
+  type ContactMailService,
+} from './infrastructure/mail/contact-mail.js';
 import { createAuthRouter } from './modules/auth/routes/auth.routes.js';
 import { AuthService } from './modules/auth/services/auth.service.js';
 import { TokenService } from './modules/auth/services/token.service.js';
@@ -62,12 +66,15 @@ import { CostService } from './modules/costs/services/cost.service.js';
 import { createCostRouter } from './modules/costs/routes/cost.routes.js';
 import { DashboardService } from './modules/dashboard/services/dashboard.service.js';
 import { createDashboardRouter } from './modules/dashboard/routes/dashboard.routes.js';
+import { createContactRouter } from './modules/contact/routes/contact.routes.js';
+import { ContactService } from './modules/contact/services/contact.service.js';
 
 export interface AppDependencies {
   config: AppConfig;
   logger: Logger;
   databaseReady: () => boolean;
   passwordResetMailService?: PasswordResetMailService;
+  contactMailService?: ContactMailService;
   stripeCheckoutGateway?: StripeCheckoutGateway;
   questionGenerationGateway?: QuestionGenerationGateway;
 }
@@ -77,6 +84,7 @@ export function createApp({
   logger,
   databaseReady,
   passwordResetMailService,
+  contactMailService,
   stripeCheckoutGateway,
   questionGenerationGateway,
 }: AppDependencies): Express {
@@ -84,24 +92,28 @@ export function createApp({
 
   const tokenService = new TokenService(config.authentication);
   const userService = new UserService();
-  const trainingService = new TrainingService();
   const fileStorage = new LocalFileStorage(
     config.uploads.directory,
     config.uploads.maxSizeMb,
   );
+  const trainingService = new TrainingService(undefined, fileStorage);
   const enrollmentAccess = new EnrollmentAccessService();
   const contentService = new ContentService(fileStorage, enrollmentAccess);
   const sessionService = new SessionService();
   const paymentService = new PaymentService(
-    stripeCheckoutGateway ?? new StripeSdkCheckoutGateway(config.stripe),
+    stripeCheckoutGateway ??
+      new StripeSdkCheckoutGateway(config.stripe, {
+        nodeEnv: config.application.nodeEnv,
+        logger,
+      }),
     config.center,
   );
-  const enrollmentService = new EnrollmentService();
   const invoiceService = new InvoiceService(
     new ProtectedDocumentStorage(config.uploads.directory),
   );
   const completionService = new CompletionService();
   const eligibilityService = new EligibilityService(completionService);
+  const enrollmentService = new EnrollmentService(eligibilityService);
   const progressService = new ProgressService(completionService);
   const attendanceService = new AttendanceService();
   const evaluationService = new EvaluationService();
@@ -122,6 +134,9 @@ export function createApp({
     config,
     tokenService,
     passwordResetMailService ?? createPasswordResetMailService(config),
+  );
+  const contactService = new ContactService(
+    contactMailService ?? createContactMailService(config),
   );
 
   app.disable('x-powered-by');
@@ -150,6 +165,7 @@ export function createApp({
     createStripeWebhookHandler(paymentService),
   );
   app.use(express.json());
+  app.use('/api', createContactRouter(contactService));
 
   app.get('/api/health', (_request, response) => {
     const ready = databaseReady();
@@ -170,7 +186,14 @@ export function createApp({
     createAuthRouter(config, authService, userService, tokenService),
   );
   app.use('/api', createUserRouter(userService, tokenService));
-  app.use('/api', createTrainingRouter(trainingService, tokenService));
+  app.use(
+    '/api',
+    createTrainingRouter(
+      trainingService,
+      tokenService,
+      fileStorage.maximumBytes,
+    ),
+  );
   app.use(
     '/api',
     createContentRouter(

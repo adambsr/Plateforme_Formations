@@ -61,22 +61,17 @@ export class InvoiceService {
     }).exec();
     if (item === null)
       throw new Error('Invoice item reference is inconsistent.');
-    const hasReadablePdf =
-      invoice.pdf !== undefined &&
-      (await this.#storage.isReadable(invoice.pdf.relativePath));
-    if (!hasReadablePdf) {
-      const rendered = await renderInvoicePdf(invoice, item);
-      const stored = await this.#storage.writeInvoice(
-        String(invoice._id),
-        rendered,
-      );
-      invoice =
-        (await InvoiceModel.findByIdAndUpdate(
-          invoice._id,
-          { $set: { pdf: stored } },
-          { returnDocument: 'after' },
-        ).exec()) ?? invoice;
-    }
+    const rendered = await renderInvoicePdf(invoice, item);
+    const stored = await this.#storage.writeInvoice(
+      String(invoice._id),
+      rendered,
+    );
+    invoice =
+      (await InvoiceModel.findByIdAndUpdate(
+        invoice._id,
+        { $set: { pdf: stored } },
+        { returnDocument: 'after' },
+      ).exec()) ?? invoice;
     if (invoice.pdf === undefined) {
       throw new Error('Invoice PDF metadata was not persisted.');
     }

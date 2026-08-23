@@ -28,10 +28,10 @@ const money = (value: number) =>
   new Intl.NumberFormat('fr-TN', {
     style: 'currency',
     currency: 'TND',
-    minimumFractionDigits: 3,
-  }).format(value / 1000);
+    minimumFractionDigits: 2,
+  }).format(value / 100);
 const percent = (value: number | null) =>
-  value === null ? 'Non calculable' : `${value}%`;
+  value === null ? 'Données insuffisantes' : `${value}%`;
 const message = (error: unknown) =>
   error instanceof ApiError
     ? error.message
@@ -49,10 +49,9 @@ export function DashboardPage() {
   const initial = useMemo(() => {
     const now = new Date();
     const year = now.getFullYear();
-    const month = String(now.getMonth() + 1).padStart(2, '0');
     return {
-      from: `${year}-${month}-01`,
-      to: `${year}-${month}-${String(new Date(year, now.getMonth() + 1, 0).getDate()).padStart(2, '0')}`,
+      from: `${year}-01-01`,
+      to: `${year}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`,
     };
   }, []);
   const [range, setRange] = useState(initial);
@@ -134,7 +133,7 @@ export function DashboardPage() {
         {
           method: 'PUT',
           body: JSON.stringify({
-            amountMinor: Math.round(Number(form.get('amount')) * 1000),
+            amountMinor: Math.round(Number(form.get('amount')) * 100),
             ...(form.get('note') ? { note: form.get('note') } : {}),
           }),
         },
@@ -156,7 +155,7 @@ export function DashboardPage() {
       trainingId: form.get('trainingId'),
       sessionId: sessionId === '' ? null : sessionId,
       date: form.get('date'),
-      amountMinor: Math.round(Number(form.get('amount')) * 1000),
+      amountMinor: Math.round(Number(form.get('amount')) * 100),
       label: form.get('label'),
     };
     try {
@@ -192,13 +191,7 @@ export function DashboardPage() {
           <h1>Tableau de bord</h1>
         </div>
       </div>
-      <form
-        className="dashboard-range"
-        onSubmit={(event) => {
-          event.preventDefault();
-          void load();
-        }}
-      >
+      <div className="dashboard-range">
         <label>
           Du
           <input
@@ -221,10 +214,7 @@ export function DashboardPage() {
             required
           />
         </label>
-        <button className="primary-button" disabled={loading}>
-          Actualiser
-        </button>
-      </form>
+      </div>
       {notice && <p className="success-message">{notice}</p>}
       {error && (
         <p className="form-error" role="alert">
@@ -371,7 +361,7 @@ export function DashboardPage() {
                 type="number"
                 min="0.001"
                 step="0.001"
-                defaultValue={editing ? editing.amountMinor / 1000 : ''}
+                defaultValue={editing ? editing.amountMinor / 100 : ''}
                 required
               />
             </label>
@@ -446,12 +436,24 @@ export function DashboardPage() {
 }
 
 function DashboardResults({ data }: { data: DashboardData }) {
+  const overviewMetrics = {
+    trainings: { label: 'Formations', icon: '▤' },
+    sessions: { label: 'Sessions', icon: '◷' },
+    learners: { label: 'Apprenants', icon: '◎' },
+    trainers: { label: 'Formateurs', icon: '◇' },
+    enrollments: { label: 'Inscriptions', icon: '✓' },
+  } as const;
   return (
     <>
       <div className="metric-grid">
         {Object.entries(data.overview.counts).map(([label, value]) => (
-          <article className="metric-card" key={label}>
-            <span>{label}</span>
+          <article className={`metric-card metric-${label}`} key={label}>
+            <span className="metric-icon" aria-hidden="true">
+              {overviewMetrics[label as keyof typeof overviewMetrics].icon}
+            </span>
+            <span>
+              {overviewMetrics[label as keyof typeof overviewMetrics].label}
+            </span>
             <strong>{value}</strong>
           </article>
         ))}
@@ -462,10 +464,15 @@ function DashboardResults({ data }: { data: DashboardData }) {
           <strong>
             {percent(data.participation.overall.participationPercent)}
           </strong>
-          <p>
-            {data.participation.overall.present}/
-            {data.participation.overall.expected} présences attendues
-          </p>
+          {data.participation.overall.expected === 0 ? (
+            <p>Aucune présence n’était attendue sur cette période.</p>
+          ) : (
+            <p>
+              {data.participation.overall.present} présente(s) sur{' '}
+              {data.participation.overall.expected} présence(s) attendue(s) ·{' '}
+              {data.participation.overall.recorded} saisie(s)
+            </p>
+          )}
         </article>
         <article className="content-card">
           <h2>Apprentissage</h2>
@@ -475,10 +482,17 @@ function DashboardResults({ data }: { data: DashboardData }) {
               {percent(data.progress.selfPaced.averagePercentage)}
             </strong>
           </p>
+          <small>
+            {data.progress.selfPaced.enrollmentCount} inscription(s) en ligne
+            prise(s) en compte
+          </small>
           <p>
             Réussite :{' '}
             <strong>{percent(data.progress.evaluations.passPercent)}</strong>
           </p>
+          <small>
+            {data.progress.evaluations.totalAttempts} tentative(s) terminée(s)
+          </small>
         </article>
         <article className="content-card">
           <h2>Satisfaction</h2>

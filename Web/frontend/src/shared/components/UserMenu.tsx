@@ -1,11 +1,16 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router';
+import chevronDownIcon from 'lucide-static/icons/chevron-down.svg';
+import layoutDashboardIcon from 'lucide-static/icons/layout-dashboard.svg';
+import logOutIcon from 'lucide-static/icons/log-out.svg';
+import userRoundIcon from 'lucide-static/icons/user-round.svg';
 
 import { roleHomePath } from '../../app/routes/destinations.js';
 import { useAuth } from '../../core/auth/AuthContext.js';
 import { Avatar } from './Avatar.js';
+import { Icon } from './Icon.js';
 
-export function UserMenu({ compact = false }: { compact?: boolean }) {
+export function UserMenu() {
   const { user, logout } = useAuth();
   const [open, setOpen] = useState(false);
   const root = useRef<HTMLDivElement>(null);
@@ -38,10 +43,8 @@ export function UserMenu({ compact = false }: { compact?: boolean }) {
         onClick={() => setOpen((value) => !value)}
       >
         <Avatar user={user} size="small" />
-        {!compact && <span>{name}</span>}
-        <svg viewBox="0 0 20 20" aria-hidden="true">
-          <path d="m6 8 4 4 4-4" />
-        </svg>
+        <span>{name}</span>
+        <Icon src={chevronDownIcon} size={16} />
       </button>
       {open && (
         <div className="user-menu-popover" role="menu">
@@ -50,17 +53,17 @@ export function UserMenu({ compact = false }: { compact?: boolean }) {
             to="/app/profile"
             onClick={() => setOpen(false)}
           >
-            <span aria-hidden="true">◎</span> Mon profil
+            <Icon src={userRoundIcon} size={17} /> Mon profil
           </Link>
           <Link
             role="menuitem"
             to={roleHomePath(user.role)}
             onClick={() => setOpen(false)}
           >
-            <span aria-hidden="true">◇</span> Dashboard
+            <Icon src={layoutDashboardIcon} size={17} /> Tableau de bord
           </Link>
           <button role="menuitem" type="button" onClick={() => void logout()}>
-            <span aria-hidden="true">↪</span> Se déconnecter
+            <Icon src={logOutIcon} size={17} /> Se déconnecter
           </button>
         </div>
       )}

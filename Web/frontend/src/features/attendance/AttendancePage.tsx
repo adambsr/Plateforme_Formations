@@ -34,6 +34,17 @@ function statusLabel(status: AttendanceStatus | null): string {
   return 'Non saisie';
 }
 
+function sessionStatusLabel(status: string): string {
+  return (
+    {
+      PLANNED: 'Planifiée',
+      IN_PROGRESS: 'En cours',
+      COMPLETED: 'Terminée',
+      CANCELLED: 'Annulée',
+    }[status] ?? status
+  );
+}
+
 export function AttendancePage() {
   const { user, request } = useAuth();
   const [sessions, setSessions] = useState<AttendanceSessionPage | null>(null);
@@ -184,7 +195,7 @@ export function AttendancePage() {
                   <span
                     className={`status-pill status-${selected.session.status.toLowerCase()}`}
                   >
-                    {selected.session.status}
+                    {sessionStatusLabel(selected.session.status)}
                   </span>
                   <h2>{selected.session.training.title}</h2>
                   <p>{selected.session.title}</p>

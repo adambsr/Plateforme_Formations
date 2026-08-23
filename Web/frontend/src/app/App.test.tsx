@@ -81,7 +81,7 @@ describe('Phase 1 Web routes', () => {
 });
 
 describe('Phase 2 management routes', () => {
-  it('loads the Admin training and category workspace', async () => {
+  it('loads the Admin training workspace with dedicated creation routes', async () => {
     const fetchMock = vi.fn().mockImplementation((input: RequestInfo | URL) => {
       const url = requestUrl(input);
       if (url.endsWith('/auth/refresh')) {
@@ -121,9 +121,12 @@ describe('Phase 2 management routes', () => {
     renderAppAt('/app/trainings');
 
     expect(
-      await screen.findByRole('heading', { name: 'Créer une formation' }),
-    ).toBeVisible();
-    expect(screen.getByRole('heading', { name: 'Catégories' })).toBeVisible();
+      await screen.findByRole('link', { name: 'Créer une formation' }),
+    ).toHaveAttribute('href', '/app/trainings/new');
+    expect(screen.getByRole('link', { name: 'Catégories' })).toHaveAttribute(
+      'href',
+      '/app/categories',
+    );
     expect(
       await screen.findByRole('heading', { name: 'Aucune formation gérée' }),
     ).toBeVisible();

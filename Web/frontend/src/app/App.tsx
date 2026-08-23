@@ -7,14 +7,25 @@ import {
   RegisterPage,
   ResetPasswordPage,
 } from '../features/auth/AuthPages.js';
-import { AdminUsersPage, ProfilePage } from '../features/users/UserPages.js';
+import { ProfilePage } from '../features/users/UserPages.js';
+import {
+  AdminUserListPage,
+  TrainerEditorPage,
+} from '../features/users/AdminUserManagementPages.js';
 import {
   CataloguePage,
   TrainingDetailPage,
-  TrainingManagementPage,
 } from '../features/trainings/TrainingPages.js';
+import {
+  CategoryManagementPage,
+  TrainingEditorPage,
+  TrainingManagementListPage,
+} from '../features/trainings/TrainingManagementPages.js';
 import { ContentPage } from '../features/content/ContentPage.js';
-import { SessionManagementPage } from '../features/sessions/SessionPages.js';
+import {
+  SessionCreatePage,
+  SessionManagementPage,
+} from '../features/sessions/SessionPages.js';
 import {
   CheckoutReturnPage,
   PaymentCenterPage,
@@ -22,7 +33,10 @@ import {
 import { RoleLayout } from './layouts/RoleLayout.js';
 import { ProgressPage } from '../features/progress/ProgressPage.js';
 import { AttendancePage } from '../features/attendance/AttendancePage.js';
-import { EvaluationPage } from '../features/evaluations/EvaluationPage.js';
+import {
+  EvaluationCreatePage,
+  EvaluationPage,
+} from '../features/evaluations/EvaluationPage.js';
 import { CertificateFeedbackPage } from '../features/certificates/CertificateFeedbackPage.js';
 import { DashboardPage } from '../features/dashboard/DashboardPage.js';
 import { PublicLayout } from './layouts/PublicLayout.js';
@@ -75,16 +89,25 @@ export function App() {
           <Route path="profile" element={<ProfilePage />} />
           <Route path="catalogue" element={<CataloguePage embedded />} />
           <Route element={<RequireRole roles={['ADMIN', 'TRAINER']} />}>
-            <Route path="trainings" element={<TrainingManagementPage />} />
+            <Route path="trainings" element={<TrainingManagementListPage />} />
+            <Route path="trainings/new" element={<TrainingEditorPage />} />
+            <Route
+              path="trainings/:trainingId/edit"
+              element={<TrainingEditorPage />}
+            />
             <Route
               path="trainings/:trainingId/content"
               element={<ContentPage />}
             />
             <Route path="sessions" element={<SessionManagementPage />} />
+            <Route path="sessions/new" element={<SessionCreatePage />} />
           </Route>
           <Route path="content/:trainingId" element={<ContentPage />} />
           <Route path="attendance" element={<AttendancePage />} />
           <Route path="evaluations" element={<EvaluationPage />} />
+          <Route element={<RequireRole roles={['TRAINER']} />}>
+            <Route path="evaluations/new" element={<EvaluationCreatePage />} />
+          </Route>
           <Route path={'certificates'} element={<CertificateFeedbackPage />} />
           <Route element={<RequireRole roles={['LEARNER']} />}>
             <Route path="learner" element={<LearnerDashboard />} />
@@ -94,7 +117,13 @@ export function App() {
             <Route path="trainer" element={<TrainerDashboard />} />
           </Route>
           <Route element={<RequireRole roles={['ADMIN']} />}>
-            <Route path="users" element={<AdminUsersPage />} />
+            <Route path="categories" element={<CategoryManagementPage />} />
+            <Route path="users" element={<AdminUserListPage />} />
+            <Route path="users/trainers/new" element={<TrainerEditorPage />} />
+            <Route
+              path="users/trainers/:trainerId/edit"
+              element={<TrainerEditorPage />}
+            />
             <Route path="dashboard" element={<DashboardPage />} />
           </Route>
           <Route element={<RequireRole roles={['ADMIN', 'LEARNER']} />}>

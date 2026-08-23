@@ -5,6 +5,7 @@ import {
   useState,
   type FormEvent,
 } from 'react';
+import { Link, useNavigate } from 'react-router';
 
 import { ApiError, apiRequest } from '../../core/api/client.js';
 import { useAuth } from '../../core/auth/AuthContext.js';
@@ -31,6 +32,15 @@ function name(trainer: SessionTrainer): string {
     [trainer.firstName, trainer.lastName].filter(Boolean).join(' ') ||
     trainer.id
   );
+}
+
+function sessionStatusLabel(status: TrainingSession['status']): string {
+  return {
+    PLANNED: 'Planifiée',
+    IN_PROGRESS: 'En cours',
+    COMPLETED: 'Terminée',
+    CANCELLED: 'Annulée',
+  }[status];
 }
 
 function selectedValues(select: HTMLSelectElement): string[] {
@@ -238,7 +248,7 @@ function ManagedSession({
           <span
             className={`status-pill status-${session.status.toLowerCase()}`}
           >
-            {session.status}
+            {sessionStatusLabel(session.status)}
           </span>
           <h2>{session.title}</h2>
           <p className="muted">
@@ -461,6 +471,9 @@ export function SessionManagementPage() {
         <span className="count-badge">
           {sessionPage?.total ?? 0} session(s)
         </span>
+        <Link className="primary-button" to="/app/sessions/new">
+          Créer une session
+        </Link>
       </div>
       <p className="muted">
         Toutes les saisies et dates affichées utilisent le fuseau Africa/Tunis.
@@ -471,37 +484,113 @@ export function SessionManagementPage() {
           {error}
         </p>
       )}
-      {trainings.length > 0 && (
+      {loading ? (
+        <p className="muted">Chargement des sessions…</p>
+      ) : sessions.length === 0 ? (
+        <div className="empty-state">
+          <h2>Aucune session</h2>
+          <p className="muted">
+            Créez une session pour une formation présentielle.
+          </p>
+        </div>
+      ) : (
+        <div className="managed-session-list">
+          {sessions.map((session) => (
+            <ManagedSession
+              key={session.id}
+              session={session}
+              trainers={trainers}
+              canManage={
+                user.role === 'ADMIN' || ownedIds.has(session.training.id)
+              }
+              mutate={mutate}
+            />
+          ))}
+          {sessionPage !== null && (
+            <Pagination
+              page={sessionPage.page}
+              pageSize={sessionPage.pageSize}
+              total={sessionPage.total}
+              onPageChange={setPageNumber}
+              label="Pagination des sessions"
+            />
+          )}
+        </div>
+      )}
+    </section>
+  );
+}
+
+export function SessionCreatePage() {
+  const { request } = useAuth();
+  const navigate = useNavigate();
+  const [trainings, setTrainings] = useState<Training[]>([]);
+  const [error, setError] = useState('');
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    void request<{ items: Training[] }>('/trainings?view=MANAGED&pageSize=100')
+      .then((value) =>
+        setTrainings(value.items.filter(({ type }) => type === 'IN_PERSON')),
+      )
+      .catch((caught) => setError(message(caught)));
+  }, [request]);
+
+  async function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const form = new FormData(event.currentTarget);
+    setBusy(true);
+    setError('');
+    try {
+      await request('/sessions', {
+        method: 'POST',
+        body: JSON.stringify({
+          trainingId: String(form.get('trainingId')),
+          title: String(form.get('title')),
+          identifier: String(form.get('identifier') ?? ''),
+          capacity: Number(form.get('capacity')),
+          location: String(form.get('location')),
+          address: String(form.get('address') ?? ''),
+          room: String(form.get('room') ?? ''),
+          additionalInformation: String(
+            form.get('additionalInformation') ?? '',
+          ),
+        }),
+      });
+      navigate('/app/sessions', { replace: true });
+    } catch (caught) {
+      setError(message(caught));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <section className="management-editor-page">
+      <Link to="/app/sessions">← Retour aux sessions</Link>
+      <div className="section-heading">
+        <div>
+          <span className="eyebrow">Présentiel</span>
+          <h1>Créer une session</h1>
+        </div>
+      </div>
+      {error !== '' && (
+        <p className="form-error" role="alert">
+          {error}
+        </p>
+      )}
+      {trainings.length === 0 ? (
+        <div className="empty-state">
+          <h2>Aucune formation présentielle disponible</h2>
+          <p className="muted">
+            Créez ou publiez d’abord une formation présentielle.
+          </p>
+        </div>
+      ) : (
         <form
-          className="content-card session-create-form"
-          onSubmit={(event) => {
-            event.preventDefault();
-            const element = event.currentTarget;
-            const form = new FormData(element);
-            void mutate(
-              '/sessions',
-              {
-                method: 'POST',
-                body: JSON.stringify({
-                  trainingId: String(form.get('trainingId')),
-                  title: String(form.get('title')),
-                  identifier: String(form.get('identifier') ?? ''),
-                  capacity: Number(form.get('capacity')),
-                  location: String(form.get('location')),
-                  address: String(form.get('address') ?? ''),
-                  room: String(form.get('room') ?? ''),
-                  additionalInformation: String(
-                    form.get('additionalInformation') ?? '',
-                  ),
-                }),
-              },
-              'Session créée.',
-            ).then((saved) => {
-              if (saved) element.reset();
-            });
-          }}
+          className="content-card editor-form"
+          onSubmit={(event) => void submit(event)}
         >
-          <h2>Créer une session planifiée</h2>
           <div className="form-grid">
             <label>
               Formation
@@ -541,43 +630,17 @@ export function SessionManagementPage() {
           </label>
           <label>
             Informations complémentaires
-            <textarea name="additionalInformation" rows={2} />
+            <textarea name="additionalInformation" rows={3} />
           </label>
-          <button className="primary-button">Créer la session</button>
+          <div className="form-actions">
+            <button className="primary-button" disabled={busy}>
+              {busy ? 'Création…' : 'Créer la session'}
+            </button>
+            <Link className="secondary-button" to="/app/sessions">
+              Annuler
+            </Link>
+          </div>
         </form>
-      )}
-      {loading ? (
-        <p className="muted">Chargement des sessions…</p>
-      ) : sessions.length === 0 ? (
-        <div className="empty-state">
-          <h2>Aucune session</h2>
-          <p className="muted">
-            Créez une session pour une formation présentielle.
-          </p>
-        </div>
-      ) : (
-        <div className="managed-session-list">
-          {sessions.map((session) => (
-            <ManagedSession
-              key={session.id}
-              session={session}
-              trainers={trainers}
-              canManage={
-                user.role === 'ADMIN' || ownedIds.has(session.training.id)
-              }
-              mutate={mutate}
-            />
-          ))}
-          {sessionPage !== null && (
-            <Pagination
-              page={sessionPage.page}
-              pageSize={sessionPage.pageSize}
-              total={sessionPage.total}
-              onPageChange={setPageNumber}
-              label="Pagination des sessions"
-            />
-          )}
-        </div>
       )}
     </section>
   );

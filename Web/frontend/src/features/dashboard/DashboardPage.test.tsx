@@ -92,7 +92,7 @@ describe('Phase 11 Admin dashboard UI', () => {
   it('renders backend aggregates, zero-revenue state, and both cost workflows', async () => {
     render(<DashboardPage />);
     expect(await screen.findByText('70%')).toBeVisible();
-    expect(screen.getByText('Non calculable')).toBeVisible();
+    expect(screen.getByText('Données insuffisantes')).toBeVisible();
     expect(
       screen.getByText('Résultat avant coûts fixes des formateurs'),
     ).toBeVisible();

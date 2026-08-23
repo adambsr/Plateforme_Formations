@@ -1,8 +1,7 @@
-import { readFile } from 'node:fs/promises';
-
 import PDFDocument from 'pdfkit';
 
 import type { Certificate } from '../../modules/certificates/models/certificate.model.js';
+import { drawDocumentBrand, loadDocumentLogo } from './document-brand.js';
 
 function date(value: Date): string {
   return value.toISOString().slice(0, 10);
@@ -15,19 +14,10 @@ function duration(minutes: number): string {
   return remainder === 0 ? `${hours} h` : `${hours} h ${remainder} min`;
 }
 
-async function readableLogo(path: string | undefined) {
-  if (path === undefined) return undefined;
-  try {
-    return await readFile(path);
-  } catch {
-    return undefined;
-  }
-}
-
 export async function renderCertificatePdf(
   certificate: Certificate,
 ): Promise<Buffer> {
-  const logo = await readableLogo(certificate.issuer.logoPath);
+  const logo = await loadDocumentLogo(certificate.issuer.logoPath);
   return await new Promise<Buffer>((resolve, reject) => {
     const document = new PDFDocument({
       size: 'A4',
@@ -53,20 +43,7 @@ export async function renderCertificatePdf(
       .lineWidth(1)
       .strokeColor('#c9a85c')
       .stroke();
-    if (logo !== undefined) {
-      try {
-        document.image(logo, 64, 58, { fit: [100, 54] });
-      } catch {
-        // The optional deployment logo must never prevent certificate access.
-      }
-    }
-    document
-      .fillColor('#1f6f78')
-      .fontSize(13)
-      .text(certificate.issuer.name, 54, 65, {
-        align: 'center',
-        width: document.page.width - 108,
-      });
+    drawDocumentBrand(document, certificate.issuer.name, logo, 64, 58);
     document
       .fillColor('#17212b')
       .fontSize(30)

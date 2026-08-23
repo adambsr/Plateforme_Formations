@@ -53,7 +53,7 @@ describe('apiRequest', () => {
     await expect(request).rejects.toMatchObject({
       status: 422,
       code: 'VALIDATION_ERROR',
-      message: 'Invalid request.',
+      message: 'Les données de la requête sont invalides.',
       fieldErrors: [{ field: 'email', message: 'Invalid email.' }],
     });
   });

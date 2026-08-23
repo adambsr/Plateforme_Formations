@@ -41,7 +41,7 @@ export function ProfilePage() {
           </div>
         </div>
         <button
-          className="secondary-button"
+          className="secondary-button profile-logout"
           type="button"
           onClick={() => void logout()}
         >

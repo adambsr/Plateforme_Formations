@@ -25,6 +25,7 @@ function date(value: string): string {
     timeZone: 'Africa/Tunis',
     dateStyle: 'medium',
     timeStyle: 'short',
+    hourCycle: 'h23',
   }).format(new Date(value));
 }
 

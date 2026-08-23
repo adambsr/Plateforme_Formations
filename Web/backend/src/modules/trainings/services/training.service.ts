@@ -1,5 +1,6 @@
 import mongoose, { type HydratedDocument, type QueryFilter } from 'mongoose';
 
+import type { LocalFileStorage } from '../../../infrastructure/files/local-file-storage.js';
 import type { AuthenticatedPrincipal } from '../../../shared/auth/principal.js';
 import { isDuplicateKeyError } from '../../../shared/database/mongo-errors.js';
 import { AppError } from '../../../shared/errors/app-error.js';
@@ -50,6 +51,7 @@ export interface PublicTraining {
   };
   status: Training['status'];
   minimumAttendancePercent?: number;
+  thumbnailUrl?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -92,11 +94,14 @@ function passwordReady(principal: AuthenticatedPrincipal): void {
 
 export class TrainingService {
   readonly #lifecycle: TrainingLifecycleRepository;
+  readonly #fileStorage: LocalFileStorage | undefined;
 
   constructor(
     lifecycle: TrainingLifecycleRepository = mongooseTrainingLifecycleRepository,
+    fileStorage?: LocalFileStorage,
   ) {
     this.#lifecycle = lifecycle;
+    this.#fileStorage = fileStorage;
   }
 
   async listCategories(
@@ -376,6 +381,99 @@ export class TrainingService {
     return (await this.#toPublicTrainings([training]))[0] as PublicTraining;
   }
 
+  async unarchiveTraining(
+    principal: AuthenticatedPrincipal,
+    trainingId: string,
+  ): Promise<PublicTraining> {
+    const training = await this.#managedTraining(principal, trainingId);
+    if (training.status !== 'ARCHIVED') {
+      throw new AppError(
+        409,
+        'ARCHIVED_TRAINING_REQUIRED',
+        'Seule une formation archivée peut être désarchivée.',
+      );
+    }
+    training.status = 'DRAFT';
+    await training.save();
+    return (await this.#toPublicTrainings([training]))[0] as PublicTraining;
+  }
+
+  async uploadThumbnail(
+    principal: AuthenticatedPrincipal,
+    trainingId: string,
+    file: Express.Multer.File | undefined,
+  ): Promise<PublicTraining> {
+    const training = await this.#managedTraining(principal, trainingId);
+    if (file === undefined) {
+      throw new AppError(422, 'THUMBNAIL_REQUIRED', 'Sélectionnez une image.');
+    }
+    if (!file.mimetype.toLowerCase().startsWith('image/')) {
+      throw new AppError(
+        422,
+        'THUMBNAIL_IMAGE_REQUIRED',
+        'La miniature doit être une image PNG, JPEG, GIF ou WebP.',
+      );
+    }
+    if (this.#fileStorage === undefined) {
+      throw new Error('Training thumbnail storage is not configured.');
+    }
+    const stored = await this.#fileStorage.store(file, 'training-thumbnails');
+    const previousPath = training.thumbnail?.relativePath;
+    try {
+      training.thumbnail = {
+        originalName: stored.originalName,
+        relativePath: stored.relativePath,
+        mimeType: stored.mimeType,
+        sizeBytes: stored.sizeBytes,
+        checksumSha256: stored.checksumSha256,
+        uploadedAt: stored.uploadedAt,
+      };
+      await training.save();
+    } catch (error) {
+      await this.#fileStorage.remove(stored.relativePath);
+      throw error;
+    }
+    if (previousPath !== undefined)
+      await this.#fileStorage.remove(previousPath);
+    return (await this.#toPublicTrainings([training]))[0] as PublicTraining;
+  }
+
+  async removeThumbnail(
+    principal: AuthenticatedPrincipal,
+    trainingId: string,
+  ): Promise<PublicTraining> {
+    const training = await this.#managedTraining(principal, trainingId);
+    const previousPath = training.thumbnail?.relativePath;
+    training.set('thumbnail', undefined);
+    await training.save();
+    if (previousPath !== undefined && this.#fileStorage !== undefined) {
+      await this.#fileStorage.remove(previousPath);
+    }
+    return (await this.#toPublicTrainings([training]))[0] as PublicTraining;
+  }
+
+  async thumbnailFile(
+    trainingId: string,
+    principal: AuthenticatedPrincipal | undefined,
+  ): Promise<{ absolutePath: string; mimeType: string }> {
+    const training = await this.#findTraining(trainingId);
+    if (training.status !== 'PUBLISHED') {
+      if (principal === undefined) throw this.#trainingNotFound();
+      await this.#managedTraining(principal, trainingId);
+    }
+    if (training.thumbnail === undefined || this.#fileStorage === undefined) {
+      throw new AppError(
+        404,
+        'TRAINING_THUMBNAIL_NOT_FOUND',
+        'Cette formation ne possède pas de miniature.',
+      );
+    }
+    return {
+      absolutePath: this.#fileStorage.resolve(training.thumbnail.relativePath),
+      mimeType: training.thumbnail.mimeType,
+    };
+  }
+
   async deleteTraining(
     principal: AuthenticatedPrincipal,
     trainingId: string,
@@ -405,6 +503,9 @@ export class TrainingService {
         'TRAINING_CHANGED',
         'The Training changed before it could be deleted.',
       );
+    }
+    if (training.thumbnail !== undefined && this.#fileStorage !== undefined) {
+      await this.#fileStorage.remove(training.thumbnail.relativePath);
     }
   }
 
@@ -606,6 +707,11 @@ export class TrainingService {
             : { lastName: owner.profile.lastName }),
         },
         status: training.status,
+        ...(training.thumbnail === undefined
+          ? {}
+          : {
+              thumbnailUrl: `/trainings/${String(training._id)}/thumbnail?v=${training.thumbnail.uploadedAt.getTime()}`,
+            }),
         ...(training.minimumAttendancePercent === undefined
           ? {}
           : {

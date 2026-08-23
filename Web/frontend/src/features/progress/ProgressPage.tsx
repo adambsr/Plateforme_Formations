@@ -58,7 +58,7 @@ export function ProgressPage() {
         <p className="muted">Chargement de votre progression…</p>
       ) : page?.items.length === 0 ? (
         <div className="empty-state">
-          <h2>Aucune formation self-paced</h2>
+          <h2>Aucune formation en ligne autonome</h2>
           <p className="muted">
             Une formation apparaîtra ici après confirmation de son paiement.
           </p>
@@ -84,8 +84,10 @@ export function ProgressPage() {
                   {progress.percentage}%
                 </progress>
                 <p className="muted">
-                  {progress.completedLessonCount}/{progress.totalLessonCount}{' '}
-                  leçon(s) terminée(s)
+                  {progress.lockedByCertificate &&
+                  progress.totalLessonCount === 0
+                    ? 'Parcours validé et certifié.'
+                    : `${progress.completedLessonCount}/${progress.totalLessonCount} leçon(s) terminée(s)`}
                 </p>
                 {progress.lockedByCertificate && (
                   <p className="success-message">

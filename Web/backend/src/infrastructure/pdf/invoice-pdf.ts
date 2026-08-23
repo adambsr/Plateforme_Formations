@@ -2,15 +2,17 @@ import PDFDocument from 'pdfkit';
 
 import type { Invoice } from '../../modules/invoices/models/invoice.model.js';
 import type { InvoiceItem } from '../../modules/invoices/models/invoice-item.model.js';
+import { drawDocumentBrand, loadDocumentLogo } from './document-brand.js';
 
 function money(value: number): string {
-  return `${(value / 100).toFixed(2)} TND`;
+  return `${(value / 1000).toFixed(3)} TND`;
 }
 
 export async function renderInvoicePdf(
   invoice: Invoice,
   item: InvoiceItem,
 ): Promise<Buffer> {
+  const logo = await loadDocumentLogo(invoice.issuer.logoPath);
   return await new Promise<Buffer>((resolve, reject) => {
     const document = new PDFDocument({
       size: 'A4',
@@ -25,7 +27,11 @@ export async function renderInvoicePdf(
     document.on('error', reject);
     document.on('end', () => resolve(Buffer.concat(chunks)));
 
-    document.fontSize(22).text('FACTURE', { align: 'right' });
+    drawDocumentBrand(document, invoice.issuer.name, logo, 54, 54);
+    document
+      .fontSize(22)
+      .fillColor('#17212b')
+      .text('FACTURE', { align: 'right' });
     document.moveDown(0.4);
     document
       .fontSize(11)
@@ -34,7 +40,7 @@ export async function renderInvoicePdf(
       align: 'right',
     });
 
-    document.moveDown(2);
+    document.moveDown(3.5);
     document.fontSize(13).text(invoice.issuer.name);
     document.fontSize(10).text(invoice.issuer.address);
     document.text(invoice.issuer.email);

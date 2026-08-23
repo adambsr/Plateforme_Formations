@@ -2,11 +2,14 @@ import mongoose from 'mongoose';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
 import { initializeDatabaseIndexes } from '../src/infrastructure/database/indexes.js';
+import { AttendanceModel } from '../src/modules/attendance/models/attendance.model.js';
 import { CostService } from '../src/modules/costs/services/cost.service.js';
 import { TrainerCostModel } from '../src/modules/costs/models/trainer-cost.model.js';
 import { TrainingCostModel } from '../src/modules/costs/models/training-cost.model.js';
 import { DashboardService } from '../src/modules/dashboard/services/dashboard.service.js';
+import { EnrollmentModel } from '../src/modules/enrollments/models/enrollment.model.js';
 import { PaymentModel } from '../src/modules/payments/models/payment.model.js';
+import { SessionScheduleModel } from '../src/modules/sessions/models/session-schedule.model.js';
 import { TrainingSessionModel } from '../src/modules/sessions/models/training-session.model.js';
 import { TrainingCategoryModel } from '../src/modules/trainings/models/training-category.model.js';
 import { TrainingModel } from '../src/modules/trainings/models/training.model.js';
@@ -41,6 +44,9 @@ suite('Phase 11 costs and dashboard integration', () => {
     await Promise.all([
       TrainerCostModel.deleteMany({}),
       TrainingCostModel.deleteMany({}),
+      AttendanceModel.deleteMany({}),
+      EnrollmentModel.deleteMany({}),
+      SessionScheduleModel.deleteMany({}),
       PaymentModel.deleteMany({}),
       TrainingSessionModel.deleteMany({}),
       TrainingModel.deleteMany({}),
@@ -236,5 +242,64 @@ suite('Phase 11 costs and dashboard integration', () => {
       revenueMinor: 0,
       profitabilityPercent: null,
     });
+  });
+
+  it('calculates participation from scheduled attendance in the selected period', async () => {
+    const { trainer, learnerUser, otherSession } = await setup();
+    const schedule = await SessionScheduleModel.create({
+      sessionId: otherSession._id,
+      trainingId: otherSession.trainingId,
+      startAt: new Date('2026-06-08T09:00:00.000Z'),
+      endAt: new Date('2026-06-08T16:00:00.000Z'),
+      trainerIds: [trainer._id],
+    });
+    const payment = await PaymentModel.create({
+      learnerId: learnerUser._id,
+      trainingId: otherSession.trainingId,
+      sessionId: otherSession._id,
+      purchaseType: 'IN_PERSON',
+      status: 'PAID',
+      amountMinor: 10_000,
+      currency: 'TND',
+      trainingTitle: 'Other',
+      sessionTitle: otherSession.title,
+      stripeCheckoutSessionId: 'cs_p11_participation',
+      paidAt: new Date('2026-05-01T09:00:00.000Z'),
+    });
+    const enrollment = await EnrollmentModel.create({
+      learnerId: learnerUser._id,
+      trainingId: otherSession.trainingId,
+      sessionId: otherSession._id,
+      paymentId: payment._id,
+    });
+    await AttendanceModel.create({
+      enrollmentId: enrollment._id,
+      learnerId: learnerUser._id,
+      trainingId: otherSession.trainingId,
+      sessionId: otherSession._id,
+      scheduleId: schedule._id,
+      status: 'PRESENT',
+      recordedById: trainer._id,
+    });
+
+    const result = await dashboard.participation(admin, {
+      from: '2026-01-01',
+      to: '2026-08-23',
+    });
+
+    expect(result.overall).toEqual({
+      expected: 1,
+      recorded: 1,
+      present: 1,
+      participationPercent: 100,
+    });
+    expect(result.byTraining).toEqual([
+      expect.objectContaining({
+        expected: 1,
+        recorded: 1,
+        present: 1,
+        participationPercent: 100,
+      }),
+    ]);
   });
 });

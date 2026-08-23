@@ -58,7 +58,7 @@ describe('Phase 6 learner progress UI', () => {
       </MemoryRouter>,
     );
     expect(
-      await screen.findByText(/Aucune formation self-paced/i),
+      await screen.findByText(/Aucune formation en ligne autonome/i),
     ).toBeVisible();
     unmount();
 

@@ -49,5 +49,6 @@ export function formatTunisDate(value: string): string {
     timeZone: TUNIS_TIME_ZONE,
     dateStyle: 'full',
     timeStyle: 'short',
+    hourCycle: 'h23',
   }).format(new Date(value));
 }

@@ -27,6 +27,8 @@ export interface Enrollment {
   training: { id: string; title: string };
   session?: { id: string; title: string };
   payment: { id: string; amountMinor: number; currency: 'TND' };
+  feedback?: { rating: number; createdAt: string };
+  eligibility?: { eligible: boolean; failures: string[] };
   createdAt: string;
 }
 

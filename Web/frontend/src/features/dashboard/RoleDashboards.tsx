@@ -47,7 +47,7 @@ export function TrainerDashboard() {
       const [trainings, sessions, evaluations] = await Promise.all([
         request<Page<Named>>('/trainings?view=MANAGED&page=1&pageSize=5'),
         request<Page<Named>>('/sessions?view=MANAGED&page=1&pageSize=5'),
-        request<Page<Named>>('/evaluations?page=1&pageSize=5'),
+        request<Page<Named>>('/evaluations?view=MANAGED&page=1&pageSize=5'),
       ]);
       setData({ trainings, sessions, evaluations });
     } catch (caught) {
@@ -61,7 +61,7 @@ export function TrainerDashboard() {
   return (
     <RoleDashboard
       title={`Bonjour ${user.profile.firstName ?? ''}`}
-      subtitle="Retrouvez vos formations, vos prochaines Sessions et les actions pédagogiques prioritaires."
+      subtitle="Retrouvez vos formations, vos prochaines sessions et les actions pédagogiques prioritaires."
       error={error}
       retry={load}
       loading={data === undefined && error === ''}
@@ -96,7 +96,7 @@ export function TrainerDashboard() {
       <Recent
         title="Sessions récentes"
         rows={data?.sessions.items ?? []}
-        empty="Aucune Session ne vous est encore affectée."
+        empty="Aucune session ne vous est encore affectée."
       />
     </RoleDashboard>
   );
@@ -162,7 +162,7 @@ export function LearnerDashboard() {
         <Action
           to="/app/attendance"
           title="Consulter mon planning"
-          text="Dates, horaires et lieux de vos Sessions."
+          text="Dates, horaires et lieux de vos sessions."
         />
         <Action
           to="/app/evaluations"
@@ -232,6 +232,23 @@ function RoleDashboard({
     </section>
   );
 }
+function visibleStatus(status: string): string {
+  return (
+    {
+      DRAFT: 'Brouillon',
+      PUBLISHED: 'Publiée',
+      ARCHIVED: 'Archivée',
+      PLANNED: 'Planifiée',
+      IN_PROGRESS: 'En cours',
+      COMPLETED: 'Terminée',
+      CANCELLED: 'Annulée',
+      PENDING: 'En attente',
+      PAID: 'Payé',
+      FAILED: 'Échoué',
+      PASSED: 'Réussi',
+    }[status] ?? status
+  );
+}
 function Kpi({
   label,
   value,
@@ -284,7 +301,9 @@ function Recent({
           {rows.map((row) => (
             <li key={row.id}>
               <span>{row.title ?? row.training?.title ?? 'Élément'}</span>
-              {row.status && <span className="status-pill">{row.status}</span>}
+              {row.status && (
+                <span className="status-pill">{visibleStatus(row.status)}</span>
+              )}
             </li>
           ))}
         </ul>

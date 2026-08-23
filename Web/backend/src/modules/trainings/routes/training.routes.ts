@@ -1,4 +1,5 @@
-import { Router } from 'express';
+import { Router, type RequestHandler } from 'express';
+import multer from 'multer';
 
 import {
   authenticate,
@@ -7,6 +8,7 @@ import {
   requirePasswordChanged,
   requireRoles,
 } from '../../../middleware/authentication.js';
+import { AppError } from '../../../shared/errors/app-error.js';
 import type { TokenService } from '../../auth/services/token.service.js';
 import {
   categoryListSchema,
@@ -20,9 +22,36 @@ import {
 } from '../dto/training.dto.js';
 import type { TrainingService } from '../services/training.service.js';
 
+function thumbnailUpload(maximumBytes: number): RequestHandler {
+  const receive = multer({
+    storage: multer.memoryStorage(),
+    limits: { fileSize: maximumBytes, files: 1, fields: 2 },
+  }).single('thumbnail');
+  return (request, _response, next) => {
+    receive(request, _response, (error: unknown) => {
+      if (error === undefined) return next();
+      if (error instanceof multer.MulterError) {
+        return next(
+          new AppError(
+            error.code === 'LIMIT_FILE_SIZE' ? 413 : 422,
+            error.code === 'LIMIT_FILE_SIZE'
+              ? 'FILE_TOO_LARGE'
+              : 'INVALID_MULTIPART_UPLOAD',
+            error.code === 'LIMIT_FILE_SIZE'
+              ? 'L’image dépasse la taille maximale autorisée.'
+              : 'Le téléversement de la miniature est invalide.',
+          ),
+        );
+      }
+      next(error);
+    });
+  };
+}
+
 export function createTrainingRouter(
   trainingService: TrainingService,
   tokenService: TokenService,
+  maximumUploadBytes: number,
 ): Router {
   const router = Router();
   const optionalAuthentication = authenticateIfPresent(tokenService);
@@ -118,6 +147,55 @@ export function createTrainingRouter(
     },
   );
 
+  router.get(
+    '/trainings/:id/thumbnail',
+    optionalAuthentication,
+    async (request, response, next) => {
+      const file = await trainingService.thumbnailFile(
+        trainingIdSchema.parse(request.params.id),
+        request.principal,
+      );
+      response.setHeader('content-type', file.mimeType);
+      response.setHeader('cache-control', 'public, max-age=86400, immutable');
+      response.setHeader('content-disposition', 'inline');
+      response.sendFile(file.absolutePath, (error) => {
+        if (error !== undefined) next(error);
+      });
+    },
+  );
+
+  router.put(
+    '/trainings/:id/thumbnail',
+    requiredAuthentication,
+    requirePasswordChanged,
+    requireRoles('ADMIN', 'TRAINER'),
+    thumbnailUpload(maximumUploadBytes),
+    async (request, response) => {
+      response.json(
+        await trainingService.uploadThumbnail(
+          authenticatedPrincipal(request),
+          trainingIdSchema.parse(request.params.id),
+          request.file,
+        ),
+      );
+    },
+  );
+
+  router.delete(
+    '/trainings/:id/thumbnail',
+    requiredAuthentication,
+    requirePasswordChanged,
+    requireRoles('ADMIN', 'TRAINER'),
+    async (request, response) => {
+      response.json(
+        await trainingService.removeThumbnail(
+          authenticatedPrincipal(request),
+          trainingIdSchema.parse(request.params.id),
+        ),
+      );
+    },
+  );
+
   router.put(
     '/trainings/:id',
     requiredAuthentication,
@@ -171,6 +249,21 @@ export function createTrainingRouter(
     async (request, response) => {
       response.json(
         await trainingService.archiveTraining(
+          authenticatedPrincipal(request),
+          trainingIdSchema.parse(request.params.id),
+        ),
+      );
+    },
+  );
+
+  router.post(
+    '/trainings/:id/unarchive',
+    requiredAuthentication,
+    requirePasswordChanged,
+    requireRoles('ADMIN', 'TRAINER'),
+    async (request, response) => {
+      response.json(
+        await trainingService.unarchiveTraining(
           authenticatedPrincipal(request),
           trainingIdSchema.parse(request.params.id),
         ),

@@ -471,8 +471,10 @@ integrationDescribe(
       expect(parsed.text).toContain(invoice.number);
       expect(parsed.text).toContain('Ali Learner');
       expect(parsed.text).toContain('TypeScript payé');
-      expect(parsed.text).toContain('125.50 TND');
+      expect(parsed.text).toContain('12.550 TND');
       expect(parsed.text).toContain('Centre Snapshot');
+      expect(parsed.text).toContain('High Skills Academy');
+      expect(parsed.text).toContain('HS');
       expect(
         (
           await request(app)

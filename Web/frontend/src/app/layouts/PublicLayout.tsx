@@ -1,8 +1,12 @@
 import { useState } from 'react';
 import { Link, NavLink, Outlet } from 'react-router';
+import menuIcon from 'lucide-static/icons/menu.svg';
+import xIcon from 'lucide-static/icons/x.svg';
 
 import { useAuth } from '../../core/auth/AuthContext.js';
 import { UserMenu } from '../../shared/components/UserMenu.js';
+import { Brand } from '../../shared/components/Brand.js';
+import { Icon } from '../../shared/components/Icon.js';
 
 export function PublicLayout() {
   const { user } = useAuth();
@@ -10,10 +14,7 @@ export function PublicLayout() {
   return (
     <div className="public-shell">
       <header className="site-header">
-        <Link className="site-brand" to="/" onClick={() => setOpen(false)}>
-          <span aria-hidden="true">PF</span>
-          <strong>Plateforme de Formations</strong>
-        </Link>
+        <Brand onClick={() => setOpen(false)} />
         <button
           className="site-menu-button"
           type="button"
@@ -21,7 +22,11 @@ export function PublicLayout() {
           aria-expanded={open}
           onClick={() => setOpen((value) => !value)}
         >
-          ☰
+          {open ? (
+            <Icon src={xIcon} size={22} />
+          ) : (
+            <Icon src={menuIcon} size={22} />
+          )}
         </button>
         <nav
           className={open ? 'site-nav site-nav-open' : 'site-nav'}
@@ -57,13 +62,33 @@ export function PublicLayout() {
         <Outlet />
       </main>
       <footer className="site-footer">
-        <nav aria-label="Navigation de pied de page">
-          <Link to="/catalogue">Formations</Link>
-          <Link to="/about">À propos</Link>
-          <Link to="/faq">FAQ</Link>
-          <Link to="/contact">Contact</Link>
-        </nav>
-        <p>© {new Date().getFullYear()} Plateforme de Formations</p>
+        <div className="footer-brand-column">
+          <Brand className="footer-brand" />
+          <p>
+            Des formations professionnelles en ligne et en présentiel pour
+            transformer durablement vos compétences.
+          </p>
+        </div>
+        <div>
+          <h2>Découvrir</h2>
+          <nav aria-label="Découvrir High Skills Academy">
+            <Link to="/catalogue">Formations</Link>
+            <Link to="/about">À propos</Link>
+            <Link to="/faq">Questions fréquentes</Link>
+          </nav>
+        </div>
+        <div>
+          <h2>Nous contacter</h2>
+          <nav aria-label="Contact et informations légales">
+            <Link to="/contact">Contact</Link>
+            <a href="mailto:contact@formation.test">contact@formation.test</a>
+            <Link to="/about">Mentions légales</Link>
+          </nav>
+        </div>
+        <p className="footer-copyright">
+          © {new Date().getFullYear()} High Skills Academy. Tous droits
+          réservés.
+        </p>
       </footer>
     </div>
   );

@@ -169,7 +169,10 @@ export class DashboardService {
           _id: 0,
           trainingId: { $toString: '$_id' },
           trainingTitle: {
-            $ifNull: [{ $arrayElemAt: ['$training.title', 0] }, 'Archived'],
+            $ifNull: [
+              { $arrayElemAt: ['$training.title', 0] },
+              'Formation archivée',
+            ],
           },
           expected: 1,
           recorded: 1,
@@ -214,7 +217,9 @@ export class DashboardService {
         {
           $match: {
             sessionId: null,
-            createdAt: { $gte: range.startAt, $lt: range.endAtExclusive },
+            // Progress is a snapshot at the end of the selected period. An
+            // enrollment created earlier remains part of the learning base.
+            createdAt: { $lt: range.endAtExclusive },
           },
         },
         {
@@ -445,7 +450,10 @@ export class DashboardService {
           _id: 0,
           trainingId: { $toString: '$_id.trainingId' },
           trainingTitle: {
-            $ifNull: [{ $arrayElemAt: ['$training.title', 0] }, 'Archived'],
+            $ifNull: [
+              { $arrayElemAt: ['$training.title', 0] },
+              'Formation archivée',
+            ],
           },
           rating: '$_id.rating',
           count: 1,
@@ -595,7 +603,10 @@ export class DashboardService {
           const revenueMinor = revenueById.get(id) ?? 0;
           const trainingCostsMinor = costById.get(id) ?? 0;
           return {
-            training: { id, title: titleById.get(id) ?? 'Archived' },
+            training: {
+              id,
+              title: titleById.get(id) ?? 'Formation archivée',
+            },
             revenueMinor,
             trainingCostsMinor,
             resultBeforeFixedTrainerCostsMinor:

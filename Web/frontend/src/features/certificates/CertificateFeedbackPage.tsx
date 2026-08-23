@@ -9,6 +9,7 @@ import type {
   Page,
 } from './types.js';
 import { Pagination } from '../../shared/components/Pagination.js';
+import { Select } from '../../shared/components/Select.js';
 
 const ratings = [1, 2, 3, 4, 5] as const;
 
@@ -37,13 +38,11 @@ export function CertificateFeedbackPage() {
   const [certificatePageNumber, setCertificatePageNumber] = useState(1);
   const [enrollmentPageNumber, setEnrollmentPageNumber] = useState(1);
   const [statistics, setStatistics] = useState<FeedbackStatistics | null>(null);
+  const [satisfactionTrainingId, setSatisfactionTrainingId] = useState('');
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState('');
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
-  const [submittedFeedback, setSubmittedFeedback] = useState<Set<string>>(
-    new Set(),
-  );
 
   const load = useCallback(async () => {
     if (user === null) return;
@@ -104,11 +103,20 @@ export function CertificateFeedbackPage() {
     setError('');
     setSuccess('');
     try {
-      await request('/feedback', {
-        method: 'POST',
-        body: JSON.stringify({ enrollmentId, rating }),
-      });
-      setSubmittedFeedback((current) => new Set(current).add(enrollmentId));
+      const feedback = await request<{ rating: number; createdAt: string }>(
+        '/feedback',
+        {
+          method: 'POST',
+          body: JSON.stringify({ enrollmentId, rating }),
+        },
+      );
+      setEnrollments((current) =>
+        current.map((enrollment) =>
+          enrollment.id === enrollmentId
+            ? { ...enrollment, feedback }
+            : enrollment,
+        ),
+      );
       setSuccess('Merci, votre note de satisfaction a été enregistrée.');
     } catch (caught) {
       setError(message(caught));
@@ -136,6 +144,12 @@ export function CertificateFeedbackPage() {
   const byEnrollment = new Map(
     certificates.map((certificate) => [certificate.enrollmentId, certificate]),
   );
+  const satisfactionSummary =
+    satisfactionTrainingId === ''
+      ? statistics?.global
+      : statistics?.byTraining.find(
+          ({ training }) => training.id === satisfactionTrainingId,
+        );
 
   return (
     <section>
@@ -144,7 +158,7 @@ export function CertificateFeedbackPage() {
           <span className="eyebrow">Achèvement vérifié par le backend</span>
           <h1>
             {user.role === 'ADMIN'
-              ? 'Certificats et satisfaction'
+              ? 'Certificats & satisfaction'
               : user.role === 'TRAINER'
                 ? 'Certificats de mes formations'
                 : 'Mes certificats et avis'}
@@ -175,7 +189,7 @@ export function CertificateFeedbackPage() {
               <h2>
                 {user.role === 'ADMIN'
                   ? 'Génération par inscription'
-                  : 'Mes formations terminées'}
+                  : 'Mes inscriptions, certificats et avis'}
               </h2>
               {enrollments.length === 0 ? (
                 <p className="muted">Aucune inscription confirmée.</p>
@@ -196,7 +210,8 @@ export function CertificateFeedbackPage() {
                           </span>
                         </div>
                         <div className="certificate-actions">
-                          {certificate === undefined ? (
+                          {certificate === undefined &&
+                          enrollment.eligibility?.eligible === true ? (
                             <button
                               className="primary-button"
                               disabled={busy === `certificate:${enrollment.id}`}
@@ -204,7 +219,7 @@ export function CertificateFeedbackPage() {
                             >
                               Générer le certificat
                             </button>
-                          ) : (
+                          ) : certificate !== undefined ? (
                             <button
                               className="secondary-button"
                               onClick={() =>
@@ -213,13 +228,17 @@ export function CertificateFeedbackPage() {
                             >
                               Télécharger {certificate.number}
                             </button>
+                          ) : (
+                            <span className="status-pill">
+                              Conditions à finaliser
+                            </span>
                           )}
                           {user.role === 'LEARNER' &&
-                            (submittedFeedback.has(enrollment.id) ? (
+                            (enrollment.feedback !== undefined ? (
                               <span className="status-pill status-paid">
-                                Avis enregistré
+                                Avis enregistré · {enrollment.feedback.rating}/5
                               </span>
-                            ) : (
+                            ) : enrollment.eligibility?.eligible === true ? (
                               <div
                                 className="rating-control"
                                 aria-label={`Noter ${enrollment.training.title}`}
@@ -241,6 +260,8 @@ export function CertificateFeedbackPage() {
                                   </button>
                                 ))}
                               </div>
+                            ) : (
+                              <span className="muted">Avis indisponible</span>
                             ))}
                         </div>
                       </li>
@@ -306,38 +327,47 @@ export function CertificateFeedbackPage() {
           {user.role === 'ADMIN' && statistics !== null && (
             <section className="content-card">
               <h2>Satisfaction</h2>
+              <label className="satisfaction-filter">
+                Formation
+                <Select
+                  value={satisfactionTrainingId}
+                  onChange={(event) =>
+                    setSatisfactionTrainingId(event.target.value)
+                  }
+                >
+                  <option value="">Vue globale</option>
+                  {statistics.byTraining.map(({ training }) => (
+                    <option key={training.id} value={training.id}>
+                      {training.title}
+                    </option>
+                  ))}
+                </Select>
+              </label>
               <p className="satisfaction-total">
-                <strong>{statistics.global.count}</strong> notes · moyenne{' '}
+                <strong>{satisfactionSummary?.count ?? 0}</strong> notes ·
+                moyenne{' '}
                 <strong>
-                  {statistics.global.average === null
+                  {satisfactionSummary?.average == null
                     ? '—'
-                    : `${statistics.global.average.toFixed(2)} / 5`}
+                    : `${satisfactionSummary.average.toFixed(2)} / 5`}
                 </strong>
               </p>
               <p className="muted">
-                Distribution globale :{' '}
+                Distribution{satisfactionTrainingId === '' ? ' globale' : ''} :{' '}
                 {ratings
                   .map(
                     (rating) =>
-                      `${rating}★ ${statistics.global.distribution[rating]}`,
+                      `${rating}★ ${satisfactionSummary?.distribution[rating] ?? 0}`,
                   )
                   .join(' · ')}
               </p>
               {statistics.byTraining.length === 0 ? (
                 <p className="muted">Aucune satisfaction enregistrée.</p>
-              ) : (
-                <ul className="certificate-list">
-                  {statistics.byTraining.map((entry) => (
-                    <li key={entry.training.id}>
-                      <strong>{entry.training.title}</strong>
-                      <span>
-                        {entry.count} notes · moyenne{' '}
-                        {entry.average?.toFixed(2) ?? '—'} / 5
-                      </span>
-                    </li>
-                  ))}
-                </ul>
-              )}
+              ) : satisfactionTrainingId === '' ? (
+                <p className="muted">
+                  Sélectionnez une formation pour consulter son résultat.
+                </p>
+              ) : null}
             </section>
           )}
         </div>

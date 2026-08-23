@@ -160,8 +160,12 @@ export class PaymentService {
       };
     } catch (error) {
       payment.status = 'FAILED';
-      payment.failureCode = 'CHECKOUT_CREATION_FAILED';
-      payment.failureMessage = 'Stripe Checkout creation failed.';
+      payment.failureCode =
+        error instanceof AppError ? error.code : 'CHECKOUT_CREATION_FAILED';
+      payment.failureMessage =
+        error instanceof AppError
+          ? error.message
+          : 'Stripe Checkout creation failed.';
       await payment.save();
       if (error instanceof AppError) throw error;
       throw new AppError(
@@ -400,6 +404,9 @@ export class PaymentService {
               ...(this.#issuer.registrationId === undefined
                 ? {}
                 : { registrationId: this.#issuer.registrationId }),
+              ...(this.#issuer.logoPath === undefined
+                ? {}
+                : { logoPath: this.#issuer.logoPath }),
             },
             purchaseDescription: description,
             subtotalMinor: payment.amountMinor,

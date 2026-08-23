@@ -23,6 +23,14 @@ export interface Training {
   status: TrainingStatus;
   minimumAttendancePercent?: number;
   certifyingEvaluationId?: Types.ObjectId;
+  thumbnail?: {
+    originalName: string;
+    relativePath: string;
+    mimeType: string;
+    sizeBytes: number;
+    checksumSha256: string;
+    uploadedAt: Date;
+  };
   createdAt: Date;
   updatedAt: Date;
 }
@@ -99,6 +107,24 @@ const trainingSchema = new mongoose.Schema<Training>(
     certifyingEvaluationId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Evaluation',
+    },
+    thumbnail: {
+      type: new mongoose.Schema(
+        {
+          originalName: { type: String, required: true, maxlength: 255 },
+          relativePath: { type: String, required: true },
+          mimeType: {
+            type: String,
+            required: true,
+            enum: ['image/png', 'image/jpeg', 'image/gif', 'image/webp'],
+          },
+          sizeBytes: { type: Number, required: true, min: 1 },
+          checksumSha256: { type: String, required: true },
+          uploadedAt: { type: Date, required: true },
+        },
+        { _id: false, strict: 'throw' },
+      ),
+      required: false,
     },
   },
   {

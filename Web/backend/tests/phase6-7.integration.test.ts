@@ -408,6 +408,14 @@ integrationDescribe(
         issuedAt,
         createdAt: issuedAt,
       });
+      // Legacy/demo imports can have a technical Lesson createdAt later than
+      // issuance even though their completed progress predates the Certificate.
+      await mongoose.connection
+        .collection('lessons')
+        .updateOne(
+          { _id: lessons.lessonOne._id },
+          { $set: { createdAt: new Date(issuedAt.getTime() + 500) } },
+        );
       await LessonModel.create({
         trainingId: trainings.selfPaced._id,
         moduleId: module._id,
