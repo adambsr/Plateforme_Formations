@@ -177,7 +177,12 @@ export function RegisterPage() {
             return;
           }
           try {
-            await register(parsed.data);
+            await register({
+              email: parsed.data.email,
+              password: parsed.data.password,
+              firstName: parsed.data.firstName,
+              lastName: parsed.data.lastName,
+            });
             navigate(roleHomePath('LEARNER'), { replace: true });
           } catch (caught) {
             setError(errorMessage(caught));

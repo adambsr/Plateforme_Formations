@@ -106,10 +106,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         );
       },
       async register(input) {
+        const { email, password, firstName, lastName } = input;
         return acceptSession(
           await apiRequest<AuthSession>('/auth/register', {
             method: 'POST',
-            body: JSON.stringify({ ...input, client: 'WEB' }),
+            body: JSON.stringify({
+              email,
+              password,
+              firstName,
+              lastName,
+              client: 'WEB',
+            }),
           }),
         );
       },
