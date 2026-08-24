@@ -32,7 +32,7 @@ describe('development seed target guard', () => {
       {
         ...validEnvironment,
         MONGODB_URI:
-          'mongodb+srv://user:secret@example.mongodb.net/plateforme_formations',
+          'mongodb://remote.example.test:27017/plateforme_formations',
       },
     ],
   ])('rejects unsafe configuration %#', (environment) => {

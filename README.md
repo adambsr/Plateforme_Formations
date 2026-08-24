@@ -238,6 +238,28 @@ Trainer/month index and the Trainer calendar, Training-cost period, and Training
 indexes. Existing Payments, Enrollments, Attendance, progress, Evaluations, and Feedback remain
 unchanged; dashboard values are calculated from their existing persisted records.
 
+## Phase 12 status
+
+Phase 12 completes the Web product and hardening work planned after the domain slices:
+
+- public website pages, shared public/authenticated layouts, and role-specific Admin, Trainer, and
+  Learner navigation;
+- responsive catalogue, training, session, payment, content, progress, evaluation, certificate,
+  feedback, user-management, attendance, and profitability workflows;
+- consistent pagination and reusable loading, error, empty, validation, conflict, and success
+  states across the Web client;
+- keyboard-accessible controls, visible focus states, semantic labels, responsive layouts, and
+  mobile-width Web behavior;
+- completed OpenAPI coverage and backend authorization/validation for the exposed workflows;
+- security-focused checks for authentication, protected files, Stripe webhook handling, upload
+  validation, redacted logs, and test-only configuration boundaries;
+- critical Web and real-replica-set workflow verification through the existing test commands.
+
+Phase 13 is not complete yet. It is the next planned phase for expanding the Expo/React Native
+client beyond its current shared API, authentication, navigation, and workspace foundation. The
+mobile client continues to use the same backend, API contracts, roles, permissions, and business
+rules; no mobile-specific backend exists.
+
 ## Prerequisites
 
 - Node.js 24.19 or newer in the Node 24 line
@@ -246,13 +268,21 @@ unchanged; dashboard values are calculated from their existing persisted records
 
 ## Local setup
 
-Install the workspace dependencies:
+This is the reproducible setup for a fresh machine. Do not copy `node_modules`, build output,
+local uploads, or `.env` files from the old machine. Clone or copy the repository, then recreate
+those machine-specific files and restore data only when required.
+
+1. Install Node.js 24.19+ in the Node 24 line, npm 11.17+, and Docker Desktop with Docker Compose.
+   On Windows, enable the Docker Desktop WSL 2 backend and ensure Docker is running before
+   starting Compose. Git is also required if the repository will be cloned.
+2. Clone the repository and open a terminal at its root.
+3. Install the workspace dependencies:
 
 ```sh
 npm ci
 ```
 
-Copy the examples before running applications directly:
+4. Copy the examples before running applications directly:
 
 ```powershell
 Copy-Item Web/backend/.env.example Web/backend/.env
@@ -260,10 +290,31 @@ Copy-Item Web/frontend/.env.example Web/frontend/.env
 Copy-Item Mobile/.env.example Mobile/.env
 ```
 
-Replace every placeholder with a suitable local value. The backend fails before listening when
-required configuration is missing or invalid. It accepts Stripe test keys only. Empty SMTP user
-and password values select an unauthenticated local SMTP server; otherwise both values are
-required. Keep all real secrets out of Git.
+5. Replace every placeholder with a suitable local value. The backend fails before listening when
+   required configuration is missing or invalid. It accepts Stripe test keys only. Empty SMTP user
+   and password values select an unauthenticated local SMTP server; otherwise both values are
+   required. Keep all real secrets out of Git.
+
+To inspect the local application database in MongoDB Compass, create a connection with:
+
+```text
+mongodb://localhost:27017/plateforme_formations?directConnection=true
+```
+
+Use the `plateforme_formations` database shown by that connection. MongoDB's `admin`, `config`,
+and `local` databases are system databases and should be left intact.
+
+For the normal Docker path, the repository-root `.env` is optional. Copy `.env.example` to `.env`
+only when overriding Compose Stripe or Gemini values:
+
+```powershell
+Copy-Item .env.example .env
+```
+
+The root `.env`, all workspace `.env` files, `uploads/`, and Docker volumes are intentionally
+ignored by Git. If moving an existing development installation, transfer secrets through a secure
+channel and restore data only as described in [Data backup and restore](#data-backup-and-restore).
+Never commit secrets.
 
 Run an individual application from the repository root:
 
@@ -272,6 +323,12 @@ npm run dev:backend
 npm run dev:frontend
 npm run dev:mobile
 ```
+
+The Web client is available at the Vite URL printed in the terminal (normally
+`http://localhost:5173`). For Android Emulator, the checked-in Mobile example uses
+`http://10.0.2.2:3000/api` because that address maps to the host machine. A physical device needs
+the host PC's LAN IP instead, and the device and PC must be on the same network. Do not expose the
+backend to an untrusted network.
 
 The backend expects a transaction-capable MongoDB replica set. The easiest supported local path
 is Compose:
@@ -308,6 +365,11 @@ npm run docker:down
 `docker:down` preserves the named `mongodb_data` and `backend_uploads` volumes. Deleting those
 volumes destroys local database and uploaded-file data and is not part of the normal workflow.
 
+After a fresh checkout, initialize a local Admin with `npm run seed:admin`, or populate the
+complete deterministic demonstration dataset using [`Docs/DEVELOPMENT_SEED.md`](Docs/DEVELOPMENT_SEED.md).
+The development seed is destructive and must target only the local MongoDB
+database `plateforme_formations`.
+
 ## Initial Admin seed
 
 Set `MONGODB_URI`, `INITIAL_ADMIN_EMAIL`, and `INITIAL_ADMIN_PASSWORD` in the untracked
@@ -323,9 +385,10 @@ Repeated runs leave the existing Admin unchanged. If the configured email alread
 non-Admin, the command fails instead of promoting that account. The MVP permits only the initial
 Admin, enforced by a partial unique database index.
 
-For MongoDB Atlas, use a complete rotated connection string with the database name included, keep
-it only in `.env`, and allow the machine's current IP in Atlas Network Access. Never commit or paste
-database credentials into source files, issue trackers, or chat.
+For local development, use the MongoDB connection string
+`mongodb://localhost:27017/plateforme_formations?replicaSet=rs0&directConnection=true` in the
+ignored `.env` file. Never commit or paste database credentials into source files, issue trackers,
+or chat.
 
 ## Stripe test boundary
 
@@ -374,7 +437,9 @@ billing, and data policy.
 
 ## Quality and CI
 
-Deployment and recovery procedures are in Docs/DEPLOYMENT.md and Docs/BACKUP_RESTORE.md.
+The former `Docs/DEPLOYMENT.md` and `Docs/BACKUP_RESTORE.md` files are no longer present. The
+operational instructions that were needed from them are kept in this README under [Deployment
+and operations](#deployment-and-operations) and [Data backup and restore](#data-backup-and-restore).
 
 Run the complete local quality gate:
 
@@ -385,8 +450,9 @@ npm run check
 This checks formatting, linting, strict types (including tests), all workspace tests, and backend
 and Web builds. `npm run ci` adds Compose configuration validation. GitHub Actions also builds and
 starts the stack, checks the HTTP health endpoint and writable MongoDB primary, runs the Phase 1
-through Phase 10 integration lifecycles, prints logs on failure, and removes only its disposable CI
-volumes.
+through Phase 11 integration lifecycles, prints logs on failure, and removes only its disposable CI
+volumes. The workflow is defined in `.github/workflows/ci.yml` and runs on pushes to `main` and on
+pull requests.
 
 To run that transaction-backed integration lifecycle locally after Compose is healthy:
 
@@ -409,6 +475,59 @@ operations across the phase integration lifecycles.
 The integration command accepts only the dedicated
 `plateforme_formations_integration` database name and cleans that test database's phase-specific
 collections before and after each integration suite.
+
+## Deployment and operations
+
+The checked-in Compose stack is a development and integration environment, not a production
+deployment. It uses placeholder credentials, local MongoDB storage, Mailpit, loopback port
+bindings, and Stripe test mode. Before any production deployment, provide a managed or hardened
+MongoDB replica set, secret storage and rotation, TLS/reverse proxy, restricted network access,
+real SMTP, monitored persistent upload storage, and a verified Stripe account/configuration.
+
+For local operation, verify the stack before using it:
+
+```powershell
+docker compose config --quiet
+docker compose up --build --detach --wait
+Invoke-WebRequest http://127.0.0.1:3000/api/health
+docker compose ps
+```
+
+The API is ready only when MongoDB is healthy and writable and the backend health endpoint returns
+success. The `mongodb-init` container is expected to exit with code 0 after creating or confirming
+replica set `rs0`. Monitor `docker compose logs --follow` and stop the stack with
+`docker compose down`; do not add `--volumes` unless the local data is intentionally disposable.
+
+## Data backup and restore
+
+The application state consists of the MongoDB database and the `backend_uploads` volume. Back up
+both together; restoring only MongoDB can leave Certificate or Resource file references broken.
+For a local Compose backup, first stop writes and create a Mongo archive plus an upload-volume
+archive from a temporary container:
+
+```powershell
+New-Item -ItemType Directory -Force .local-backups | Out-Null
+docker compose exec --no-TTY mongodb mongodump --archive --gzip --db plateforme_formations > .local-backups\plateforme_formations.archive.gz
+docker run --rm -v plateforme-formations_backend_uploads:/data:ro -v ${PWD}\.local-backups:/backup alpine tar czf /backup/backend_uploads.tar.gz -C /data .
+```
+
+The exact volume name is based on the Compose project name; check it with `docker volume ls` if the
+project was started with a different name. Store backup files outside Git, protect them like
+production data, and test restores periodically.
+
+To restore into a disposable local environment, start MongoDB and its dependencies, restore the
+database, restore the upload archive into the upload volume, then restart the backend:
+
+```powershell
+docker compose up --detach --wait mongodb mongodb-init mailpit
+Get-Content .local-backups\plateforme_formations.archive.gz -Raw -AsByteStream | docker compose exec -T mongodb mongorestore --archive --gzip --drop
+docker run --rm -v plateforme-formations_backend_uploads:/data -v ${PWD}\.local-backups:/backup alpine sh -c "rm -rf /data/*; tar xzf /backup/backend_uploads.tar.gz -C /data"
+docker compose up --detach --wait backend
+```
+
+Validate `/api/health`, login, a representative protected file download, and a certificate
+download after restoration. Do not use `--drop` or overwrite a non-disposable environment without
+an approved recovery procedure and a verified backup.
 
 ## Backend environment contract
 

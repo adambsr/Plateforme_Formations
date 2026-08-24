@@ -21,7 +21,7 @@ them. It runs only when all of these checks pass:
 - the database name is exactly `plateforme_formations`;
 - `CONFIRM_DEVELOPMENT_SEED=replace-local-development-data`.
 
-Atlas and production targets are rejected. No development credentials are
+Non-local and production targets are rejected. No development credentials are
 stored in production configuration.
 
 ## Run with Docker Compose
