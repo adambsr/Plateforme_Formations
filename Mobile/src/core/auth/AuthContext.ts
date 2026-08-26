@@ -13,6 +13,7 @@ export interface AuthContextValue {
   changePassword(currentPassword: string, newPassword: string): Promise<User>;
   updateProfile(firstName: string, lastName: string): Promise<User>;
   request<T>(path: string, options?: RequestInit): Promise<T>;
+  download(path: string, fileName: string): Promise<string>;
 }
 
 export const AuthContext = createContext<AuthContextValue | null>(null);

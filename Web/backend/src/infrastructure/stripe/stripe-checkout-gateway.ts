@@ -13,6 +13,7 @@ export interface CreateHostedCheckoutInput {
   description: string;
   amountMinor: number;
   currency: 'EUR';
+  returnUrls?: { success: string; cancel: string };
 }
 
 export interface HostedCheckout {
@@ -117,16 +118,18 @@ export class StripeSdkCheckoutGateway implements StripeCheckoutGateway {
       trainingId: input.trainingId,
       ...(input.sessionId === undefined ? {} : { sessionId: input.sessionId }),
     };
-    const separator = this.#successUrl.includes('?') ? '&' : '?';
-    const cancelSeparator = this.#cancelUrl.includes('?') ? '&' : '?';
+    const successUrl = input.returnUrls?.success ?? this.#successUrl;
+    const cancelUrl = input.returnUrls?.cancel ?? this.#cancelUrl;
+    const separator = successUrl.includes('?') ? '&' : '?';
+    const cancelSeparator = cancelUrl.includes('?') ? '&' : '?';
     let session: Stripe.Checkout.Session;
     try {
       session = await this.#stripe.checkout.sessions.create({
         mode: 'payment',
         client_reference_id: input.paymentId,
         customer_email: input.learnerEmail,
-        success_url: `${this.#successUrl}${separator}paymentId=${input.paymentId}&session_id={CHECKOUT_SESSION_ID}`,
-        cancel_url: `${this.#cancelUrl}${cancelSeparator}paymentId=${input.paymentId}`,
+        success_url: `${successUrl}${separator}paymentId=${input.paymentId}&session_id={CHECKOUT_SESSION_ID}`,
+        cancel_url: `${cancelUrl}${cancelSeparator}paymentId=${input.paymentId}`,
         metadata,
         payment_intent_data: { metadata },
         line_items: [

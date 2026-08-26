@@ -107,6 +107,7 @@ export function createApp({
         logger,
       }),
     config.center,
+    config.application.mobileAppScheme,
   );
   const invoiceService = new InvoiceService(
     new ProtectedDocumentStorage(config.uploads.directory),

@@ -131,3 +131,9 @@ export class ApiClient {
 }
 
 export const apiClient = new ApiClient(appConfig.apiBaseUrl);
+
+export function apiAssetUrl(path: string): string {
+  return /^https?:\/\//i.test(path)
+    ? path
+    : `${appConfig.apiBaseUrl}${path.startsWith('/') ? path : `/${path}`}`;
+}

@@ -32,6 +32,7 @@ describe('loadAppConfig', () => {
     delete environment.PASSWORD_RESET_TTL_MINUTES;
     delete environment.MAX_UPLOAD_SIZE_MB;
     delete environment.AI_MAX_CONTEXT_CHARS;
+    delete environment.MOBILE_APP_SCHEME;
 
     const config = loadAppConfig(environment);
 
@@ -39,6 +40,7 @@ describe('loadAppConfig', () => {
       port: 3000,
       timezone: 'UTC',
       logLevel: 'info',
+      mobileAppScheme: 'plateforme-formations',
     });
     expect(config.authentication).toMatchObject({
       jwtAccessTtlMinutes: 15,
@@ -47,6 +49,13 @@ describe('loadAppConfig', () => {
     });
     expect(config.uploads.maxSizeMb).toBe(20);
     expect(config.ai.maxContextChars).toBe(100_000);
+  });
+
+  it('rejects an unsafe Mobile deep-link scheme', () => {
+    const environment = validEnvironment();
+    environment.MOBILE_APP_SCHEME = 'https://example.test';
+
+    expect(() => loadAppConfig(environment)).toThrow(ConfigurationError);
   });
 
   it('reports missing variable names without exposing secret values', () => {

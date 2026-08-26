@@ -30,13 +30,26 @@ function passwordReady(principal: AuthenticatedPrincipal): void {
   }
 }
 
+export function mobileCheckoutReturnUrls(mobileAppScheme: string) {
+  return {
+    success: `${mobileAppScheme}://payments/success`,
+    cancel: `${mobileAppScheme}://payments/cancel`,
+  } as const;
+}
+
 export class PaymentService {
   readonly #gateway: StripeCheckoutGateway;
   readonly #issuer: AppConfig['center'];
+  readonly #mobileAppScheme: string;
 
-  constructor(gateway: StripeCheckoutGateway, issuer: AppConfig['center']) {
+  constructor(
+    gateway: StripeCheckoutGateway,
+    issuer: AppConfig['center'],
+    mobileAppScheme = 'plateforme-formations',
+  ) {
     this.#gateway = gateway;
     this.#issuer = issuer;
+    this.#mobileAppScheme = mobileAppScheme;
   }
 
   async createCheckout(
@@ -151,6 +164,11 @@ export class PaymentService {
             : `${training.title} — ${session.title}`,
         amountMinor: payment.amountMinor,
         currency: payment.currency,
+        ...(input.client === 'MOBILE'
+          ? {
+              returnUrls: mobileCheckoutReturnUrls(this.#mobileAppScheme),
+            }
+          : {}),
       });
       payment.stripeCheckoutSessionId = checkout.id;
       await payment.save();

@@ -255,10 +255,25 @@ Phase 12 completes the Web product and hardening work planned after the domain s
   validation, redacted logs, and test-only configuration boundaries;
 - critical Web and real-replica-set workflow verification through the existing test commands.
 
-Phase 13 is not complete yet. It is the next planned phase for expanding the Expo/React Native
-client beyond its current shared API, authentication, navigation, and workspace foundation. The
-mobile client continues to use the same backend, API contracts, roles, permissions, and business
-rules; no mobile-specific backend exists.
+## Phase 13 status
+
+Phase 13 completes the Expo/React Native application through roadmap item 13.9. Mobile now uses
+the same backend contracts for secure rotating-token authentication, catalogue and Training
+management, self-paced content/progress, Sessions and schedules, Stripe Checkout and paid
+Enrollments, Evaluations and AI-assisted draft review, protected Invoices/Certificates/resources,
+Feedback, Attendance, Admin users/categories/costs, and backend-calculated dashboard statistics.
+The interface uses native stacks, safe areas, touch-sized cards/forms, pull-to-refresh, system
+browser Checkout, application deep links, SecureStore, and Expo download/share/picker APIs; no
+mobile-specific backend or duplicated business rule was introduced.
+
+The only shared contract extension is client-aware return routing. `MOBILE_APP_SCHEME` must match
+`EXPO_PUBLIC_APP_SCHEME` and the Expo `scheme` value. Mobile forgot-password requests receive a
+`plateforme-formations://reset-password?token=…` link, and Mobile Stripe Checkout returns to
+`plateforme-formations://payments/success|cancel?paymentId=…`. A return link never proves payment:
+Mobile always reloads the Payment whose status is confirmed by the backend webhook.
+
+Phase 13 adds no collection, migration, database index, seed, or Firebase dependency. Firebase
+remains the optional Web Analytics preparation described below.
 
 ## Prerequisites
 
@@ -330,6 +345,24 @@ The Web client is available at the Vite URL printed in the terminal (normally
 the host PC's LAN IP instead, and the device and PC must be on the same network. Do not expose the
 backend to an untrusted network.
 
+Copy `Mobile/.env.example` to the ignored `Mobile/.env` when its defaults do not match the target
+device. `EXPO_PUBLIC_API_BASE_URL` must end at the shared backend `/api`; do not put secrets in an
+`EXPO_PUBLIC_*` variable. Password reset and Stripe browser returns require the same scheme in
+`Mobile/app.json`, `EXPO_PUBLIC_APP_SCHEME`, and backend `MOBILE_APP_SCHEME`.
+
+Mobile verification commands are:
+
+```sh
+npm run typecheck --workspace Mobile
+npm run lint --workspace Mobile
+npm run test --workspace Mobile
+npm exec --workspace Mobile -- expo-doctor
+npm exec --workspace Mobile -- expo export --platform all --output-dir dist
+```
+
+The generated `Mobile/dist` directory is ignored. Android Emulator and physical-device API host
+rules still apply as described above.
+
 The backend expects a transaction-capable MongoDB replica set. The easiest supported local path
 is Compose:
 
@@ -397,20 +430,26 @@ checked-in defaults are inert placeholders that keep the local stack configurabl
 a real Checkout Session. For a directly started backend, put the account's test secret key in the
 untracked `Web/backend/.env`. For Compose, copy the repository-root `.env.example` to `.env` and
 replace its Stripe placeholders; Compose reads those ignored overrides without changing tracked
-YAML. Then forward test webhooks to the raw-body endpoint and use the signing secret printed by the
-Stripe CLI:
+YAML.
+
+**Important: every local Stripe Checkout test requires a running Stripe CLI listener.** Stripe
+does not deliver Dashboard events to `localhost`, and the Docker backend does not start this host
+process for you. Start this command in a separate terminal *before* testing Checkout, and leave it
+running for the entire test session:
 
 ```powershell
 stripe listen --forward-to http://127.0.0.1:3000/api/payments/webhook/stripe
 ```
 
-Set that `whsec_...` value as `STRIPE_WEBHOOK_SECRET`, restart the backend, and use Stripe's test
-payment methods through the hosted Checkout page. Checkout redirects are never treated as proof of
-payment: the Web client waits for backend status, and only a verified successful webhook can create
-the Enrollment and Invoice. Automated tests use an injected Checkout adapter and locally signed
-webhook fixtures, so they create no Stripe objects or charges. Never place account secrets in
-Compose or Git. Production support for a Tunisia-established Stripe account remains a separate
-pre-launch readiness check.
+Copy the `whsec_...` secret printed by that command into `STRIPE_WEBHOOK_SECRET` and restart the
+backend whenever the value changes. If the listener is stopped, Checkout can succeed in Stripe
+while the application remains at **En attente du webhook** because no event reaches
+`/api/payments/webhook/stripe`. Checkout redirects are never treated as proof of payment: the Web
+client waits for backend status, and only a verified successful webhook can create the Enrollment
+and Invoice. Automated tests use an injected Checkout adapter and locally signed webhook fixtures,
+so they create no Stripe objects or charges. Never place account secrets in Compose or Git.
+Production support for a Tunisia-established Stripe account remains a separate pre-launch
+readiness check.
 
 ## Gemini AI question generation
 
@@ -539,6 +578,36 @@ and immutable centre identity. Defaults are limited to the values documented by 
 
 Web and Mobile build-time public values live in their respective `.env.example` files. Secret
 provider values must remain backend-only.
+
+## Firebase Analytics (Web)
+
+The Web client has an optional Firebase Analytics integration. It is disabled by
+default, makes no backend/API changes, and tracks client-side route page views only
+when all Firebase values below are provided and `VITE_FIREBASE_ANALYTICS_ENABLED=true`.
+
+Create one Firebase project for the platform and register the Web client as a Web
+app. Enable Google Analytics for the Firebase project, then copy the Web app
+configuration values from **Project settings > Your apps** into the ignored
+`Web/frontend/.env` file:
+
+```dotenv
+VITE_FIREBASE_ANALYTICS_ENABLED=true
+VITE_FIREBASE_API_KEY=...
+VITE_FIREBASE_AUTH_DOMAIN=...
+VITE_FIREBASE_PROJECT_ID=...
+VITE_FIREBASE_APP_ID=...
+VITE_FIREBASE_MEASUREMENT_ID=G-...
+```
+
+These are public client configuration identifiers, not service-account secrets.
+Do not add a Firebase service-account key to the Web client or commit `.env` files.
+Before enabling production collection, ensure the centre's privacy notice and any
+required visitor-consent process cover Analytics. Firebase Analytics must not receive
+emails, user IDs, payment references, or other personal data.
+
+When the Mobile phase starts, register the Android and iOS applications in this same
+Firebase project; they will have their own app identifiers and configuration files.
+That future FCM work will use a backend-only service-account credential.
 
 ## Architecture boundaries
 

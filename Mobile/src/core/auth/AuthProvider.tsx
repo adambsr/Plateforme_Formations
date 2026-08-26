@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import * as FileSystem from 'expo-file-system/legacy';
 
 import { ApiError, apiClient } from '../api/client';
+import { appConfig } from '../config/environment';
 import { secureRefreshTokenStore } from '../storage/refresh-token-store';
 import {
   AuthContext,
@@ -89,6 +91,43 @@ export function AuthProvider({ children }: React.PropsWithChildren) {
     [becomeGuest, refreshSession],
   );
 
+  const download = useCallback(
+    async (path: string, fileName: string): Promise<string> => {
+      const directory = FileSystem.cacheDirectory;
+      if (directory === null) {
+        throw new ApiError(
+          0,
+          'FILE_CACHE_UNAVAILABLE',
+          'Le stockage temporaire est indisponible.',
+        );
+      }
+      const safeName = fileName.replace(/[^a-zA-Z0-9._-]/g, '_');
+      const destination = `${directory}${Date.now()}-${safeName}`;
+      const perform = async (token: string) =>
+        FileSystem.downloadAsync(
+          `${appConfig.apiBaseUrl}${path.startsWith('/') ? path : `/${path}`}`,
+          destination,
+          { headers: { authorization: `Bearer ${token}` } },
+        );
+      let token = accessToken.current;
+      if (token === null) token = (await refreshSession()).accessToken;
+      let result = await perform(token);
+      if (result.status === 401) {
+        const session = await refreshSession();
+        result = await perform(session.accessToken);
+      }
+      if (result.status < 200 || result.status >= 300) {
+        throw new ApiError(
+          result.status,
+          'FILE_DOWNLOAD_FAILED',
+          'Le téléchargement a échoué.',
+        );
+      }
+      return result.uri;
+    },
+    [refreshSession],
+  );
+
   const value = useMemo<AuthContextValue>(
     () => ({
       status,
@@ -156,8 +195,9 @@ export function AuthProvider({ children }: React.PropsWithChildren) {
         return updated;
       },
       request,
+      download,
     }),
-    [acceptSession, becomeGuest, request, status, user],
+    [acceptSession, becomeGuest, download, request, status, user],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

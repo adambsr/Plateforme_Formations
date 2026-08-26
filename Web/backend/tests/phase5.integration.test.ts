@@ -471,7 +471,7 @@ integrationDescribe(
       expect(parsed.text).toContain(invoice.number);
       expect(parsed.text).toContain('Ali Learner');
       expect(parsed.text).toContain('TypeScript payé');
-      expect(parsed.text).toContain('12.550 EUR');
+      expect(parsed.text).toContain('125.50 EUR');
       expect(parsed.text).toContain('Centre Snapshot');
       expect(parsed.text).toContain('High Skills Academy');
       expect(parsed.text).toContain('HS');

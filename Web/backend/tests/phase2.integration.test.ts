@@ -393,7 +393,7 @@ integrationDescribe(
         .get('/api/trainings?view=MANAGED&pageSize=100')
         .set('authorization', `Bearer ${adminToken}`);
       expect(managed.status).toBe(200);
-      expect(managed.body.total).toBe(3);
+      expect(managed.body.total).toBe(2);
     }, 60_000);
   },
 );

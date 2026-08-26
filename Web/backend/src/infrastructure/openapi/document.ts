@@ -2628,7 +2628,15 @@ export const openApiDocument: OpenAPIV3.Document = {
         type: 'object',
         additionalProperties: false,
         required: ['email'],
-        properties: { email: { type: 'string', format: 'email' } },
+        properties: {
+          email: { type: 'string', format: 'email' },
+          client: {
+            type: 'string',
+            enum: ['WEB', 'MOBILE'],
+            default: 'WEB',
+            description: 'Selects the reset-link target client.',
+          },
+        },
       },
       ResetPasswordRequest: {
         type: 'object',
@@ -3527,6 +3535,12 @@ export const openApiDocument: OpenAPIV3.Document = {
             type: 'string',
             pattern: '^[a-fA-F0-9]{24}$',
             description: 'Required only for an IN_PERSON purchase.',
+          },
+          client: {
+            type: 'string',
+            enum: ['WEB', 'MOBILE'],
+            default: 'WEB',
+            description: 'Selects the hosted Checkout return target.',
           },
         },
       },

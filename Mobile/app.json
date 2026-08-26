@@ -1,13 +1,22 @@
 {
   "expo": {
-    "name": "Plateforme de Formations",
+    "name": "High Skills Academy",
     "slug": "plateforme-formations",
     "version": "0.1.0",
     "scheme": "plateforme-formations",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
-    "plugins": ["expo-secure-store"],
+    "plugins": [
+      "expo-secure-store",
+      "expo-sharing",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Autoriser l’application à choisir une miniature de formation."
+        }
+      ]
+    ],
     "ios": {
       "supportsTablet": true
     },

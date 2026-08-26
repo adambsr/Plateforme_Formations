@@ -1,97 +1,78 @@
 # Mobile parity audit
 
-Audit date: 2026-08-23
+Audit date: 2026-08-25
 
-## Authority and active roadmap phase
+## Authority and scope
 
-The implementation follows `Docs/SOURCE_OF_TRUTH.md`, then `PLAN.md`, then
-`Docs/MOBILE_DEVELOPMENT_PROMPT.md`. Web phases 0 through 12 are reported complete, so the active
-roadmap phase is Phase 13. Mobile must consume the shared REST API and must not reproduce backend
-business rules.
+Implementation was audited against, in order, `Docs/SOURCE_OF_TRUTH.md`, `PLAN.md`, and
+`Docs/MOBILE_DEVELOPMENT_PROMPT.md`, then against every Web feature and shared backend route.
+Phase 13 is complete through 13.9. Mobile uses `Web/backend`; it has no database, Firebase data
+access, Mobile-only API, or duplicated backend business rule.
 
-Phase 13 is ordered as follows:
+## Phase 13 completion map
 
-1. configuration, API client, secure authentication, and role navigation;
-2. catalogue and Training details;
-3. self-paced content and progress;
-4. Sessions and schedules;
-5. Checkout and paid Enrollment state;
-6. Evaluations, Certificates, Invoices, and Feedback;
-7. Trainer Sessions and Attendance;
-8. relevant Admin views;
-9. integration and device E2E stabilization.
+| Slice | Mobile result                                                                                                                                                                                                                                                                                                                   |
+| ----- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 13.1  | Validated public configuration, shared design tokens, normalized API errors, SecureStore refresh token, in-memory access token, rotation/single-flight retry, Learner registration, login/reset/change password, profile, logout, role guards and native navigation.                                                            |
+| 13.2  | Public/authenticated catalogue, category/type filters, pagination, Training detail, thumbnails, native loading/error/empty/retry states.                                                                                                                                                                                        |
+| 13.3  | Authorized modules/lessons/resources, backend-calculated lesson progress, certificate lock, external links, authenticated file download/share, and owner/Admin content authoring with file picker.                                                                                                                              |
+| 13.4  | Public available Sessions, enrolled/managed role views, Session detail, Africa/Tunis schedules, staff Session CRUD, trainer assignment, lifecycle actions, and schedule CRUD.                                                                                                                                                   |
+| 13.5  | Stripe system-browser Checkout, client-aware deep-link returns, backend Payment polling, paid Enrollment state, Payment/Enrollment/Invoice lists, and protected Invoice sharing.                                                                                                                                                |
+| 13.6  | Learner Attempts with backend timer/scoring/reveal rules; Trainer draft creation, AI generation, manual question review/edit/delete, publication, certification designation and results; Admin supervision/archive; Certificate eligibility/idempotent generation/download; immutable 1–5 Feedback and satisfaction aggregates. |
+| 13.7  | Role-filtered Session sheets, learner schedule/attendance percentage, touch attendance roster, complete bulk submission, and backend `canRecord`/immutability enforcement.                                                                                                                                                      |
+| 13.8  | Admin dashboard KPIs/participation/progress/satisfaction/profitability, explicit Trainer/Training costs, trainer creation/edit/disable, learner lists, categories, Training ownership/lifecycle/content, and shared operational supervision views.                                                                              |
+| 13.9  | Auth and feature-flow component tests, deep-link and role navigation tests, Checkout-return integration, strict checks, Expo Doctor, live backend integration tests, and production Android/iOS bundle export.                                                                                                                  |
 
-## Repository snapshot before Phase 13 work
+## Native adaptations
 
-Mobile contained an Expo/React Native application with one static shell screen, the default Expo
-image assets, environment examples, strict TypeScript, and one application-configuration test. It
-had no navigation, API client, authentication state, secure storage, domain types, feature
-screens, reusable theme, loading/error states, or API integration.
+- Native stack routes replace React Router; single-column cards and compact forms replace desktop
+  tables and grids.
+- Safe areas, keyboard-aware scrolling, pull-to-refresh, 44–48 point actions, native alerts,
+  media/document pickers, system browser linking, and Expo file sharing are used.
+- The access token remains memory-only and the rotating refresh token remains in SecureStore.
+- Resources, Invoices, and Certificates are downloaded with bearer authentication before native
+  sharing. Stripe and password-reset flows return through the configured application scheme.
+- Money remains backend-owned EUR minor units and displayed in EUR. Calendar displays use
+  `Africa/Tunis`; schedule writes require explicit ISO offsets.
 
-The Web application is the implemented product reference. It contains:
+## Shared contract changes
 
-- public landing, catalogue, Training detail, about, FAQ, and contact pages;
-- Learner-only registration, login, forgot/reset/change password, profile, and guarded routes;
-- role dashboards and role-specific navigation;
-- Training/category/content management for Admin and Training owners;
-- in-person Session planning and public Session availability;
-- Learner progress and schedules plus Trainer/Admin Attendance;
-- Stripe Checkout return, Payments, Enrollments, and Invoice downloads;
-- Evaluation authoring/AI review, Learner attempts, and result views;
-- Certificates, immutable satisfaction Feedback, explicit costs, and Admin statistics.
+- `POST /auth/forgot-password` accepts optional `client: WEB | MOBILE` (default `WEB`).
+- `POST /payments/checkout` accepts optional `client: WEB | MOBILE` (default `WEB`).
+- `MOBILE_APP_SCHEME` selects Mobile reset and Checkout return URLs.
+- OpenAPI documents both client selectors. Existing Web defaults and URLs are preserved.
+- Mobile never treats a Checkout redirect as payment confirmation; it queries `/payments/:id`
+  until the webhook-owned status becomes terminal.
 
-## Shared concepts and native adaptations
+No migrations, collection/index changes, backfill, or seed changes are required.
 
-The API paths, DTO shapes, roles, statuses, error codes, validation constraints, EUR money rules,
-and `Africa/Tunis` time semantics are shared conceptually. They remain backend-authoritative.
+## Firebase state
 
-The following must be implemented natively rather than copied from Web:
+Firebase remains optional Web Analytics only. Mobile has no Firebase dependency, Android/iOS
+Firebase registration file, service-account credential, Analytics, Auth, database, storage, or
+FCM integration. Future Mobile Analytics/FCM work must register native apps in the existing
+Firebase project and keep privileged credentials backend-only.
 
-- native stack/tab navigation instead of React Router and desktop sidebars;
-- secure platform storage for the refresh token instead of an HttpOnly cookie;
-- in-memory access tokens with a Mobile refresh request body;
-- touch targets, safe areas, keyboard avoidance, scroll behavior, and native accessibility;
-- hosted Checkout through the system browser and deep-link return handling;
-- protected downloads saved/shared through Expo-supported file APIs rather than browser blobs;
-- compact cards and lists instead of desktop tables or multi-column management layouts.
+## Verification record
 
-## Current parity gaps by functional area
+- Mobile strict TypeScript and Oxlint: passed.
+- Mobile Jest: 11 suites / 32 tests, including auth, content/progress, Sessions/planning,
+  attendance, purchases, evaluations, Certificates, loading/empty/error states, deep links, role
+  navigation, and the Checkout-return backend-status integration.
+- Expo Doctor: 21/21 checks passed.
+- Production Expo export: Android and iOS Hermes bundles generated successfully in ignored
+  `Mobile/dist`.
+- Backend strict TypeScript and Oxlint: passed.
+- Backend Vitest default suite: 23 files / 90 tests passed; the 8 database files are intentionally
+  skipped when `TEST_MONGODB_URI` is absent.
+- Backend database integration suite against the local `rs0` replica set: 8 files / 17 tests
+  passed.
+- Focused Mobile deep-link backend contracts: 10/10 tests passed.
+- `npm audit --omit=dev` reports 11 moderate findings from Expo's transitive `xcode` -> `uuid`
+  toolchain. npm only offers a forced breaking `expo-sharing` downgrade; it was not applied because
+  the current Expo 57 dependency set passes all 21 Expo Doctor checks.
 
-| Area                           | Web      | Mobile before Phase 13 | Priority |
-| ------------------------------ | -------- | ---------------------- | -------- |
-| Configuration/theme            | Complete | Expo defaults only     | 13.1     |
-| API/auth/session               | Complete | Missing                | 13.1     |
-| Role navigation/profile        | Complete | Missing                | 13.1     |
-| Catalogue/detail               | Complete | Missing                | 13.2     |
-| Content/progress               | Complete | Missing                | 13.3     |
-| Sessions/schedules             | Complete | Missing                | 13.4     |
-| Checkout/Enrollment/Payments   | Complete | Missing                | 13.5     |
-| Evaluations/documents/Feedback | Complete | Missing                | 13.6     |
-| Trainer Attendance             | Complete | Missing                | 13.7     |
-| Admin operations/dashboard     | Complete | Missing                | 13.8     |
-| Mobile integration/device E2E  | Missing  | Missing                | 13.9     |
-
-## Backend contract findings
-
-No new endpoint is required for Phase 13.1. Login, registration, refresh, logout, password change,
-profile read/update, and forgot-password already use the shared backend. The auth API explicitly
-supports `client: "MOBILE"`, returns the raw refresh token only to Mobile, and rotates it on every
-refresh.
-
-Two later integration gaps need resolution without creating Mobile-only business logic:
-
-- password-reset emails currently build only a `WEB_APP_URL` reset link, so a Mobile reset deep
-  link is not yet selected by the forgot-password contract;
-- Stripe success/cancel URLs are deployment-wide Web URLs, so Mobile Checkout return/deep-link
-  selection is not yet represented in the Checkout request contract.
-
-Both should be addressed in the shared backend contract at their relevant Phase 13 slice rather
-than worked around by trusting Mobile state.
-
-## Phase 13.1 implementation decision
-
-The first slice introduces the Web-derived High Skills Academy design tokens, typed public
-configuration, a normalized API client, secure refresh-token storage, rotating refresh and one
-401 retry, Learner-only registration, login/forgot/change-password flows, profile editing, forced
-password-change navigation, and role-aware authenticated workspaces. Later feature routes are not
-scaffolded until their vertical slice is implemented.
+No Android SDK/emulator, ADB, macOS/Xcode, or attached native device is available in this Windows
+workspace. Native execution was therefore verified with React Native component integration tests,
+Expo Doctor, and production Android/iOS bundling; hardware-only gestures and OS browser return
+delivery remain a release-device smoke check rather than an unreported claim.

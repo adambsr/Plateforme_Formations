@@ -20,4 +20,10 @@ describe('Mobile environment configuration', () => {
       'HTTP ou HTTPS',
     );
   });
+
+  it('rejects an unsafe deep-link scheme', () => {
+    expect(() =>
+      createMobileAppConfig({ appScheme: 'https://example.test' }),
+    ).toThrow('schéma URI valide');
+  });
 });

@@ -867,13 +867,13 @@ export function EvaluationPage() {
                 {user.role === 'LEARNER' &&
                   attempt === null &&
                   !selected.completed && (
-                  <button
-                    className="primary-button"
-                    disabled={busy}
-                    onClick={() => void startAttempt(selected)}
-                  >
-                    Démarrer une nouvelle tentative
-                  </button>
+                    <button
+                      className="primary-button"
+                      disabled={busy}
+                      onClick={() => void startAttempt(selected)}
+                    >
+                      Démarrer une nouvelle tentative
+                    </button>
                   )}
                 {user.role === 'LEARNER' && attempt !== null && (
                   <div className="attempt-panel content-card">

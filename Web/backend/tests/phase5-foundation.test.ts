@@ -6,6 +6,7 @@ import { InvoiceItemModel } from '../src/modules/invoices/models/invoice-item.mo
 import { InvoiceModel } from '../src/modules/invoices/models/invoice.model.js';
 import { PAYMENT_STATUSES } from '../src/modules/payments/domain/payment.js';
 import { PaymentModel } from '../src/modules/payments/models/payment.model.js';
+import { mobileCheckoutReturnUrls } from '../src/modules/payments/services/payment.service.js';
 
 describe('Phase 5 persistence and request boundaries', () => {
   it('uses only the four authoritative Payment statuses', () => {
@@ -24,6 +25,21 @@ describe('Phase 5 persistence and request boundaries', () => {
         amountMinor: 1,
       }).success,
     ).toBe(false);
+  });
+
+  it('defaults Checkout to Web and selects stable Mobile deep-link returns', () => {
+    expect(
+      checkoutRequestSchema.parse({
+        trainingId: '507f1f77bcf86cd799439011',
+      }),
+    ).toEqual({
+      trainingId: '507f1f77bcf86cd799439011',
+      client: 'WEB',
+    });
+    expect(mobileCheckoutReturnUrls('plateforme-formations')).toEqual({
+      success: 'plateforme-formations://payments/success',
+      cancel: 'plateforme-formations://payments/cancel',
+    });
   });
 
   it('declares Stripe, Enrollment, Invoice, and one-line cardinality indexes', () => {

@@ -27,6 +27,18 @@ export interface AuthSessionResult {
   user: PublicUser;
 }
 
+export function passwordResetUrl(
+  application: Pick<AppConfig['application'], 'webAppUrl' | 'mobileAppScheme'>,
+  rawToken: string,
+  client: 'WEB' | 'MOBILE',
+): string {
+  const baseUrl =
+    client === 'MOBILE'
+      ? `${application.mobileAppScheme}://reset-password`
+      : `${application.webAppUrl}/reset-password`;
+  return `${baseUrl}?token=${encodeURIComponent(rawToken)}`;
+}
+
 const invalidCredentials = () =>
   new AppError(
     401,
@@ -193,7 +205,10 @@ export class AuthService {
     );
   }
 
-  async forgotPassword(email: string): Promise<void> {
+  async forgotPassword(
+    email: string,
+    client: 'WEB' | 'MOBILE' = 'WEB',
+  ): Promise<void> {
     const user = await UserModel.findOne({ email, isActive: true }).exec();
     if (user === null) return;
 
@@ -212,7 +227,11 @@ export class AuthService {
       ),
     });
 
-    const resetUrl = `${this.#config.application.webAppUrl}/reset-password?token=${encodeURIComponent(generated.rawToken)}`;
+    const resetUrl = passwordResetUrl(
+      this.#config.application,
+      generated.rawToken,
+      client,
+    );
     try {
       await this.#mail.sendPasswordReset(user.email, resetUrl);
     } catch (error) {

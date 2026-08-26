@@ -52,6 +52,86 @@ export function WorkspaceScreen({
           <Text style={styles.muted}>
             Votre navigation est adaptée au rôle {user.role.toLowerCase()}.
           </Text>
+          {user.role === 'ADMIN' && (
+            <>
+              <Button
+                label="Tableau de bord"
+                onPress={() => navigation.navigate('AdminDashboard')}
+              />
+              <Button
+                label="Formateurs et apprenants"
+                onPress={() => navigation.navigate('AdminUsers')}
+                variant="secondary"
+              />
+              <Button
+                label="Coûts explicites"
+                onPress={() => navigation.navigate('AdminCosts')}
+                variant="secondary"
+              />
+              <Button
+                label="Catégories du catalogue"
+                onPress={() => navigation.navigate('AdminCategories')}
+                variant="secondary"
+              />
+            </>
+          )}
+          <Button
+            label="Explorer le catalogue"
+            onPress={() => navigation.navigate('Catalogue')}
+          />
+          {user.role !== 'LEARNER' && (
+            <Button
+              label={
+                user.role === 'ADMIN'
+                  ? 'Gérer les Formations'
+                  : 'Mes Formations'
+              }
+              onPress={() => navigation.navigate('ManagedTrainings')}
+              variant="secondary"
+            />
+          )}
+          {user.role === 'LEARNER' && (
+            <Button
+              label="Ma progression"
+              onPress={() => navigation.navigate('Progress')}
+              variant="secondary"
+            />
+          )}
+          <Button
+            label={user.role === 'LEARNER' ? 'Mon planning' : 'Mes sessions'}
+            onPress={() => navigation.navigate('Sessions')}
+            variant="secondary"
+          />
+          <Button
+            label={
+              user.role === 'LEARNER' ? 'Mes présences' : 'Gérer les présences'
+            }
+            onPress={() => navigation.navigate('Attendance')}
+            variant="secondary"
+          />
+          {(user.role === 'LEARNER' || user.role === 'ADMIN') && (
+            <Button
+              label={
+                user.role === 'ADMIN' ? 'Paiements et factures' : 'Mes achats'
+              }
+              onPress={() => navigation.navigate('Purchases')}
+              variant="secondary"
+            />
+          )}
+          <Button
+            label="Évaluations"
+            onPress={() => navigation.navigate('Evaluations')}
+            variant="secondary"
+          />
+          <Button
+            label={
+              user.role === 'ADMIN'
+                ? 'Certificats et satisfaction'
+                : 'Certificats'
+            }
+            onPress={() => navigation.navigate('Certificates')}
+            variant="secondary"
+          />
           <Button
             label="Mon profil"
             onPress={() => navigation.navigate('Profile')}

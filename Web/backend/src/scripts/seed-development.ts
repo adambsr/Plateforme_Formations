@@ -340,7 +340,9 @@ export async function seedDevelopmentData(environment = process.env) {
     const inPersonTrainingIds = trainingIds.slice(10);
     const sessionTitle = (trainingIndex: number, occurrence: number) =>
       `${trainingData[trainingIndex]![0]} — ${
-        occurrence === 0 ? 'promotion printemps terminée' : 'promotion automne à venir'
+        occurrence === 0
+          ? 'promotion printemps terminée'
+          : 'promotion automne à venir'
       }`;
     const sessionIds = inPersonTrainingIds.flatMap((_, index) => [
       objectId(7, index * 2 + 1),
@@ -434,9 +436,8 @@ export async function seedDevelopmentData(environment = process.env) {
           filter: { _id: trainingIds[trainingIndex]! },
           update: {
             $set: {
-              certifyingEvaluationId: evaluationIds[
-                onlineTrainingIndexes.indexOf(trainingIndex)
-              ]!,
+              certifyingEvaluationId:
+                evaluationIds[onlineTrainingIndexes.indexOf(trainingIndex)]!,
             },
           },
         },
@@ -462,9 +463,30 @@ export async function seedDevelopmentData(environment = process.env) {
             'La réponse attendue correspond aux notions et pratiques présentées dans le parcours.',
           type: 'SINGLE_CHOICE' as const,
           options: [
-            { id: 'a', text: ['Organiser les données et les responsabilités', 'Tester le comportement attendu', 'Comparer le résultat aux critères définis'][question]! },
-            { id: 'b', text: ['Supprimer les contrôles', 'Modifier le code sans vérification', 'Ignorer les critères de réussite'][question]! },
-            { id: 'c', text: ['Travailler sans objectif', 'Éviter les cas limites', 'Reporter toute validation'][question]! },
+            {
+              id: 'a',
+              text: [
+                'Organiser les données et les responsabilités',
+                'Tester le comportement attendu',
+                'Comparer le résultat aux critères définis',
+              ][question]!,
+            },
+            {
+              id: 'b',
+              text: [
+                'Supprimer les contrôles',
+                'Modifier le code sans vérification',
+                'Ignorer les critères de réussite',
+              ][question]!,
+            },
+            {
+              id: 'c',
+              text: [
+                'Travailler sans objectif',
+                'Éviter les cas limites',
+                'Reporter toute validation',
+              ][question]!,
+            },
           ],
           correctOptionIds: ['a'],
         })),
@@ -688,7 +710,9 @@ export async function seedDevelopmentData(environment = process.env) {
         const purchaseIndex = evaluatedOutcomeIndexes[index]!;
         return {
           _id: attemptIds[index],
-          evaluationId: evaluationIdByTrainingIndex.get(purchase.trainingIndex)!,
+          evaluationId: evaluationIdByTrainingIndex.get(
+            purchase.trainingIndex,
+          )!,
           trainingId: purchase.trainingId,
           enrollmentId: enrollmentIds[purchaseIndex],
           learnerId: purchase.learnerId,
@@ -723,9 +747,30 @@ export async function seedDevelopmentData(environment = process.env) {
               'La réponse attendue correspond aux notions et pratiques présentées.',
             type: 'SINGLE_CHOICE' as const,
             options: [
-              { id: 'a', text: ['Organiser les données et les responsabilités', 'Tester le comportement attendu', 'Comparer le résultat aux critères définis'][questionIndex]! },
-              { id: 'b', text: ['Supprimer les contrôles', 'Modifier le code sans vérification', 'Ignorer les critères de réussite'][questionIndex]! },
-              { id: 'c', text: ['Travailler sans objectif', 'Éviter les cas limites', 'Reporter toute validation'][questionIndex]! },
+              {
+                id: 'a',
+                text: [
+                  'Organiser les données et les responsabilités',
+                  'Tester le comportement attendu',
+                  'Comparer le résultat aux critères définis',
+                ][questionIndex]!,
+              },
+              {
+                id: 'b',
+                text: [
+                  'Supprimer les contrôles',
+                  'Modifier le code sans vérification',
+                  'Ignorer les critères de réussite',
+                ][questionIndex]!,
+              },
+              {
+                id: 'c',
+                text: [
+                  'Travailler sans objectif',
+                  'Éviter les cas limites',
+                  'Reporter toute validation',
+                ][questionIndex]!,
+              },
             ],
             correctOptionIds: ['a'],
           },
@@ -779,9 +824,8 @@ export async function seedDevelopmentData(environment = process.env) {
                   certifyingEvaluationId: evaluationIdByTrainingIndex.get(
                     purchase.trainingIndex,
                   ),
-                  passedAttemptId: attemptIds[
-                    evaluatedOutcomePurchases.indexOf(purchase)
-                  ],
+                  passedAttemptId:
+                    attemptIds[evaluatedOutcomePurchases.indexOf(purchase)],
                 }
               : {}),
             passedAt: date(-1),

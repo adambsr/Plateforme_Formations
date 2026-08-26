@@ -38,7 +38,12 @@ export const refreshSchema = z
 
 export const logoutSchema = refreshSchema;
 
-export const forgotPasswordSchema = z.object({ email }).strict();
+export const forgotPasswordSchema = z
+  .object({
+    email,
+    client: z.enum(['WEB', 'MOBILE']).default('WEB'),
+  })
+  .strict();
 
 export const resetPasswordSchema = z
   .object({ token: z.string().min(20), newPassword: password })

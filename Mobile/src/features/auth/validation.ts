@@ -45,3 +45,14 @@ export function passwordChangeError(
     return 'Les mots de passe doivent correspondre.';
   return null;
 }
+
+export function resetPasswordError(
+  newPassword: string,
+  confirmPassword: string,
+): string | null {
+  if (newPassword.length < 8)
+    return 'Le nouveau mot de passe doit contenir au moins 8 caractères.';
+  if (newPassword !== confirmPassword)
+    return 'Les mots de passe doivent correspondre.';
+  return null;
+}

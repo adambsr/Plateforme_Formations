@@ -2,7 +2,11 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
-import type { GuestStackParamList } from '../../app/navigation/types';
+import type {
+  AppStackParamList,
+  GuestStackParamList,
+  PasswordStackParamList,
+} from '../../app/navigation/types';
 import { ApiError, apiClient } from '../../core/api/client';
 import { useAuth } from '../../core/auth/AuthContext';
 import { Button } from '../../shared/components/Button';
@@ -13,6 +17,7 @@ import {
   credentialsError,
   passwordChangeError,
   registrationError,
+  resetPasswordError,
 } from './validation';
 
 function messageFor(error: unknown): string {
@@ -103,6 +108,11 @@ export function LoginScreen({
           onPress={() => navigation.navigate('Register')}
           variant="secondary"
         />
+        <Button
+          label="Explorer le catalogue"
+          onPress={() => navigation.navigate('Catalogue')}
+          variant="link"
+        />
       </View>
     </AuthScaffold>
   );
@@ -192,6 +202,11 @@ export function RegisterScreen({
         onPress={() => navigation.navigate('Login')}
         variant="secondary"
       />
+      <Button
+        label="Retour au catalogue"
+        onPress={() => navigation.navigate('Catalogue')}
+        variant="link"
+      />
     </AuthScaffold>
   );
 }
@@ -211,7 +226,10 @@ export function ForgotPasswordScreen({
     try {
       await apiClient.request('/auth/forgot-password', {
         method: 'POST',
-        body: JSON.stringify({ email: email.trim().toLowerCase() }),
+        body: JSON.stringify({
+          email: email.trim().toLowerCase(),
+          client: 'MOBILE',
+        }),
       });
       setSent(true);
     } catch (caught) {
@@ -255,6 +273,134 @@ export function ForgotPasswordScreen({
         onPress={() => navigation.navigate('Login')}
         variant="link"
       />
+    </AuthScaffold>
+  );
+}
+
+export function ResetPasswordScreen({
+  navigation,
+  route,
+}: NativeStackScreenProps<GuestStackParamList, 'ResetPassword'>) {
+  return (
+    <ResetPasswordForm
+      onReturn={() => navigation.navigate('Login')}
+      token={route.params.token}
+    />
+  );
+}
+
+export function AuthenticatedResetPasswordScreen({
+  route,
+}: NativeStackScreenProps<AppStackParamList, 'ResetPassword'>) {
+  const { logout } = useAuth();
+  const clearSession = async () => {
+    try {
+      await logout();
+    } catch {
+      // logout always clears the local session in its finally block.
+    }
+  };
+  return (
+    <ResetPasswordForm
+      afterReset={clearSession}
+      onReturn={() => void clearSession()}
+      token={route.params.token}
+    />
+  );
+}
+
+export function PasswordRequiredResetScreen({
+  route,
+}: NativeStackScreenProps<PasswordStackParamList, 'ResetPassword'>) {
+  const { logout } = useAuth();
+  const clearSession = async () => {
+    try {
+      await logout();
+    } catch {
+      // logout always clears the local session in its finally block.
+    }
+  };
+  return (
+    <ResetPasswordForm
+      afterReset={clearSession}
+      onReturn={() => void clearSession()}
+      token={route.params.token}
+    />
+  );
+}
+
+function ResetPasswordForm({
+  token,
+  onReturn,
+  afterReset,
+}: {
+  token?: string;
+  onReturn: () => void;
+  afterReset?: () => Promise<void>;
+}) {
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [error, setError] = useState('');
+  const [complete, setComplete] = useState(false);
+  const [loading, setLoading] = useState(false);
+
+  async function submit() {
+    const validation = resetPasswordError(newPassword, confirmPassword);
+    if (validation !== null) return setError(validation);
+    if (token === undefined || token.length < 20) {
+      return setError('Le lien de réinitialisation est invalide ou incomplet.');
+    }
+    setLoading(true);
+    setError('');
+    try {
+      await apiClient.request('/auth/reset-password', {
+        method: 'POST',
+        body: JSON.stringify({ token, newPassword }),
+      });
+      setComplete(true);
+      await afterReset?.();
+    } catch (caught) {
+      setError(messageFor(caught));
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return (
+    <AuthScaffold
+      title="Nouveau mot de passe"
+      subtitle="Choisissez un nouveau mot de passe pour votre compte."
+    >
+      {complete ? (
+        <AlertMessage
+          message="Votre mot de passe a été réinitialisé."
+          success
+        />
+      ) : (
+        <>
+          <TextField
+            autoComplete="new-password"
+            label="Nouveau mot de passe"
+            onChangeText={setNewPassword}
+            secureTextEntry
+            value={newPassword}
+          />
+          <TextField
+            autoComplete="new-password"
+            label="Confirmer le mot de passe"
+            onChangeText={setConfirmPassword}
+            secureTextEntry
+            value={confirmPassword}
+          />
+          {error !== '' && <AlertMessage message={error} />}
+          <Button
+            label="Réinitialiser"
+            loading={loading}
+            onPress={() => void submit()}
+          />
+        </>
+      )}
+      <Button label="Retour à la connexion" onPress={onReturn} variant="link" />
     </AuthScaffold>
   );
 }

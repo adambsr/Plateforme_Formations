@@ -5,6 +5,7 @@ export function validEnvironment(): NodeJS.ProcessEnv {
     MONGODB_URI:
       'mongodb://localhost:27017/plateforme_formations_test?replicaSet=rs0',
     WEB_APP_URL: 'http://localhost:5173',
+    MOBILE_APP_SCHEME: 'plateforme-formations',
     CORS_ORIGINS: 'http://localhost:5173,http://127.0.0.1:5173',
     TZ: 'UTC',
     LOG_LEVEL: 'silent',

@@ -143,7 +143,7 @@ export function createAuthRouter(
     rateLimit('forgot-password', 5),
     async (request, response) => {
       const input = forgotPasswordSchema.parse(request.body);
-      await authService.forgotPassword(input.email);
+      await authService.forgotPassword(input.email, input.client);
       response.status(202).json({
         message:
           'If an active account exists, password reset instructions have been sent.',

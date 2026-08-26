@@ -14,6 +14,11 @@ const environmentSchema = z
     PORT: z.coerce.number().int().min(1).max(65_535).default(3000),
     MONGODB_URI: z.string().trim().min(1),
     WEB_APP_URL: z.url(),
+    MOBILE_APP_SCHEME: z
+      .string()
+      .trim()
+      .regex(/^[a-z][a-z0-9+.-]*$/i)
+      .default('plateforme-formations'),
     CORS_ORIGINS: z
       .string()
       .transform((value) => value.split(',').map((origin) => origin.trim()))
@@ -93,6 +98,7 @@ export interface AppConfig {
     nodeEnv: 'development' | 'test' | 'production';
     port: number;
     webAppUrl: string;
+    mobileAppScheme: string;
     corsOrigins: string[];
     timezone: 'UTC';
     logLevel:
@@ -186,6 +192,7 @@ export function loadAppConfig(
       nodeEnv: value.NODE_ENV,
       port: value.PORT,
       webAppUrl: value.WEB_APP_URL,
+      mobileAppScheme: value.MOBILE_APP_SCHEME,
       corsOrigins: value.CORS_ORIGINS,
       timezone: value.TZ,
       logLevel: value.LOG_LEVEL,

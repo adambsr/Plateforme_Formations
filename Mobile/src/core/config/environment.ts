@@ -32,6 +32,16 @@ function requiredText(value: string, variable: string): string {
   return normalized;
 }
 
+function requiredScheme(value: string): string {
+  const normalized = requiredText(value, 'EXPO_PUBLIC_APP_SCHEME');
+  if (!/^[a-z][a-z0-9+.-]*$/i.test(normalized)) {
+    throw new Error(
+      'EXPO_PUBLIC_APP_SCHEME doit être un schéma URI valide sans ://.',
+    );
+  }
+  return normalized;
+}
+
 export function createMobileAppConfig(
   environment: MobileEnvironment,
 ): MobileAppConfig {
@@ -43,10 +53,7 @@ export function createMobileAppConfig(
       environment.centerName ?? 'High Skills Academy',
       'EXPO_PUBLIC_CENTER_NAME',
     ),
-    appScheme: requiredText(
-      environment.appScheme ?? 'plateforme-formations',
-      'EXPO_PUBLIC_APP_SCHEME',
-    ),
+    appScheme: requiredScheme(environment.appScheme ?? 'plateforme-formations'),
   };
 }
 

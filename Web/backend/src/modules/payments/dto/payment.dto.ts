@@ -10,6 +10,7 @@ export const checkoutRequestSchema = z
   .object({
     trainingId: paymentIdSchema,
     sessionId: paymentIdSchema.optional(),
+    client: z.enum(['WEB', 'MOBILE']).default('WEB'),
   })
   .strict();
 

@@ -424,15 +424,18 @@ export function TrainingEditorPage() {
       if (thumbnailFile !== undefined) {
         const body = new FormData();
         body.append('thumbnail', thumbnailFile);
-        await request<Training>(
-          `/trainings/${savedTraining.id}/thumbnail`,
-          { method: 'PUT', body },
-        );
-      } else if (editing && thumbnailRemoved && value?.thumbnailUrl !== undefined) {
-        await request<Training>(
-          `/trainings/${savedTraining.id}/thumbnail`,
-          { method: 'DELETE' },
-        );
+        await request<Training>(`/trainings/${savedTraining.id}/thumbnail`, {
+          method: 'PUT',
+          body,
+        });
+      } else if (
+        editing &&
+        thumbnailRemoved &&
+        value?.thumbnailUrl !== undefined
+      ) {
+        await request<Training>(`/trainings/${savedTraining.id}/thumbnail`, {
+          method: 'DELETE',
+        });
       }
       navigate('/app/trainings', { replace: true });
     } catch (caught) {
@@ -602,7 +605,8 @@ export function TrainingEditorPage() {
           )}
           <div className="thumbnail-editor-actions">
             <label className="secondary-button compact-button">
-              {thumbnailPreviewUrl === undefined && value?.thumbnailUrl === undefined
+              {thumbnailPreviewUrl === undefined &&
+              value?.thumbnailUrl === undefined
                 ? 'Ajouter une miniature'
                 : 'Remplacer la miniature'}
               <input

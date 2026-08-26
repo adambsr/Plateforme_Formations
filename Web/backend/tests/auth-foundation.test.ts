@@ -3,8 +3,10 @@ import { describe, expect, it } from 'vitest';
 import { loadAppConfig } from '../src/config/environment.js';
 import {
   changePasswordSchema,
+  forgotPasswordSchema,
   registerLearnerSchema,
 } from '../src/modules/auth/dto/auth.dto.js';
+import { passwordResetUrl } from '../src/modules/auth/services/auth.service.js';
 import { TokenService } from '../src/modules/auth/services/token.service.js';
 import { validEnvironment } from './fixtures/environment.js';
 
@@ -36,6 +38,25 @@ describe('authentication foundation', () => {
     });
 
     expect(result.success).toBe(false);
+  });
+
+  it('defaults reset requests to Web and builds an encoded Mobile deep link', () => {
+    expect(forgotPasswordSchema.parse({ email: 'USER@example.com' })).toEqual({
+      email: 'user@example.com',
+      client: 'WEB',
+    });
+    expect(
+      passwordResetUrl(
+        {
+          webAppUrl: 'https://academy.example',
+          mobileAppScheme: 'plateforme-formations',
+        },
+        'token with/+reserved',
+        'MOBILE',
+      ),
+    ).toBe(
+      'plateforme-formations://reset-password?token=token%20with%2F%2Breserved',
+    );
   });
 
   it('rejects unchanged passwords', () => {

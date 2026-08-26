@@ -1,4 +1,4 @@
-import { ApiClient, ApiError } from '../src/core/api/client';
+import { ApiClient, ApiError, apiAssetUrl } from '../src/core/api/client';
 
 function response(status: number, body?: unknown): Response {
   return new Response(body === undefined ? undefined : JSON.stringify(body), {
@@ -49,5 +49,14 @@ describe('Mobile API client', () => {
       status: 0,
       code: 'NETWORK_ERROR',
     });
+  });
+
+  it('resolves protected API asset paths against the shared backend', () => {
+    expect(apiAssetUrl('/trainings/training-id/thumbnail')).toBe(
+      'http://10.0.2.2:3000/api/trainings/training-id/thumbnail',
+    );
+    expect(apiAssetUrl('https://cdn.example.test/image.png')).toBe(
+      'https://cdn.example.test/image.png',
+    );
   });
 });

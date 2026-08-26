@@ -2,6 +2,7 @@ import {
   credentialsError,
   passwordChangeError,
   registrationError,
+  resetPasswordError,
 } from '../src/features/auth/validation';
 
 describe('Mobile authentication validation', () => {
@@ -28,5 +29,13 @@ describe('Mobile authentication validation', () => {
     expect(
       passwordChangeError('password-123', 'new-password', 'other-password'),
     ).toContain('correspondre');
+  });
+
+  it('validates password reset confirmation from a Mobile deep link', () => {
+    expect(resetPasswordError('new-password', 'new-password')).toBeNull();
+    expect(resetPasswordError('short', 'short')).toContain('8 caractères');
+    expect(resetPasswordError('new-password', 'different-password')).toContain(
+      'correspondre',
+    );
   });
 });
