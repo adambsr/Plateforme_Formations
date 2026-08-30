@@ -122,6 +122,7 @@ export async function seedDevelopmentData(environment = process.env) {
       ['Skander', 'Tlili'],
       ['Hela', 'Zouari'],
       ['Malek', 'Baccar'],
+      ['Fairouz', 'Raouin'],
     ] as const;
     const trainerIds = trainerNames.map((_, index) => objectId(1, index + 2));
     const learnerIds = learnerNames.map((_, index) => objectId(1, index + 10));
@@ -151,7 +152,10 @@ export async function seedDevelopmentData(environment = process.env) {
       })),
       ...learnerNames.map(([firstName, lastName], index) => ({
         _id: learnerIds[index],
-        email: `apprenant${String(index + 1).padStart(2, '0')}@formation.test`,
+        email:
+          firstName === 'Fairouz' && lastName === 'Raouin'
+            ? 'fairouz.raouin@gmail.com'
+            : `apprenant${String(index + 1).padStart(2, '0')}@formation.test`,
         passwordHash,
         role: 'LEARNER' as const,
         isActive: true,
@@ -493,6 +497,7 @@ export async function seedDevelopmentData(environment = process.env) {
       ),
     );
     const paidPurchases = learnerIds.flatMap((learnerId, learnerIndex) => {
+      const isFairouz = learnerNames[learnerIndex]?.[0] === 'Fairouz';
       const onlineIndex = learnerIndex % 10;
       const sessionIndex = learnerIndex % sessionIds.length;
       const inPersonIndex = 10 + Math.floor(sessionIndex / 2);
@@ -500,17 +505,17 @@ export async function seedDevelopmentData(environment = process.env) {
         {
           learnerId,
           learnerIndex,
-          trainingIndex: onlineIndex,
-          trainingId: trainingIds[onlineIndex],
+          trainingIndex: isFairouz ? 3 : onlineIndex,
+          trainingId: trainingIds[isFairouz ? 3 : onlineIndex],
           sessionId: undefined,
           purchaseType: 'SELF_PACED_ONLINE' as const,
         },
         {
           learnerId,
           learnerIndex,
-          trainingIndex: inPersonIndex,
-          trainingId: trainingIds[inPersonIndex],
-          sessionId: sessionIds[sessionIndex],
+          trainingIndex: isFairouz ? 15 : inPersonIndex,
+          trainingId: trainingIds[isFairouz ? 15 : inPersonIndex],
+          sessionId: sessionIds[isFairouz ? 11 : sessionIndex],
           purchaseType: 'IN_PERSON' as const,
         },
       ];
@@ -617,7 +622,10 @@ export async function seedDevelopmentData(environment = process.env) {
           number: `DEV-FACT-${String(index + 1).padStart(4, '0')}`,
           issuedAt: date(-5 + (index % 6), 4 + (index % 20)),
           learner: {
-            email: `apprenant${String(purchase.learnerIndex + 1).padStart(2, '0')}@formation.test`,
+            email:
+              learnerNames[purchase.learnerIndex]?.[0] === 'Fairouz'
+                ? 'fairouz.raouin@gmail.com'
+                : `apprenant${String(purchase.learnerIndex + 1).padStart(2, '0')}@formation.test`,
             firstName,
             lastName,
           },

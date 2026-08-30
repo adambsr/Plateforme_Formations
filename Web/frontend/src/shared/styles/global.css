@@ -3141,3 +3141,36 @@ label,
     align-items: flex-start;
   }
 }
+
+/* Shared timed feedback: all feature pages reuse these semantic classes. */
+.success-message,
+.form-error {
+  position: fixed;
+  right: clamp(1rem, 3vw, 2rem);
+  bottom: clamp(1rem, 3vw, 2rem);
+  z-index: 200;
+  max-width: min(28rem, calc(100vw - 2rem));
+  margin: 0;
+  box-shadow: var(--shadow-lg);
+  animation: notification-toast 5s ease forwards;
+}
+.success-message { border: 1px solid #9fddba; }
+.form-error { border: 1px solid #f1b4b4; }
+@keyframes notification-toast {
+  0%, 80% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  100% {
+    visibility: hidden;
+    opacity: 0;
+    transform: translateY(0.75rem);
+  }
+}
+.evaluation-list .content-card { cursor: pointer; }
+.evaluation-list .content-card:hover,
+.evaluation-list .content-card:focus-visible {
+  transform: translateY(-3px);
+  border-color: #8eb4dc;
+  box-shadow: 0 12px 26px rgba(24, 89, 166, 0.16);
+}

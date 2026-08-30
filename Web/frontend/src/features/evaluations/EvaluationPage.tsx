@@ -762,6 +762,7 @@ export function EvaluationPage() {
                     </form>
                   </>
                 )}
+                {user.role !== 'LEARNER' && (
                 <div className="evaluation-questions">
                   {selected.questions?.map((question) => (
                     <article className="content-card" key={question.id}>
@@ -864,6 +865,7 @@ export function EvaluationPage() {
                     </article>
                   ))}
                 </div>
+                )}
                 {user.role === 'LEARNER' &&
                   attempt === null &&
                   !selected.completed && (

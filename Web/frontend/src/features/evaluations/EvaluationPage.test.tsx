@@ -168,5 +168,6 @@ describe('Phase 8 and 9 Evaluation UI', () => {
     );
     fireEvent.click(await screen.findByRole('button', { name: /Quiz/i }));
     expect(await screen.findByText('Tentative 1')).toBeVisible();
+    expect(document.querySelector('.evaluation-questions')).toBeNull();
   });
 });

@@ -58,9 +58,9 @@ environment.
 
 ## Dataset coverage
 
-The seed creates 27 users, 5 categories, 16 published EUR formations, 32 modules,
-64 lessons/resources, 12 in-person sessions, 24 schedule entries, 56 payments
-across all supported statuses, 44 paid enrollments and invoices, progress and
+The seed creates 28 users, 5 categories, 16 published EUR formations, 32 modules,
+64 lessons/resources, 12 in-person sessions, 24 schedule entries, 58 payments
+across all supported statuses, 46 paid enrollments and invoices, progress and
 attendance histories, published evaluations with attempts, eligible
 certificates and feedback, plus six months of trainer and training costs.
 

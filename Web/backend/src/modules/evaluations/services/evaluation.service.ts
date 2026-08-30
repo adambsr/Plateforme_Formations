@@ -548,7 +548,8 @@ export class EvaluationService {
     });
     const passed = await EvaluationAttemptModel.exists({
       evaluationId: evaluation._id,
-      enrollmentId: enrollment._id,
+      // A learner cannot bypass a passed Evaluation with another Enrollment.
+      learnerId: principal.userId,
       status: 'PASSED',
     });
     if (passed !== null)
