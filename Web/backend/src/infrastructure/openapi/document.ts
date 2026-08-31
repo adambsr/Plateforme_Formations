@@ -2124,6 +2124,29 @@ export const openApiDocument: OpenAPIV3.Document = {
         'Get global profitability and pre-fixed-cost Training results',
       ),
     },
+    '/dashboard/learning-insights': {
+      get: dashboardOperation(
+        'getDashboardLearningInsights',
+        'Get self-paced completion trends and inactive Learners',
+      ),
+    },
+    '/dashboard/recommendations': {
+      get: {
+        operationId: 'getLearnerTrainingRecommendations',
+        summary: 'Get personal next-Training recommendations',
+        description:
+          'Learner-only explainable recommendations based on enrollment history, platform popularity, and recency.',
+        tags: ['Dashboard'],
+        security: secured,
+        responses: {
+          '200': {
+            description: 'Ranked published Trainings not yet enrolled in.',
+            content: json({ type: 'object', additionalProperties: true }),
+          },
+          default: errorResponse,
+        },
+      },
+    },
   },
   components: {
     securitySchemes: {

@@ -2,6 +2,7 @@ import { render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { trackRecommendationEnrollment } from '../../core/analytics/recommendation-analytics.js';
 import { CheckoutReturnPage, PaymentCenterPage } from './PaymentPages.js';
 
 const request = vi.fn();
@@ -23,10 +24,14 @@ vi.mock('../../core/auth/AuthContext.js', () => ({
     download,
   }),
 }));
+vi.mock('../../core/analytics/recommendation-analytics.js', () => ({
+  trackRecommendationEnrollment: vi.fn(),
+}));
 
 beforeEach(() => {
   request.mockReset();
   download.mockReset();
+  vi.mocked(trackRecommendationEnrollment).mockReset();
 });
 
 describe('Phase 5 webhook-confirmed Web state', () => {
@@ -83,6 +88,7 @@ describe('Phase 5 webhook-confirmed Web state', () => {
       screen.getByRole('link', { name: 'Accéder à la formation' }),
     ).toHaveAttribute('href', '/app/content/training-1');
     expect(request).toHaveBeenCalledWith('/payments/payment-1');
+    expect(trackRecommendationEnrollment).toHaveBeenCalledWith('training-1');
   });
 
   it('renders financial API errors', async () => {

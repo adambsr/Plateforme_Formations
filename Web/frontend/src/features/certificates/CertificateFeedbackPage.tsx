@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import { Star } from 'lucide-react';
 
 import { ApiError } from '../../core/api/client.js';
 import { useAuth } from '../../core/auth/AuthContext.js';
@@ -12,6 +13,32 @@ import { Pagination } from '../../shared/components/Pagination.js';
 import { Select } from '../../shared/components/Select.js';
 
 const ratings = [1, 2, 3, 4, 5] as const;
+
+function RatingDistribution({
+  summary,
+}: {
+  summary: FeedbackStatistics['global'] | undefined;
+}) {
+  const total = summary?.count ?? 0;
+  return (
+    <div className="satisfaction-distribution" aria-label="Distribution des notes">
+      {ratings.map((rating) => {
+        const count = summary?.distribution[rating] ?? 0;
+        return (
+          <div className="satisfaction-row" key={rating}>
+            <span aria-label={`${rating} étoiles`}>
+              {Array.from({ length: rating }, (_, index) => (
+                <Star key={index} aria-hidden="true" size={15} fill="currentColor" />
+              ))}
+            </span>
+            <div><i style={{ width: `${total === 0 ? 0 : (count / total) * 100}%` }} /></div>
+            <strong>{count}</strong>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
 
 function message(error: unknown): string {
   return error instanceof ApiError
@@ -327,6 +354,7 @@ export function CertificateFeedbackPage() {
           {user.role === 'ADMIN' && statistics !== null && (
             <section className="content-card">
               <h2>Satisfaction</h2>
+              <RatingDistribution summary={satisfactionSummary} />
               <label className="satisfaction-filter">
                 Formation
                 <Select

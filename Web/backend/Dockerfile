@@ -27,6 +27,7 @@ RUN npm ci --omit=dev --workspace @plateforme-formations/backend \
   && npm cache clean --force
 
 COPY --from=build /app/Web/backend/dist Web/backend/dist
+COPY --from=build /app/Web/backend/assets Web/backend/assets
 
 RUN mkdir -p /app/uploads \
   && chown -R node:node /app/uploads

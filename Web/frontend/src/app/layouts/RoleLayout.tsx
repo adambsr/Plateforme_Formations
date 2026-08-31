@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { NavLink, Outlet, useLocation } from 'react-router';
+import { Link, NavLink, Outlet, useLocation } from 'react-router';
 import awardIcon from 'lucide-static/icons/award.svg';
 import calendarDaysIcon from 'lucide-static/icons/calendar-days.svg';
 import chevronLeftIcon from 'lucide-static/icons/chevron-left.svg';
@@ -17,9 +17,10 @@ import userRoundIcon from 'lucide-static/icons/user-round.svg';
 import usersRoundIcon from 'lucide-static/icons/users-round.svg';
 import xIcon from 'lucide-static/icons/x.svg';
 
+import blueLogo from '../../assets/hsa-logo-blue.png';
+
 import { useAuth } from '../../core/auth/AuthContext.js';
 import { UserMenu } from '../../shared/components/UserMenu.js';
-import { Brand } from '../../shared/components/Brand.js';
 import { Icon } from '../../shared/components/Icon.js';
 
 export function RoleLayout() {
@@ -63,7 +64,9 @@ export function RoleLayout() {
           >
             <Icon src={menuIcon} size={21} />
           </button>
-          <Brand className="portal-brand" />
+          <Link className="portal-logo" to="/" aria-label="Accueil High Skills Academy">
+            <img src={blueLogo} alt="High Skills Academy" />
+          </Link>
         </div>
         <div className="portal-account" aria-label={roleLabel}>
           <UserMenu />

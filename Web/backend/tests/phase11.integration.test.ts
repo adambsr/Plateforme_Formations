@@ -6,9 +6,12 @@ import { AttendanceModel } from '../src/modules/attendance/models/attendance.mod
 import { CostService } from '../src/modules/costs/services/cost.service.js';
 import { TrainerCostModel } from '../src/modules/costs/models/trainer-cost.model.js';
 import { TrainingCostModel } from '../src/modules/costs/models/training-cost.model.js';
+import { LessonModel } from '../src/modules/content/models/lesson.model.js';
+import { TrainingModuleModel } from '../src/modules/content/models/training-module.model.js';
 import { DashboardService } from '../src/modules/dashboard/services/dashboard.service.js';
 import { EnrollmentModel } from '../src/modules/enrollments/models/enrollment.model.js';
 import { PaymentModel } from '../src/modules/payments/models/payment.model.js';
+import { LessonProgressModel } from '../src/modules/progress/models/lesson-progress.model.js';
 import { SessionScheduleModel } from '../src/modules/sessions/models/session-schedule.model.js';
 import { TrainingSessionModel } from '../src/modules/sessions/models/training-session.model.js';
 import { TrainingCategoryModel } from '../src/modules/trainings/models/training-category.model.js';
@@ -45,6 +48,9 @@ suite('Phase 11 costs and dashboard integration', () => {
       TrainerCostModel.deleteMany({}),
       TrainingCostModel.deleteMany({}),
       AttendanceModel.deleteMany({}),
+      LessonProgressModel.deleteMany({}),
+      LessonModel.deleteMany({}),
+      TrainingModuleModel.deleteMany({}),
       EnrollmentModel.deleteMany({}),
       SessionScheduleModel.deleteMany({}),
       PaymentModel.deleteMany({}),
@@ -301,5 +307,156 @@ suite('Phase 11 costs and dashboard integration', () => {
         participationPercent: 100,
       }),
     ]);
+  });
+
+  it('recommends published unenrolled Trainings from the Learner history first', async () => {
+    const { trainer, learnerUser, training } = await setup();
+    await EnrollmentModel.create({
+      learnerId: learnerUser._id,
+      trainingId: training._id,
+      sessionId: null,
+      paymentId: new mongoose.Types.ObjectId(),
+    });
+    const related = await TrainingModel.create({
+      title: 'Related next step',
+      description: 'Related recommendation',
+      categoryId: training.categoryId,
+      level: 'Advanced',
+      durationMinutes: 120,
+      objectives: [],
+      prerequisites: [],
+      type: 'SELF_PACED_ONLINE',
+      priceMinor: 12_000,
+      currency: 'EUR',
+      ownerTrainerId: trainer._id,
+      status: 'PUBLISHED',
+    });
+    await TrainingModel.create({
+      title: 'Unrelated',
+      description: 'Cold-start fallback',
+      categoryId: (
+        await TrainingCategoryModel.create({
+          name: 'Other category',
+          normalizedName: 'other category',
+          isArchived: false,
+        })
+      )._id,
+      level: 'Base',
+      durationMinutes: 60,
+      objectives: [],
+      prerequisites: [],
+      type: 'SELF_PACED_ONLINE',
+      priceMinor: 8_000,
+      currency: 'EUR',
+      ownerTrainerId: trainer._id,
+      status: 'PUBLISHED',
+    });
+
+    const result = await dashboard.recommendations({
+      userId: String(learnerUser._id),
+      role: 'LEARNER',
+      mustChangePassword: false,
+    });
+
+    expect(result.recommendations[0]).toMatchObject({
+      id: String(related._id),
+      title: 'Related next step',
+    });
+    expect(result.recommendations.map((row) => row.id)).not.toContain(
+      String(training._id),
+    );
+    await expect(dashboard.recommendations(admin)).rejects.toMatchObject({
+      status: 403,
+    });
+  });
+
+  it('reports monthly self-paced completions and unfinished Learners inactive for 30 days', async () => {
+    const { learnerUser, training } = await setup();
+    const inactiveLearner = await UserModel.create({
+      email: 'inactive.p11@example.com',
+      passwordHash: 'unused',
+      role: 'LEARNER',
+      isActive: true,
+      mustChangePassword: false,
+      passwordChangedAt: new Date(),
+      profile: { firstName: 'Inactive' },
+    });
+    const trainingModule = await TrainingModuleModel.create({
+      trainingId: training._id,
+      title: 'Module',
+      description: '',
+      order: 1,
+      isArchived: false,
+    });
+    const lesson = await LessonModel.create({
+      trainingId: training._id,
+      moduleId: trainingModule._id,
+      title: 'Lesson',
+      description: '',
+      textContent: '',
+      instructions: '',
+      order: 1,
+      isArchived: false,
+    });
+    const [completedEnrollment, inactiveEnrollment] =
+      await EnrollmentModel.create([
+        {
+          learnerId: learnerUser._id,
+          trainingId: training._id,
+          sessionId: null,
+          paymentId: new mongoose.Types.ObjectId(),
+        },
+        {
+          learnerId: inactiveLearner._id,
+          trainingId: training._id,
+          sessionId: null,
+          paymentId: new mongoose.Types.ObjectId(),
+        },
+      ]);
+    if (!completedEnrollment || !inactiveEnrollment) {
+      throw new Error('Enrollment fixtures were not created.');
+    }
+    await EnrollmentModel.updateOne(
+      { _id: inactiveEnrollment._id },
+      { $set: { createdAt: new Date('2026-06-01T00:00:00.000Z') } },
+    );
+    await LessonProgressModel.create({
+      enrollmentId: completedEnrollment._id,
+      learnerId: learnerUser._id,
+      trainingId: training._id,
+      lessonId: lesson._id,
+      completed: true,
+      completedAt: new Date('2026-08-15T12:00:00.000Z'),
+    });
+    const intelligence = new DashboardService(
+      () => new Date('2026-08-30T12:00:00.000Z'),
+    );
+
+    const result = await intelligence.learningInsights(admin, {
+      from: '2026-08-01',
+      to: '2026-08-31',
+    });
+
+    expect(result.completionTrend).toEqual([
+      { month: '2026-08', completed: 1 },
+    ]);
+    expect(result.inactivity).toMatchObject({
+      thresholdDays: 30,
+      total: 1,
+      learners: [
+        expect.objectContaining({
+          learner: expect.objectContaining({
+            id: String(inactiveLearner._id),
+          }),
+          activeTrainingCount: 1,
+        }),
+      ],
+    });
+    await expect(
+      intelligence.learningInsights(learner, {
+        from: '2026-08-01',
+        to: '2026-08-31',
+      }),
+    ).rejects.toMatchObject({ status: 403 });
   });
 });

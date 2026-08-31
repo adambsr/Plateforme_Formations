@@ -44,6 +44,27 @@ export interface ProgressDashboard {
   };
 }
 
+export interface LearningInsights {
+  period: Period;
+  completionTrend: Array<{ month: string; completed: number }>;
+  inactivity: {
+    thresholdDays: number;
+    total: number;
+    learners: Array<{
+      learner: {
+        id: string;
+        email: string;
+        firstName?: string;
+        lastName?: string;
+      };
+      lastActivityAt: string;
+      inactiveDays: number;
+      activeTrainingCount: number;
+      trainingTitles: string[];
+    }>;
+  };
+}
+
 export interface Satisfaction {
   period: Period;
   global: {

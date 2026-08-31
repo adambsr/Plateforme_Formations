@@ -58,13 +58,19 @@ import {
   RequireRole,
 } from './routes/guards.js';
 import { ScrollToTop } from '../shared/components/ScrollToTop.js';
+import { BackToTop } from '../shared/components/BackToTop.js';
+import { DocumentTitle } from '../shared/components/DocumentTitle.js';
 import { AnalyticsPageTracker } from '../core/analytics/AnalyticsPageTracker.js';
+import { AnalyticsConsentBanner } from '../core/analytics/AnalyticsConsentBanner.js';
 
 export function App() {
   return (
     <>
       <ScrollToTop />
+      <DocumentTitle />
+      <BackToTop />
       <AnalyticsPageTracker />
+      <AnalyticsConsentBanner />
       <Routes>
         <Route element={<PublicLayout />}>
           <Route index element={<LandingPage />} />

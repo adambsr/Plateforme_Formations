@@ -5,6 +5,7 @@ import {
   useState,
   type FormEvent,
 } from 'react';
+import { CalendarRange } from 'lucide-react';
 
 import { ApiError } from '../../core/api/client.js';
 import { useAuth } from '../../core/auth/AuthContext.js';
@@ -14,6 +15,7 @@ import { Select } from '../../shared/components/Select.js';
 import type { PaginatedSessions } from '../sessions/types.js';
 import type { Training } from '../trainings/types.js';
 import type {
+  LearningInsights,
   Overview,
   Page,
   Participation,
@@ -42,6 +44,7 @@ type DashboardData = {
   progress: ProgressDashboard;
   satisfaction: Satisfaction;
   profitability: Profitability;
+  learningInsights: LearningInsights;
 };
 
 export function DashboardPage() {
@@ -85,6 +88,7 @@ export function DashboardPage() {
         request<ProgressDashboard>(`/dashboard/progress?${query}`),
         request<Satisfaction>(`/dashboard/satisfaction?${query}`),
         request<Profitability>(`/dashboard/profitability?${query}`),
+        request<LearningInsights>(`/dashboard/learning-insights?${query}`),
         request<PaginatedUsers>('/trainers?pageSize=100'),
         request<Page<Training>>('/trainings?view=MANAGED&pageSize=100'),
         request<PaginatedSessions>('/sessions?view=MANAGED&pageSize=100'),
@@ -101,16 +105,17 @@ export function DashboardPage() {
         progress: results[2],
         satisfaction: results[3],
         profitability: results[4],
+        learningInsights: results[5],
       });
       setOptions({
-        trainers: results[5].items,
-        trainings: results[6].items,
-        sessions: results[7].items,
+        trainers: results[6].items,
+        trainings: results[7].items,
+        sessions: results[8].items,
       });
-      setTrainerCosts(results[8].items);
-      setTrainingCosts(results[9].items);
-      setTrainerCostPage(results[8]);
-      setTrainingCostPage(results[9]);
+      setTrainerCosts(results[9].items);
+      setTrainingCosts(results[10].items);
+      setTrainerCostPage(results[9]);
+      setTrainingCostPage(results[10]);
     } catch (caught) {
       setError(message(caught));
     } finally {
@@ -127,9 +132,10 @@ export function DashboardPage() {
     event.preventDefault();
     setSaving(true);
     const form = new FormData(event.currentTarget);
+    const [year, month] = String(form.get('period')).split('-');
     try {
       await request(
-        `/costs/trainers/${form.get('trainerId')}/${form.get('year')}/${form.get('month')}`,
+        `/costs/trainers/${form.get('trainerId')}/${year}/${month}`,
         {
           method: 'PUT',
           body: JSON.stringify({
@@ -191,9 +197,10 @@ export function DashboardPage() {
           <h1>Tableau de bord</h1>
         </div>
       </div>
-      <div className="dashboard-range">
-        <label>
-          Du
+      <div className="dashboard-range" aria-label="Période d'analyse">
+        <span className="filter-icon"><CalendarRange aria-hidden="true" size={19} /></span>
+        <label className="date-field">
+          Début
           <input
             aria-label="Du"
             type="date"
@@ -204,8 +211,8 @@ export function DashboardPage() {
             required
           />
         </label>
-        <label>
-          Au
+        <label className="date-field">
+          Fin
           <input
             aria-label="Au"
             type="date"
@@ -224,7 +231,7 @@ export function DashboardPage() {
       {loading ? (
         <p className="muted">Calcul des indicateurs…</p>
       ) : data ? (
-        <DashboardResults data={data} />
+        <DashboardResults data={data} trainings={options.trainings} />
       ) : null}
       <div className="dashboard-management">
         <form
@@ -244,6 +251,15 @@ export function DashboardPage() {
                 </option>
               ))}
             </Select>
+          </label>
+          <label className="date-field">
+            Période
+            <input
+              name="period"
+              type="month"
+              defaultValue={`${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}`}
+              required
+            />
           </label>
           <div className="form-grid">
             <label>
@@ -435,7 +451,13 @@ export function DashboardPage() {
   );
 }
 
-function DashboardResults({ data }: { data: DashboardData }) {
+function DashboardResults({
+  data,
+  trainings,
+}: {
+  data: DashboardData;
+  trainings: Training[];
+}) {
   const overviewMetrics = {
     trainings: { label: 'Formations', icon: '▤' },
     sessions: { label: 'Sessions', icon: '◷' },
@@ -523,9 +545,63 @@ function DashboardResults({ data }: { data: DashboardData }) {
           <small>{percent(data.profitability.profitabilityPercent)}</small>
         </article>
       </div>
+      <LearningInsightCards data={data.learningInsights} />
       <DashboardCharts data={data} />
-      <TrainingResults rows={data.profitability.byTraining} />
+      <TrainingResults rows={data.profitability.byTraining} trainings={trainings} />
     </>
+  );
+}
+
+function LearningInsightCards({ data }: { data: LearningInsights }) {
+  const maximum = Math.max(
+    1,
+    ...data.completionTrend.map((point) => point.completed),
+  );
+  return (
+    <div className='learning-insight-grid'>
+      <figure className='content-card'>
+        <figcaption>Complétions self-paced par mois</figcaption>
+        {data.completionTrend.length === 0 ? (
+          <p className='muted'>Aucune compl\u00e9tion sur cette p\u00e9riode.</p>
+        ) : (
+          data.completionTrend.map((point) => (
+            <Bar
+              key={point.month}
+              label={point.month}
+              value={point.completed}
+              max={maximum}
+              shown={String(point.completed)}
+            />
+          ))
+        )}
+      </figure>
+      <article className='content-card inactive-learners-card'>
+        <h2>Apprenants devenus inactifs</h2>
+        <p>
+          <strong>{data.inactivity.total}</strong> apprenant(s) sans activit\u00e9
+          depuis au moins {data.inactivity.thresholdDays} jours.
+        </p>
+        {data.inactivity.learners.length === 0 ? (
+          <p className='muted'>Aucun apprenant \u00e0 relancer.</p>
+        ) : (
+          <ul>
+            {data.inactivity.learners.map((row) => (
+              <li key={row.learner.id}>
+                <span>
+                  <strong>
+                    {[row.learner.firstName, row.learner.lastName]
+                      .filter(Boolean)
+                      .join(' ') || row.learner.email}
+                  </strong>
+                  <small>{row.trainingTitles.join(', ')}</small>
+                </span>
+                <span className='status-pill'>{row.inactiveDays} jours</span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </article>
+    </div>
   );
 }
 
@@ -542,6 +618,7 @@ function DashboardCharts({ data }: { data: DashboardData }) {
   );
   return (
     <div className="chart-grid">
+      <SatisfactionDonut data={data.satisfaction.global} />
       <figure className="content-card">
         <figcaption>Revenus et coûts</figcaption>
         <Bar
@@ -646,7 +723,45 @@ function Bar({
   );
 }
 
-function TrainingResults({ rows }: { rows: Profitability['byTraining'] }) {
+function SatisfactionDonut({ data }: { data: Satisfaction['global'] }) {
+  const total = Math.max(1, data.count);
+  const positive = (data.distribution['4'] + data.distribution['5']) / total;
+  return (
+    <figure className="content-card satisfaction-donut">
+      <figcaption>Satisfaction positive</figcaption>
+      <div
+        className="donut"
+        style={{ '--positive': `${positive * 360}deg` } as React.CSSProperties}
+        role="img"
+        aria-label={`${Math.round(positive * 100)}% de notes quatre ou cinq étoiles`}
+      >
+        <strong>{data.count === 0 ? '—' : `${Math.round(positive * 100)}%`}</strong>
+        <span>4–5 étoiles</span>
+      </div>
+      <p className="muted">{data.count} avis sur la période</p>
+    </figure>
+  );
+}
+
+function TrainingResults({
+  rows,
+  trainings,
+}: {
+  rows: Profitability['byTraining'];
+  trainings: Training[];
+}) {
+  const [categoryId, setCategoryId] = useState('');
+  const [modality, setModality] = useState('');
+  const [visible, setVisible] = useState<Profitability['byTraining']>([]);
+  const details = new Map(trainings.map((training) => [training.id, training]));
+  const categories = Array.from(new Map(trainings.map((training) => [training.category.id, training.category])).values());
+  function applyFilters() {
+    setVisible(rows.filter((row) => {
+      const training = details.get(row.training.id);
+      return (categoryId === '' || training?.category.id === categoryId) &&
+        (modality === '' || training?.type === modality);
+    }));
+  }
   if (rows.length === 0)
     return (
       <div className="empty-state">
@@ -654,9 +769,25 @@ function TrainingResults({ rows }: { rows: Profitability['byTraining'] }) {
       </div>
     );
   return (
-    <div className="content-card dashboard-table">
+    <div className="content-card dashboard-table training-results-card">
+      <div className="result-filters">
+        <label>Catégorie
+          <Select value={categoryId} onChange={(event) => setCategoryId(event.target.value)}>
+            <option value="">Toutes</option>
+            {categories.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}
+          </Select>
+        </label>
+        <label>Modalité
+          <Select value={modality} onChange={(event) => setModality(event.target.value)}>
+            <option value="">Toutes</option>
+            <option value="SELF_PACED_ONLINE">En ligne</option>
+            <option value="IN_PERSON">Présentiel</option>
+          </Select>
+        </label>
+        <button className="secondary-button compact-button" type="button" onClick={applyFilters}>Appliquer</button>
+      </div>
       <h2>Résultat avant coûts fixes des formateurs</h2>
-      {rows.map((row) => (
+      {visible.map((row) => (
         <div key={row.training.id}>
           <span>{row.training.title}</span>
           <strong>{money(row.resultBeforeFixedTrainerCostsMinor)}</strong>

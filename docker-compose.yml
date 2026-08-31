@@ -89,6 +89,7 @@ services:
       CENTER_NAME: High Skills Academy
       CENTER_ADDRESS: Adresse du centre
       CENTER_EMAIL: contact@example.com
+      CENTER_LOGO_PATH: /app/Web/backend/assets/hsa-logo-blue.png
     ports:
       - '127.0.0.1:3000:3000'
     volumes:

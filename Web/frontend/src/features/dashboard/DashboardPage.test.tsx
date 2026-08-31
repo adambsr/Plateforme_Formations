@@ -63,6 +63,28 @@ beforeEach(() => {
         },
         byTraining: [],
       });
+    if (path.startsWith('/dashboard/learning-insights'))
+      return Promise.resolve({
+        period,
+        completionTrend: [{ month: '2026-08', completed: 2 }],
+        inactivity: {
+          thresholdDays: 30,
+          total: 1,
+          learners: [
+            {
+              learner: {
+                id: 'learner-1',
+                email: 'learner@example.com',
+                firstName: 'Amina',
+              },
+              lastActivityAt: '2026-06-01T00:00:00.000Z',
+              inactiveDays: 60,
+              activeTrainingCount: 1,
+              trainingTitles: ['TypeScript'],
+            },
+          ],
+        },
+      });
     if (path.startsWith('/dashboard/profitability'))
       return Promise.resolve({
         period,
@@ -102,6 +124,7 @@ describe('Phase 11 Admin dashboard UI', () => {
     expect(
       screen.getByRole('heading', { name: 'Nouvelle dépense formation' }),
     ).toBeVisible();
+    expect(screen.getByText('Amina')).toBeVisible();
   });
 
   it('shows a backend loading failure', async () => {

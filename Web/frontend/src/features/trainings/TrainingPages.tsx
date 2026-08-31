@@ -1,4 +1,11 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import {
+  type MouseEventHandler,
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+} from 'react';
+import { ImageOff } from 'lucide-react';
 import { useForm } from 'react-hook-form';
 import { Link, useParams } from 'react-router';
 
@@ -51,20 +58,27 @@ function statusLabel(status: Training['status']): string {
   }[status];
 }
 
-function TrainingImage({ training }: { training: Training }) {
-  return training.thumbnailUrl === undefined ? (
+function TrainingImage({
+  training,
+}: {
+  training: Pick<Training, 'title' | 'thumbnailUrl'>;
+}) {
+  const [unavailable, setUnavailable] = useState(false);
+  return training.thumbnailUrl === undefined || unavailable ? (
     <div
       className="training-thumbnail training-thumbnail-fallback"
       role="img"
       aria-label="Aucune miniature disponible"
     >
-      <span aria-hidden="true">HSA</span>
+      <ImageOff aria-hidden="true" size={27} strokeWidth={1.7} />
+      <span>Image unavailable</span>
     </div>
   ) : (
     <img
       className="training-thumbnail"
       src={apiAssetUrl(training.thumbnailUrl)}
       alt={`Miniature de la formation ${training.title}`}
+      onError={() => setUnavailable(true)}
     />
   );
 }
@@ -88,9 +102,22 @@ function parseEurMinor(value: string): number | undefined {
 export function TrainingCard({
   training,
   headingLevel = 2,
+  onClick,
 }: {
-  training: Training;
+  training: Pick<
+    Training,
+    | 'id'
+    | 'title'
+    | 'description'
+    | 'category'
+    | 'type'
+    | 'level'
+    | 'durationMinutes'
+    | 'priceMinor'
+    | 'thumbnailUrl'
+  >;
   headingLevel?: 2 | 3;
+  onClick?: MouseEventHandler<HTMLAnchorElement>;
 }) {
   const Heading = headingLevel === 3 ? 'h3' : 'h2';
   return (
@@ -98,6 +125,7 @@ export function TrainingCard({
       className="training-card-link"
       to={`/trainings/${training.id}`}
       aria-label={`Voir la formation ${training.title}`}
+      onClick={onClick}
     >
       <article className="training-card">
         <TrainingImage training={training} />

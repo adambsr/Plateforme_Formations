@@ -363,7 +363,7 @@ export async function seedDevelopmentData(environment = process.env) {
           enrolledCount: occurrence === 0 ? 3 : 2,
           assignedTrainerIds: [trainerIds[(index + 2) % trainerIds.length]],
           location: 'Centre de formation Tunis',
-          address: '12 avenue Habib-Bourguiba, Tunis',
+          address: 'Route Manzel Chaker km 2.5 en face Magasin Général (MG) , Sfax, Tunisia',
           room: `Salle ${index + 1}`,
           additionalInformation: 'Accueil quinze minutes avant le début.',
           status:
@@ -401,7 +401,7 @@ export async function seedDevelopmentData(environment = process.env) {
             lessonId: lessonIds[trainingIndex * 4 + slot * 2],
             trainerIds: [trainerIds[(trainingIndex + 2) % trainerIds.length]],
             location: 'Centre de formation Tunis',
-            address: '12 avenue Habib-Bourguiba, Tunis',
+            address: 'Route Manzel Chaker km 2.5 en face Magasin Général (MG) , Sfax, Tunisia',
             room: `Salle ${Math.floor(sessionIndex / 2) + 1}`,
             normalizedLocationRoom: `centre de formation tunis|salle ${Math.floor(sessionIndex / 2) + 1}`,
           };
@@ -603,8 +603,8 @@ export async function seedDevelopmentData(environment = process.env) {
     const invoiceIds = paidPurchases.map((_, index) => objectId(13, index + 1));
     const issuer = {
       name: 'High Skills Academy — Démonstration',
-      address: '12 avenue Habib-Bourguiba, Tunis',
-      email: 'contact@formation.test',
+      address: 'Route Manzel Chaker km 2.5 en face Magasin Général (MG) , Sfax, Tunisia',
+      email: 'highskills.ac@gmail.com',
       phone: '+216 70 000 000',
       registrationId: 'DEV-DEMO-001',
     };

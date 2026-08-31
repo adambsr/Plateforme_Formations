@@ -1,4 +1,4 @@
-import { Types } from 'mongoose';
+import { Types, type PipelineStage } from 'mongoose';
 
 import type { AuthenticatedPrincipal } from '../../../shared/auth/principal.js';
 import { AppError } from '../../../shared/errors/app-error.js';
@@ -37,6 +37,25 @@ function requireAdmin(principal: AuthenticatedPrincipal): void {
   }
 }
 
+function requireLearner(principal: AuthenticatedPrincipal): void {
+  if (principal.mustChangePassword) {
+    throw new AppError(
+      403,
+      'PASSWORD_CHANGE_REQUIRED',
+      'The temporary password must be changed before continuing.',
+    );
+  }
+  if (principal.role !== 'LEARNER') {
+    throw new AppError(
+      403,
+      'LEARNER_RECOMMENDATIONS_REQUIRED',
+      'Only a Learner can view personal Training recommendations.',
+    );
+  }
+}
+
+const INACTIVITY_DAYS = 30;
+
 function period(range: TunisDateRange) {
   return {
     from: range.from,
@@ -56,6 +75,345 @@ function distribution() {
 }
 
 export class DashboardService {
+  private readonly now: () => Date;
+
+  constructor(now: () => Date = () => new Date()) {
+    this.now = now;
+  }
+
+  async recommendations(principal: AuthenticatedPrincipal) {
+    requireLearner(principal);
+    const learnerId = new Types.ObjectId(principal.userId);
+    const enrolledTrainingIds = await EnrollmentModel.distinct('trainingId', {
+      learnerId,
+    });
+    const categoryRows = await EnrollmentModel.aggregate<{
+      categoryId: string;
+      count: number;
+      latestTrainingTitle: string;
+    }>([
+      { $match: { learnerId } },
+      {
+        $lookup: {
+          from: TrainingModel.collection.name,
+          localField: 'trainingId',
+          foreignField: '_id',
+          as: 'training',
+        },
+      },
+      { $unwind: '$training' },
+      { $sort: { createdAt: -1 } },
+      {
+        $group: {
+          _id: '$training.categoryId',
+          count: { $sum: 1 },
+          latestTrainingTitle: { $first: '$training.title' },
+        },
+      },
+      {
+        $project: {
+          _id: 0,
+          categoryId: { $toString: '$_id' },
+          count: 1,
+          latestTrainingTitle: 1,
+        },
+      },
+    ]);
+    const categoryHistory = new Map(
+      categoryRows.map((value) => [value.categoryId, value]),
+    );
+    const candidates = await TrainingModel.aggregate<{
+      id: string;
+      title: string;
+      description: string;
+      type: 'SELF_PACED_ONLINE' | 'IN_PERSON';
+      level: string;
+      durationMinutes: number;
+      priceMinor: number;
+      currency: 'EUR';
+      categoryId: string;
+      categoryName: string;
+      thumbnailUrl?: string;
+      enrollmentCount: number;
+      createdAt: Date;
+    }>([
+      {
+        $match: {
+          status: 'PUBLISHED',
+          _id: { $nin: enrolledTrainingIds },
+        },
+      },
+      {
+        $lookup: {
+          from: 'training_categories',
+          localField: 'categoryId',
+          foreignField: '_id',
+          as: 'category',
+        },
+      },
+      {
+        $lookup: {
+          from: EnrollmentModel.collection.name,
+          localField: '_id',
+          foreignField: 'trainingId',
+          as: 'enrollments',
+        },
+      },
+      {
+        $project: {
+          _id: 0,
+          id: { $toString: '$_id' },
+          title: 1,
+          description: 1,
+          type: 1,
+          level: 1,
+          durationMinutes: 1,
+          priceMinor: 1,
+          currency: 1,
+          categoryId: { $toString: '$categoryId' },
+          categoryName: {
+            $ifNull: [{ $arrayElemAt: ['$category.name', 0] }, 'Formation'],
+          },
+          thumbnailUrl: 1,
+          enrollmentCount: { $size: '$enrollments' },
+          createdAt: 1,
+        },
+      },
+    ]);
+    const recommendations = candidates
+      .map((candidate) => {
+        const match = categoryHistory.get(candidate.categoryId);
+        return {
+          ...candidate,
+          score: (match?.count ?? 0) * 100 + candidate.enrollmentCount,
+          reason:
+            match === undefined
+              ? candidate.enrollmentCount > 0
+                ? 'Populaire aupr\és des apprenants de la plateforme.'
+                : 'Une nouvelle formation \u00e0 d\écouvrir.'
+              : `Dans la continuit\é de \u00ab ${match.latestTrainingTitle} \u00bb.`,
+        };
+      })
+      .sort(
+        (left, right) =>
+          right.score - left.score ||
+          right.createdAt.getTime() - left.createdAt.getTime(),
+      )
+      .slice(0, 3)
+      .map(({ createdAt: _createdAt, ...value }) =>
+        value,
+      );
+    return {
+      strategy: 'HISTORY_AND_POPULARITY' as const,
+      recommendations,
+    };
+  }
+
+  async learningInsights(
+    principal: AuthenticatedPrincipal,
+    input: DashboardRangeInput,
+  ) {
+    requireAdmin(principal);
+    const range = tunisDateRange(input.from, input.to);
+    const now = this.now();
+    const inactiveBefore = new Date(
+      now.getTime() - INACTIVITY_DAYS * 24 * 60 * 60 * 1000,
+    );
+    const baseSelfPacedPipeline: PipelineStage[] = [
+      { $match: { sessionId: null } },
+      {
+        $lookup: {
+          from: TrainingModel.collection.name,
+          localField: 'trainingId',
+          foreignField: '_id',
+          as: 'training',
+        },
+      },
+      { $unwind: '$training' },
+      { $match: { 'training.type': 'SELF_PACED_ONLINE' } },
+      {
+        $lookup: {
+          from: 'training_modules',
+          let: { trainingId: '$trainingId' },
+          pipeline: [
+            {
+              $match: {
+                $expr: { $eq: ['$trainingId', '$$trainingId'] },
+                isArchived: false,
+              },
+            },
+            { $project: { _id: 1 } },
+          ],
+          as: 'modules',
+        },
+      },
+      {
+        $lookup: {
+          from: 'lessons',
+          let: { trainingId: '$trainingId', moduleIds: '$modules._id' },
+          pipeline: [
+            {
+              $match: {
+                $expr: {
+                  $and: [
+                    { $eq: ['$trainingId', '$$trainingId'] },
+                    { $in: ['$moduleId', '$$moduleIds'] },
+                  ],
+                },
+                isArchived: false,
+              },
+            },
+            { $project: { _id: 1 } },
+          ],
+          as: 'lessons',
+        },
+      },
+      {
+        $lookup: {
+          from: LessonProgressModel.collection.name,
+          let: { enrollmentId: '$_id', lessonIds: '$lessons._id' },
+          pipeline: [
+            {
+              $match: {
+                $expr: {
+                  $and: [
+                    { $eq: ['$enrollmentId', '$$enrollmentId'] },
+                    { $in: ['$lessonId', '$$lessonIds'] },
+                  ],
+                },
+              },
+            },
+          ],
+          as: 'progressEntries',
+        },
+      },
+      {
+        $set: {
+          completedEntries: {
+            $filter: {
+              input: '$progressEntries',
+              as: 'entry',
+              cond: { $eq: ['$$entry.completed', true] },
+            },
+          },
+        },
+      },
+      {
+        $set: {
+          totalLessons: { $size: '$lessons' },
+          completedLessons: { $size: '$completedEntries' },
+          completionAt: { $max: '$completedEntries.completedAt' },
+          lastActivityAt: {
+            $max: {
+              $concatArrays: [['$createdAt'], '$progressEntries.updatedAt'],
+            },
+          },
+        },
+      },
+    ];
+    const [completionTrend, inactiveLearners] = await Promise.all([
+      EnrollmentModel.aggregate<{ month: string; completed: number }>([
+        ...baseSelfPacedPipeline,
+        {
+          $match: {
+            totalLessons: { $gt: 0 },
+            $expr: { $eq: ['$completedLessons', '$totalLessons'] },
+            completionAt: { $gte: range.startAt, $lt: range.endAtExclusive },
+          },
+        },
+        {
+          $group: {
+            _id: {
+              $dateToString: {
+                date: '$completionAt',
+                format: '%Y-%m',
+                timezone: 'Africa/Tunis',
+              },
+            },
+            completed: { $sum: 1 },
+          },
+        },
+        { $project: { _id: 0, month: '$_id', completed: 1 } },
+        { $sort: { month: 1 } },
+      ]),
+      EnrollmentModel.aggregate<{
+        learner: {
+          id: string;
+          email: string;
+          firstName?: string;
+          lastName?: string;
+        };
+        lastActivityAt: Date;
+        inactiveDays: number;
+        activeTrainingCount: number;
+        trainingTitles: string[];
+        total: number;
+      }>([
+        ...baseSelfPacedPipeline,
+        {
+          $match: {
+            totalLessons: { $gt: 0 },
+            $expr: { $lt: ['$completedLessons', '$totalLessons'] },
+            lastActivityAt: { $lt: inactiveBefore },
+          },
+        },
+        {
+          $group: {
+            _id: '$learnerId',
+            lastActivityAt: { $max: '$lastActivityAt' },
+            activeTrainingCount: { $sum: 1 },
+            trainingTitles: { $addToSet: '$training.title' },
+          },
+        },
+        {
+          $lookup: {
+            from: UserModel.collection.name,
+            localField: '_id',
+            foreignField: '_id',
+            as: 'learner',
+          },
+        },
+        { $unwind: '$learner' },
+        { $match: { 'learner.isActive': true, 'learner.role': 'LEARNER' } },
+        { $setWindowFields: { output: { total: { $count: {} } } } },
+        {
+          $project: {
+            _id: 0,
+            learner: {
+              id: { $toString: '$learner._id' },
+              email: '$learner.email',
+              firstName: '$learner.profile.firstName',
+              lastName: '$learner.profile.lastName',
+            },
+            lastActivityAt: 1,
+            inactiveDays: {
+              $floor: {
+                $divide: [
+                  { $subtract: [now, '$lastActivityAt'] },
+                  24 * 60 * 60 * 1000,
+                ],
+              },
+            },
+            activeTrainingCount: 1,
+            trainingTitles: { $slice: ['$trainingTitles', 3] },
+            total: 1,
+          },
+        },
+        { $sort: { inactiveDays: -1, 'learner.email': 1 } },
+        { $limit: 5 },
+      ]),
+    ]);
+    return {
+      period: period(range),
+      completionTrend,
+      inactivity: {
+        thresholdDays: INACTIVITY_DAYS,
+        total: inactiveLearners[0]?.total ?? 0,
+        learners: inactiveLearners.map(({ total: _total, ...row }) => row),
+      },
+    };
+  }
+
   async overview(
     principal: AuthenticatedPrincipal,
     input: DashboardRangeInput,

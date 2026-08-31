@@ -1102,6 +1102,8 @@ Deliver:
 
 - monthly TrainerCost and explicit TrainingCost management;
 - operational, learning, participation, satisfaction, and financial aggregations;
+- explainable Learner Training recommendations based on enrollment-category history, popularity, and recency;
+- monthly self-paced completion trends and a 30-day unfinished-learning inactivity signal;
 - correct zero-revenue behavior and month/date boundaries;
 - Admin dashboard and profitability views.
 
@@ -1168,4 +1170,3 @@ These are implementation constraints, not unresolved product decisions:
 | Timezone mistakes can corrupt schedule/conflict/financial boundaries | Centralize `Africa/Tunis` conversion and test DST/calendar boundaries even though timestamps are stored in UTC |
 
 No remaining ambiguity blocks Phase 0 or the implementation order above. Provider/library choices that do not change behavior, such as the concrete AI SDK, PDF package, or React Native toolchain, are implementation selections to make at the phase boundary and record in technical documentation.
-

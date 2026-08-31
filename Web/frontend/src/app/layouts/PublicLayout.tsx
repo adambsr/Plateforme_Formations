@@ -3,9 +3,11 @@ import { Link, NavLink, Outlet } from 'react-router';
 import menuIcon from 'lucide-static/icons/menu.svg';
 import xIcon from 'lucide-static/icons/x.svg';
 
+import blueLogo from '../../assets/hsa-logo-blue.png';
+import footerLogo from '../../assets/hsa-logo-footer.png';
+
 import { useAuth } from '../../core/auth/AuthContext.js';
 import { UserMenu } from '../../shared/components/UserMenu.js';
-import { Brand } from '../../shared/components/Brand.js';
 import { Icon } from '../../shared/components/Icon.js';
 
 export function PublicLayout() {
@@ -14,7 +16,14 @@ export function PublicLayout() {
   return (
     <div className="public-shell">
       <header className="site-header">
-        <Brand onClick={() => setOpen(false)} />
+        <Link
+          className="site-logo"
+          to="/"
+          aria-label="Accueil High Skills Academy"
+          onClick={() => setOpen(false)}
+        >
+          <img src={blueLogo} alt="High Skills Academy" />
+        </Link>
         <button
           className="site-menu-button"
           type="button"
@@ -62,8 +71,18 @@ export function PublicLayout() {
         <Outlet />
       </main>
       <footer className="site-footer">
-        <div className="footer-brand-column">
-          <Brand className="footer-brand" />
+        <div className="footer-about-column">
+          <Link
+            className="footer-logo-link"
+            to="/"
+            aria-label="Accueil High Skills Academy"
+          >
+            <img
+              className="footer-logo"
+              src={footerLogo}
+              alt="High Skills Academy"
+            />
+          </Link>
           <p>
             Des formations professionnelles en ligne et en présentiel pour
             transformer durablement vos compétences.
@@ -81,7 +100,7 @@ export function PublicLayout() {
           <h2>Nous contacter</h2>
           <nav aria-label="Contact et informations légales">
             <Link to="/contact">Contact</Link>
-            <a href="mailto:contact@formation.test">contact@formation.test</a>
+            <a href="mailto:highskills.ac@gmail.com">highskills.ac@gmail.com</a>
             <Link to="/about">Mentions légales</Link>
           </nav>
         </div>

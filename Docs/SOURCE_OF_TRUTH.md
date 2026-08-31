@@ -741,7 +741,8 @@ Le Feedback respecte les règles suivantes :
 - le backend recalcule l'éligibilité avant d'accepter le Feedback ;
 - le Feedback devient immuable après sa création ;
 - aucun commentaire textuel n'est prévu ;
-- aucun affichage public, système de modération ou moteur de recommandation n'est prévu.
+- aucun affichage public ou système de modération des Feedbacks n'est prévu ;
+- les notes individuelles de Feedback ne sont pas utilisées par le moteur de recommandation et ne sont jamais exposées aux Apprenants.
 
 Le dashboard Admin utilise les Feedbacks pour présenter au minimum le nombre de notes, la moyenne et la distribution des notes de 1 à 5, globalement et par Formation.
 
@@ -1077,6 +1078,8 @@ Le dashboard Admin doit fournir des indicateurs tels que :
 - inscriptions ;
 - taux de participation ;
 - progression des formations en ligne ;
+- tendance mensuelle des complétions self-paced ;
+- Apprenants ayant une formation self-paced non terminée et aucune activité pédagogique depuis au moins 30 jours ;
 - résultats/satisfaction ;
 - revenus ;
 - coûts ;
@@ -1086,6 +1089,18 @@ Le dashboard Admin doit fournir des indicateurs tels que :
 Les indicateurs financiers doivent être calculés uniquement à partir des données enregistrées.
 
 Il ne faut jamais inventer de revenus ou de coûts.
+
+Le dashboard Apprenant présente au maximum trois Formations publiées auxquelles l'Apprenant n'est pas déjà inscrit. La première version du classement est explicable et déterministe : continuité avec les catégories de l'historique d'inscription, puis popularité par nombre d'inscriptions et récence. Chaque recommandation affiche sa raison. Les règles d'accès, de paiement, de prérequis et d'inscription restent entièrement validées par le backend.
+
+L'inactivité du dashboard Admin désigne uniquement l'absence d'activité pédagogique sur une inscription self-paced non terminée. La dernière activité correspond à la date la plus récente entre l'inscription et la mise à jour d'une progression de lesson. Elle ne représente pas la dernière connexion globale de l'utilisateur.
+
+---
+
+Les mesures facultatives de recommandations peuvent être envoyées à Firebase Analytics uniquement après consentement explicite dans le navigateur et lorsque la configuration de déploiement active ce service. Elles se limitent à l'identifiant technique de la Formation, sa catégorie et son rang de recommandation. Elles n'incluent jamais l'email, le nom, l'identifiant de l'Apprenant, le montant d'un paiement, les réponses ou résultats d'Évaluation. Une conversion de recommandation est mesurée seulement lorsque le backend a confirmé le paiement et créé l'inscription.
+
+---
+
+Les mesures facultatives de recommandations peuvent être envoyées à Firebase Analytics uniquement après consentement explicite dans le navigateur et lorsque la configuration de déploiement active ce service. Elles se limitent à l'identifiant technique de la Formation, sa catégorie et son rang de recommandation. Elles n'incluent jamais l'email, le nom, l'identifiant de l'Apprenant, le montant d'un paiement, les réponses ou résultats d'Évaluation. Une conversion de recommandation est mesurée seulement lorsque le backend a confirmé le paiement et créé l'inscription.
 
 ---
 

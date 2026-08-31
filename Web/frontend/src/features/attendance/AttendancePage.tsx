@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react';
+import { CalendarCheck2, SlidersHorizontal } from 'lucide-react';
 
 import { ApiError } from '../../core/api/client.js';
 import { useAuth } from '../../core/auth/AuthContext.js';
@@ -162,20 +163,22 @@ export function AttendancePage() {
         </div>
       ) : (
         <>
-          <div className="attendance-session-tabs">
-            {sessions?.items.map((session) => (
-              <button
-                key={session.id}
-                className={
-                  selected?.session.id === session.id
-                    ? 'primary-button compact-button'
-                    : 'secondary-button compact-button'
-                }
-                onClick={() => void loadDetail(session.id)}
-              >
-                {session.title}
-              </button>
-            ))}
+          <div className="attendance-filter content-card">
+            <div>
+              <span className="filter-icon"><SlidersHorizontal aria-hidden="true" size={18} /></span>
+              <label htmlFor="attendance-session">Session à consulter</label>
+            </div>
+            <Select
+              id="attendance-session"
+              value={selected?.session.id ?? ''}
+              onChange={(event) => void loadDetail(event.target.value)}
+            >
+              {sessions?.items.map((session) => (
+                <option key={session.id} value={session.id}>
+                  {session.training.title} · {session.title}
+                </option>
+              ))}
+            </Select>
           </div>
           {sessions !== null && (
             <Pagination
@@ -197,7 +200,7 @@ export function AttendancePage() {
                   >
                     {sessionStatusLabel(selected.session.status)}
                   </span>
-                  <h2>{selected.session.training.title}</h2>
+                  <h2><CalendarCheck2 aria-hidden="true" size={20} /> {selected.session.training.title}</h2>
                   <p>{selected.session.title}</p>
                 </div>
                 <strong>

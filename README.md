@@ -582,8 +582,11 @@ provider values must remain backend-only.
 ## Firebase Analytics (Web)
 
 The Web client has an optional Firebase Analytics integration. It is disabled by
-default, makes no backend/API changes, and tracks client-side route page views only
-when all Firebase values below are provided and `VITE_FIREBASE_ANALYTICS_ENABLED=true`.
+default, makes no backend/API changes, and tracks consented client-side route page
+views plus privacy-safe recommendation impressions, clicks, and backend-confirmed
+recommendation enrollments when all Firebase values below are provided and
+`VITE_FIREBASE_ANALYTICS_ENABLED=true`. The recommendation event model and reporting
+setup are documented in [`Docs/AI_RECOMMENDATIONS_PHASE1.md`](Docs/AI_RECOMMENDATIONS_PHASE1.md).
 
 Create one Firebase project for the platform and register the Web client as a Web
 app. Enable Google Analytics for the Firebase project, then copy the Web app

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { Link } from 'react-router';
+import { CalendarClock, Mail, MapPin, Send } from 'lucide-react';
 import badgeCheckIcon from 'lucide-static/icons/badge-check.svg';
 import bookOpenCheckIcon from 'lucide-static/icons/book-open-check.svg';
 import brainCircuitIcon from 'lucide-static/icons/brain-circuit.svg';
@@ -12,6 +13,7 @@ import paletteIcon from 'lucide-static/icons/palette.svg';
 
 import academyHero from '../../assets/academy-hero.png';
 import { apiRequest } from '../../core/api/client.js';
+import { useAuth } from '../../core/auth/AuthContext.js';
 import { Icon } from '../../shared/components/Icon.js';
 import { TrainingCard } from '../trainings/TrainingPages.js';
 import type {
@@ -20,6 +22,7 @@ import type {
 } from '../trainings/types.js';
 
 export function LandingPage() {
+  const { user } = useAuth();
   const [preview, setPreview] = useState<PaginatedTrainings>();
   const [categories, setCategories] = useState<TrainingCategory[]>([]);
   useEffect(() => {
@@ -63,9 +66,11 @@ export function LandingPage() {
             <Link className="primary-button" to="/catalogue">
               Explorer les formations
             </Link>
-            <Link className="secondary-button" to="/register">
-              Créer mon compte
-            </Link>
+            {user === null ? (
+              <Link className="secondary-button" to="/register">
+                Créer mon compte
+              </Link>
+            ) : null}
           </div>
           <dl className="hero-proof">
             <div>
@@ -91,7 +96,7 @@ export function LandingPage() {
             <strong>Apprendre ensemble</strong>
             <span>Des parcours concrets, en ligne et en présentiel.</span>
           </figcaption>
-          <div className="hero-card hero-card-one">
+          {/* <div className="hero-card hero-card-one">
             <Icon src={bookOpenCheckIcon} size={22} />
             <strong>À votre rythme</strong>
             <span>Progression claire</span>
@@ -100,15 +105,17 @@ export function LandingPage() {
             <Icon src={calendarClockIcon} size={22} />
             <strong>Planning maîtrisé</strong>
             <span>Sessions en présentiel</span>
-          </div>
+          </div> */}
         </figure>
       </section>
       <section className="landing-section">
         <div className="section-copy">
-          <span className="eyebrow">Une expérience complète</span>
-          <h2>
-            Tout ce qu’il faut pour transformer une inscription en compétences.
-          </h2>
+          <div>
+            <span className="eyebrow">Une expérience complète</span>
+            <h2>
+              Tout ce qu’il faut pour transformer une inscription en compétences.
+            </h2>
+          </div>
         </div>
         <div className="feature-grid">
           <article>
@@ -211,12 +218,14 @@ export function LandingPage() {
       </section>
       <section className="landing-section testimonial-section">
         <div className="section-copy">
-          <span className="eyebrow">Retours de démonstration</span>
-          <h2>Une expérience pensée pour rester simple.</h2>
-          <p className="muted">
-            Témoignages fictifs affichés uniquement pour illustrer la version de
-            développement.
-          </p>
+          <div>
+            <span className="eyebrow">Retours de démonstration</span>
+            <h2>Une expérience pensée pour rester simple.</h2>
+            <p className="muted">
+              Témoignages fictifs affichés uniquement pour illustrer la version de
+              développement.
+            </p>
+          </div>
         </div>
         <div className="testimonial-grid">
           {[
@@ -279,9 +288,11 @@ export function LandingPage() {
             paiements, évaluations et certificats.
           </p>
         </div>
-        <Link className="primary-button" to="/register">
-          Créer mon compte
-        </Link>
+        {user === null ? (
+          <Link className="primary-button" to="/register">
+            Créer mon compte
+          </Link>
+        ) : null}
       </section>
     </>
   );
@@ -342,16 +353,26 @@ const questions = [
   ],
 ] as const;
 export function FaqPage() {
+  const [openQuestion, setOpenQuestion] = useState<string | null>(questions[0][0]);
   return (
-    <section className="static-page">
+    <section className="static-page faq-page">
       <span className="eyebrow">Questions fréquentes</span>
       <h1>Les réponses avant de commencer.</h1>
       <div className="faq-list">
         {questions.map(([question, answer]) => (
-          <details key={question}>
-            <summary>{question}</summary>
-            <p>{answer}</p>
-          </details>
+          <article
+            className={openQuestion === question ? 'faq-item is-open' : 'faq-item'}
+            key={question}
+          >
+            <button
+              type="button"
+              aria-expanded={openQuestion === question}
+              onClick={() => setOpenQuestion((current) => current === question ? null : question)}
+            >
+              {question}
+            </button>
+            <div className="faq-answer"><p>{answer}</p></div>
+          </article>
         ))}
       </div>
       <div className="inline-cta">
@@ -373,8 +394,8 @@ export function ContactPage() {
     message: string;
   }>();
   const address =
-    import.meta.env.VITE_CENTER_ADDRESS ?? '12 avenue Habib-Bourguiba, Tunis';
-  const email = import.meta.env.VITE_CENTER_EMAIL ?? 'contact@formation.test';
+    import.meta.env.VITE_CENTER_ADDRESS ?? 'Route Manzel Chaker km 2.5 en face Magasin Général (MG) , Sfax, Tunisia';
+  const email = import.meta.env.VITE_CENTER_EMAIL ?? 'highskills.ac@gmail.com';
   const phone = import.meta.env.VITE_CENTER_PHONE ?? '+216 70 000 000';
   const hours =
     import.meta.env.VITE_CENTER_HOURS ?? 'Lundi–vendredi, 8 h 30–17 h 30';
@@ -390,11 +411,11 @@ export function ContactPage() {
         </p>
         <dl className="contact-details">
           <div>
-            <dt>Adresse</dt>
+            <dt><MapPin aria-hidden="true" size={16} /> Adresse</dt>
             <dd>{address}</dd>
           </div>
           <div>
-            <dt>Email</dt>
+            <dt><Mail aria-hidden="true" size={16} /> Email</dt>
             <dd>
               <a href={`mailto:${email}`}>{email}</a>
             </dd>
@@ -406,7 +427,7 @@ export function ContactPage() {
             </dd>
           </div>
           <div>
-            <dt>Horaires</dt>
+            <dt><CalendarClock aria-hidden="true" size={16} /> Horaires</dt>
             <dd>{hours}</dd>
           </div>
         </dl>
@@ -472,6 +493,7 @@ export function ContactPage() {
           className="primary-button"
           disabled={form.formState.isSubmitting}
         >
+          <Send aria-hidden="true" size={17} />
           {form.formState.isSubmitting ? 'Envoi…' : 'Envoyer le message'}
         </button>
       </form>

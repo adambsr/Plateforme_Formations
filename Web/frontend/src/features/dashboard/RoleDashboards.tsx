@@ -2,8 +2,13 @@ import { useCallback, useEffect, useState } from 'react';
 import { Link, Navigate } from 'react-router';
 
 import { ApiError } from '../../core/api/client.js';
+import {
+  trackRecommendationClick,
+  trackRecommendationImpressions,
+} from '../../core/analytics/recommendation-analytics.js';
 import { useAuth } from '../../core/auth/AuthContext.js';
 import { roleHomePath } from '../../app/routes/destinations.js';
+import { TrainingCard } from '../trainings/TrainingPages.js';
 
 interface Page<T> {
   items: T[];
@@ -20,6 +25,25 @@ interface Progress {
   percentage: number;
   isComplete: boolean;
 }
+interface Recommendation {
+  id: string;
+  title: string;
+  description: string;
+  type: 'SELF_PACED_ONLINE' | 'IN_PERSON';
+  level: string;
+  durationMinutes: number;
+  priceMinor: number;
+  currency: 'EUR';
+  categoryId: string;
+  categoryName: string;
+  thumbnailUrl?: string;
+  reason: string;
+}
+interface Recommendations {
+  strategy: 'HISTORY_AND_POPULARITY';
+  recommendations: Recommendation[];
+}
+
 
 const message = (error: unknown) =>
   error instanceof ApiError
@@ -109,18 +133,21 @@ export function LearnerDashboard() {
     sessions: Page<Named>;
     payments: Page<Named>;
     certificates: Page<Named>;
+    recommendations: Recommendations;
   }>();
   const [error, setError] = useState('');
   const load = useCallback(async () => {
     setError('');
     try {
-      const [progress, sessions, payments, certificates] = await Promise.all([
-        request<Page<Progress>>('/progress?page=1&pageSize=5'),
-        request<Page<Named>>('/sessions?view=ENROLLED&page=1&pageSize=5'),
-        request<Page<Named>>('/payments?page=1&pageSize=5'),
-        request<Page<Named>>('/certificates?page=1&pageSize=5'),
-      ]);
-      setData({ progress, sessions, payments, certificates });
+      const [progress, sessions, payments, certificates, recommendations] =
+        await Promise.all([
+          request<Page<Progress>>('/progress?page=1&pageSize=5'),
+          request<Page<Named>>('/sessions?view=ENROLLED&page=1&pageSize=5'),
+          request<Page<Named>>('/payments?page=1&pageSize=5'),
+          request<Page<Named>>('/certificates?page=1&pageSize=5'),
+          request<Recommendations>('/dashboard/recommendations'),
+        ]);
+      setData({ progress, sessions, payments, certificates, recommendations });
     } catch (caught) {
       setError(message(caught));
     }
@@ -184,7 +211,81 @@ export function LearnerDashboard() {
         }))}
         empty="Aucune formation en ligne active."
       />
+      <RecommendationPanel data={data} />
     </RoleDashboard>
+  );
+}
+
+function RecommendationPanel({
+  data,
+}: {
+  data:
+    | { recommendations: Recommendations }
+    | undefined;
+}) {
+  const recommendations =
+    data === undefined ? [] : data.recommendations.recommendations;
+  useEffect(() => {
+    if (data === undefined) return;
+    trackRecommendationImpressions(
+      data.recommendations.recommendations.map((recommendation, index) => ({
+        trainingId: recommendation.id,
+        categoryName: recommendation.categoryName,
+        rank: index + 1,
+      })),
+    );
+  }, [data]);
+  return (
+    <section
+      className='recommendation-section'
+      aria-labelledby='recommendations-title'
+    >
+      <div className='section-heading'>
+        <div>
+          <span className='eyebrow'>Pour aller plus loin</span>
+          <h2 id='recommendations-title'>Prochaines formations recommandées</h2>
+        </div>
+      </div>
+      {recommendations.length === 0 ? (
+        <div className='content-card'>
+          <p className='muted'>
+            Aucune nouvelle recommandation pour le moment. Explorez le catalogue
+            pour découvrir d'autres parcours.
+          </p>
+        </div>
+      ) : (
+        <div className='training-grid recommendation-grid'>
+          {recommendations.map((recommendation) => (
+            <TrainingCard
+              key={recommendation.id}
+              headingLevel={3}
+              training={{
+                id: recommendation.id,
+                title: recommendation.title,
+                description: recommendation.description,
+                category: {
+                  id: recommendation.categoryId,
+                  name: recommendation.categoryName,
+                  isArchived: false,
+                },
+                type: recommendation.type,
+                level: recommendation.level,
+                durationMinutes: recommendation.durationMinutes,
+                priceMinor: recommendation.priceMinor,
+                thumbnailUrl: recommendation.thumbnailUrl,
+              }}
+              onClick={() =>
+                trackRecommendationClick({
+                  trainingId: recommendation.id,
+                  categoryName: recommendation.categoryName,
+                  rank: recommendations.indexOf(recommendation) + 1,
+                })
+              }
+            />
+          ))}
+        </div>
+      )}
+    </section>
   );
 }
 

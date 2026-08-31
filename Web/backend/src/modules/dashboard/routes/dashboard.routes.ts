@@ -22,6 +22,7 @@ export function createDashboardRouter(
     satisfaction: service.satisfaction.bind(service),
     financial: service.financial.bind(service),
     profitability: service.profitability.bind(service),
+    'learning-insights': service.learningInsights.bind(service),
   };
   for (const [name, handler] of Object.entries(endpoints)) {
     router.get(`/dashboard/${name}`, ...ready, async (request, response) => {
@@ -33,5 +34,10 @@ export function createDashboardRouter(
       );
     });
   }
+  router.get('/dashboard/recommendations', ...ready, async (request, response) => {
+    response.json(
+      await service.recommendations(authenticatedPrincipal(request)),
+    );
+  });
   return router;
 }

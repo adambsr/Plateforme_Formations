@@ -1,10 +1,13 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router';
+import { Download, RefreshCw } from 'lucide-react';
 
 import { ApiError } from '../../core/api/client.js';
+import { trackRecommendationEnrollment } from '../../core/analytics/recommendation-analytics.js';
 import { useAuth } from '../../core/auth/AuthContext.js';
 import { Pagination } from '../../shared/components/Pagination.js';
-import type { Enrollment, Invoice, Page, Payment } from './types.js';
+import type { Invoice, Page, Payment } from './types.js';
+import type { User } from '../../core/auth/types.js';
 
 function message(error: unknown): string {
   return error instanceof ApiError
@@ -73,6 +76,13 @@ export function CheckoutReturnPage({
     };
   }, [load, payment?.status, payment]);
 
+  useEffect(() => {
+    if (payment?.status !== 'PAID' || payment.enrollmentId === undefined) {
+      return;
+    }
+    trackRecommendationEnrollment(payment.training.id);
+  }, [payment?.enrollmentId, payment?.status, payment?.training.id]);
+
   return (
     <main className="checkout-return-page">
       <article className="content-card checkout-return-card">
@@ -129,11 +139,8 @@ export function CheckoutReturnPage({
 export function PaymentCenterPage() {
   const { user, request, download } = useAuth();
   const [payments, setPayments] = useState<Page<Payment> | null>(null);
-  const [enrollments, setEnrollments] = useState<Page<Enrollment> | null>(null);
   const [invoices, setInvoices] = useState<Page<Invoice> | null>(null);
   const [paymentPage, setPaymentPage] = useState(1);
-  const [enrollmentPage, setEnrollmentPage] = useState(1);
-  const [invoicePage, setInvoicePage] = useState(1);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
@@ -141,23 +148,19 @@ export function PaymentCenterPage() {
     setLoading(true);
     setError('');
     try {
-      const [paymentResult, enrollmentResult, invoiceResult] =
+      const [paymentResult, invoiceResult] =
         await Promise.all([
           request<Page<Payment>>(`/payments?page=${paymentPage}&pageSize=10`),
-          request<Page<Enrollment>>(
-            `/enrollments?page=${enrollmentPage}&pageSize=10`,
-          ),
-          request<Page<Invoice>>(`/invoices?page=${invoicePage}&pageSize=10`),
+          request<Page<Invoice>>('/invoices?page=1&pageSize=100'),
         ]);
       setPayments(paymentResult);
-      setEnrollments(enrollmentResult);
       setInvoices(invoiceResult);
     } catch (caught) {
       setError(message(caught));
     } finally {
       setLoading(false);
     }
-  }, [enrollmentPage, invoicePage, paymentPage, request]);
+  }, [paymentPage, request]);
 
   useEffect(() => {
     // Route entry synchronizes the webhook-confirmed financial records.
@@ -181,6 +184,23 @@ export function PaymentCenterPage() {
 
   if (user === null) return null;
   return (
+    <PaymentLedger
+      user={user}
+      payments={payments}
+      invoices={invoices}
+      loading={loading}
+      error={error}
+      refresh={load}
+      downloadInvoice={downloadInvoice}
+      page={paymentPage}
+      setPage={setPaymentPage}
+    />
+  );
+  /*
+  const invoicesByPayment = new Map(
+    invoices?.items.map((invoice) => [invoice.paymentId, invoice]) ?? [],
+  );
+  return (
     <section>
       <div className="section-heading">
         <div>
@@ -190,6 +210,7 @@ export function PaymentCenterPage() {
           </h1>
         </div>
         <button className="secondary-button" onClick={() => void load()}>
+          <RefreshCw aria-hidden="true" size={16} />
           Actualiser
         </button>
       </div>
@@ -203,7 +224,7 @@ export function PaymentCenterPage() {
       ) : (
         <div className="financial-sections">
           <section className="content-card">
-            <h2>Paiements</h2>
+            <h2>Paiements et factures</h2>
             {payments?.items.length === 0 ? (
               <p className="muted">Aucune tentative de paiement.</p>
             ) : (
@@ -221,6 +242,16 @@ export function PaymentCenterPage() {
                     >
                       {statusLabel(payment.status)}
                     </span>
+                    {invoicesByPayment.get(payment.id) ? (
+                      <button
+                        className="secondary-button compact-button"
+                        onClick={() =>
+                          void downloadInvoice(invoicesByPayment.get(payment.id)!)
+                        }
+                      >
+                        <Download aria-hidden="true" size={16} /> Télécharger
+                      </button>
+                    ) : null}
                   </li>
                 ))}
               </ul>
@@ -308,6 +339,76 @@ export function PaymentCenterPage() {
             )}
           </section>
         </div>
+      )}
+    </section>
+  );
+}
+*/
+}
+
+function PaymentLedger({
+  user,
+  payments,
+  invoices,
+  loading,
+  error,
+  refresh,
+  downloadInvoice,
+  page,
+  setPage,
+}: {
+  user: User;
+  payments: Page<Payment> | null;
+  invoices: Page<Invoice> | null;
+  loading: boolean;
+  error: string;
+  refresh: () => Promise<void>;
+  downloadInvoice: (invoice: Invoice) => Promise<void>;
+  page: number;
+  setPage: (page: number) => void;
+}) {
+  const invoicesByPayment = new Map(
+    invoices?.items.map((invoice) => [invoice.paymentId, invoice]) ?? [],
+  );
+  return (
+    <section>
+      <div className="section-heading">
+        <div>
+          <span className="eyebrow">Stripe test · EUR</span>
+          <h1>{user.role === 'ADMIN' ? 'Paiements et factures' : 'Mes achats'}</h1>
+        </div>
+        <button className="secondary-button" onClick={() => void refresh()}>
+          <RefreshCw aria-hidden="true" size={16} /> Actualiser
+        </button>
+      </div>
+      {error !== '' && <p className="form-error" role="alert">{error}</p>}
+      {loading ? <p className="muted">Chargement des données confirmées…</p> : (
+        <section className="content-card payment-ledger">
+          <div className="ledger-heading">
+            <div><h2>Historique des paiements</h2><p className="muted">Les factures sont disponibles dès leur émission.</p></div>
+            <span className="count-badge">{payments?.total ?? 0}</span>
+          </div>
+          {payments?.items.length === 0 ? <p className="muted">Aucun paiement.</p> : (
+            <div className="responsive-table payment-table" role="table">
+              <div className="table-row table-head" role="row">
+                <span role="columnheader">Utilisateur</span><span role="columnheader">Formation</span><span role="columnheader">Statut</span><span role="columnheader">Facture</span>
+              </div>
+              {payments?.items.map((payment) => {
+                const invoice = invoicesByPayment.get(payment.id);
+                const name = invoice === undefined
+                  ? (user.profile.firstName ?? user.email)
+                  : [invoice.learner.firstName, invoice.learner.lastName].filter(Boolean).join(' ') || invoice.learner.email;
+                return <div className="table-row" role="row" key={payment.id}>
+                  <span role="cell"><strong>{name}</strong><small>{invoice?.learner.email ?? user.email}</small></span>
+                  <span role="cell"><strong>{payment.training.title}</strong><small>{date(payment.createdAt)} · {money(payment.amountMinor)}</small></span>
+                  <span role="cell" className={`status-pill status-${payment.status.toLowerCase()}`}>{statusLabel(payment.status)}</span>
+                  <span role="cell">{invoice ? <button className="secondary-button compact-button" onClick={() => void downloadInvoice(invoice)}><Download aria-hidden="true" size={16} /> Télécharger</button> : <span className="muted">Non disponible</span>}</span>
+                </div>;
+              })}
+            </div>
+          )}
+          {payments && <Pagination page={page} pageSize={payments.pageSize} total={payments.total} onPageChange={setPage} disabled={loading} label="Pages des paiements" />}
+        </section>
       )}
     </section>
   );
