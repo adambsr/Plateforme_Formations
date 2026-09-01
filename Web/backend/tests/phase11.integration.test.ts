@@ -330,6 +330,14 @@ suite('Phase 11 costs and dashboard integration', () => {
       currency: 'EUR',
       ownerTrainerId: trainer._id,
       status: 'PUBLISHED',
+      thumbnail: {
+        originalName: 'related.png',
+        relativePath: 'thumbnails/related.png',
+        mimeType: 'image/png',
+        sizeBytes: 1,
+        checksumSha256: 'a'.repeat(64),
+        uploadedAt: new Date('2026-09-01T00:00:00.000Z'),
+      },
     });
     await TrainingModel.create({
       title: 'Unrelated',
@@ -361,6 +369,7 @@ suite('Phase 11 costs and dashboard integration', () => {
     expect(result.recommendations[0]).toMatchObject({
       id: String(related._id),
       title: 'Related next step',
+      thumbnailUrl: `/trainings/${String(related._id)}/thumbnail?v=1788220800000`,
     });
     expect(result.recommendations.map((row) => row.id)).not.toContain(
       String(training._id),

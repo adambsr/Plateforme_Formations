@@ -36,6 +36,7 @@ beforeEach(() => {
             currency: 'EUR',
             categoryId: 'category-1',
             categoryName: 'D\u00e9veloppement',
+            thumbnailUrl: '/trainings/recommended-1/thumbnail?v=42',
             reason: 'Dans la continuit\u00e9 de votre parcours.',
           },
         ],
@@ -67,6 +68,12 @@ describe('Learner dashboard recommendations', () => {
     expect(cardLink).toHaveAttribute(
       'href',
       '/trainings/recommended-1',
+    );
+    expect(
+      screen.getByAltText('Miniature de la formation TypeScript avanc\u00e9'),
+    ).toHaveAttribute(
+      'src',
+      'http://localhost:3000/api/trainings/recommended-1/thumbnail?v=42',
     );
   });
 });

@@ -612,6 +612,16 @@ When the Mobile phase starts, register the Android and iOS applications in this 
 Firebase project; they will have their own app identifiers and configuration files.
 That future FCM work will use a backend-only service-account credential.
 
+## Course-grounded AI tutor
+
+Paid Learners have a Gemini-backed chatbot on each protected Training content page.
+The backend retrieves bounded active Lesson text, validates every returned citation
+against that authorized retrieval set, and exposes clickable Lesson sources. Tutor
+questions and relevant course excerpts are processed by Gemini; identity, payment,
+progress, and Evaluation data are excluded. The complete scope, privacy boundary,
+and verification guide are in
+[`Docs/AI_TUTOR_PHASE2.md`](Docs/AI_TUTOR_PHASE2.md).
+
 ## Architecture boundaries
 
 `Web/backend` is the only backend for both clients. Business rules, validation, and authorization

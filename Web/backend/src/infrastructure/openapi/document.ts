@@ -791,6 +791,54 @@ export const openApiDocument: OpenAPIV3.Document = {
         },
       },
     },
+    '/public/concierge/messages': {
+      post: {
+        operationId: 'askPublicConcierge',
+        summary: 'Ask the public website AI concierge',
+        description:
+          'Anonymous endpoint grounded only in curated public pages and published catalogue fields. It stores no conversation, resolves links server-side, and is rate-limited per source IP.',
+        tags: ['AI', 'Public concierge'],
+        requestBody: {
+          required: true,
+          content: json({
+            $ref: '#/components/schemas/PublicConciergeMessageRequest',
+          }),
+        },
+        responses: {
+          '200': {
+            description:
+              'Public-information answer with server-authorized sources and actions.',
+            content: json({
+              $ref: '#/components/schemas/PublicConciergeMessageResponse',
+            }),
+          },
+          '429': errorResponse,
+          default: errorResponse,
+        },
+      },
+    },
+    '/trainings/{id}/tutor/messages': {
+      post: {
+        operationId: 'askCourseTutor',
+        summary: 'Ask the enrolled Learner course-grounded AI tutor',
+        description:
+          'Learner-only. Retrieves bounded active Lesson text from the paid Training, sends only relevant course excerpts and recent chat to Gemini, and rejects citations outside that retrieved context.',
+        tags: ['AI', 'Content'],
+        security: secured,
+        parameters: [{ $ref: '#/components/parameters/TrainingId' }],
+        requestBody: {
+          required: true,
+          content: json({ $ref: '#/components/schemas/TutorMessageRequest' }),
+        },
+        responses: {
+          '200': {
+            description: 'Grounded tutor answer with authorized Lesson citations.',
+            content: json({ $ref: '#/components/schemas/TutorMessageResponse' }),
+          },
+          default: errorResponse,
+        },
+      },
+    },
     '/trainings/{id}/modules': {
       post: {
         operationId: 'createTrainingModule',
@@ -3064,6 +3112,176 @@ export const openApiDocument: OpenAPIV3.Document = {
           },
         },
       },
+      TutorMessageRequest: {
+        type: 'object',
+        additionalProperties: false,
+        required: ['message'],
+        properties: {
+          message: { type: 'string', minLength: 2, maxLength: 2000 },
+          mode: {
+            type: 'string',
+            enum: [
+              'QUESTION',
+              'SIMPLIFY',
+              'EXAMPLE',
+              'PRACTICE',
+              'SUMMARY',
+              'REVISION',
+            ],
+            default: 'QUESTION',
+          },
+          currentLessonId: { type: 'string', pattern: '^[a-fA-F0-9]{24}$' },
+          conversation: {
+            type: 'array',
+            maxItems: 8,
+            items: {
+              type: 'object',
+              additionalProperties: false,
+              required: ['role', 'content'],
+              properties: {
+                role: { type: 'string', enum: ['USER', 'ASSISTANT'] },
+                content: { type: 'string', minLength: 1, maxLength: 2000 },
+              },
+            },
+          },
+        },
+      },
+      TutorMessageResponse: {
+        type: 'object',
+        required: [
+          'answer',
+          'grounded',
+          'citations',
+          'followUpQuestions',
+          'metadata',
+        ],
+        properties: {
+          answer: { type: 'string' },
+          grounded: { type: 'boolean' },
+          citations: {
+            type: 'array',
+            items: {
+              type: 'object',
+              required: ['lessonId', 'lessonTitle', 'moduleTitle', 'href'],
+              properties: {
+                lessonId: { type: 'string' },
+                lessonTitle: { type: 'string' },
+                moduleTitle: { type: 'string' },
+                href: { type: 'string' },
+              },
+            },
+          },
+          followUpQuestions: { type: 'array', items: { type: 'string' } },
+          metadata: {
+            type: 'object',
+            required: [
+              'provider',
+              'model',
+              'retrievedLessonCount',
+              'contextChars',
+            ],
+            properties: {
+              provider: { type: 'string' },
+              model: { type: 'string' },
+              retrievedLessonCount: { type: 'integer', minimum: 1 },
+              contextChars: { type: 'integer', minimum: 1 },
+            },
+          },
+        },
+      },
+      PublicConciergeMessageRequest: {
+        type: 'object',
+        additionalProperties: false,
+        required: ['message'],
+        properties: {
+          message: { type: 'string', minLength: 2, maxLength: 1000 },
+          currentPath: {
+            type: 'string',
+            maxLength: 200,
+            description: 'Current allowlisted public website path.',
+          },
+          conversation: {
+            type: 'array',
+            maxItems: 4,
+            description:
+              'Bounded client-supplied context; it is not persisted by the server.',
+            items: {
+              type: 'object',
+              additionalProperties: false,
+              required: ['role', 'content'],
+              properties: {
+                role: { type: 'string', enum: ['USER', 'ASSISTANT'] },
+                content: { type: 'string', minLength: 1, maxLength: 1000 },
+              },
+            },
+          },
+          website: {
+            type: 'string',
+            maxLength: 200,
+            description: 'Spam honeypot; legitimate clients leave it absent.',
+          },
+        },
+      },
+      PublicConciergeMessageResponse: {
+        type: 'object',
+        required: [
+          'answer',
+          'grounded',
+          'sources',
+          'actions',
+          'suggestedQuestions',
+          'metadata',
+        ],
+        properties: {
+          answer: { type: 'string' },
+          grounded: { type: 'boolean' },
+          sources: {
+            type: 'array',
+            items: {
+              type: 'object',
+              required: ['id', 'title', 'href'],
+              properties: {
+                id: { type: 'string' },
+                title: { type: 'string' },
+                href: { type: 'string' },
+              },
+            },
+          },
+          actions: {
+            type: 'array',
+            items: {
+              type: 'object',
+              required: ['label', 'href'],
+              properties: {
+                label: { type: 'string' },
+                href: { type: 'string' },
+              },
+            },
+          },
+          suggestedQuestions: {
+            type: 'array',
+            items: { type: 'string' },
+          },
+          metadata: {
+            type: 'object',
+            required: [
+              'provider',
+              'model',
+              'retrievedPublicSourceCount',
+              'contextChars',
+            ],
+            properties: {
+              provider: { type: 'string' },
+              model: { type: 'string' },
+              retrievedPublicSourceCount: {
+                type: 'integer',
+                minimum: 0,
+              },
+              contextChars: { type: 'integer', minimum: 0 },
+            },
+          },
+        },
+      },
       ContentItemRequest: {
         type: 'object',
         additionalProperties: false,
@@ -3991,6 +4209,7 @@ export const openApiDocument: OpenAPIV3.Document = {
     { name: 'Attendance' },
     { name: 'Evaluations' },
     { name: 'AI' },
+    { name: 'Public concierge' },
     { name: 'Certificates' },
     { name: 'Feedback' },
     { name: 'Costs' },

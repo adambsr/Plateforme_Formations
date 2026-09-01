@@ -12,6 +12,7 @@ import type {
   TrainingContent,
 } from './types.js';
 import type { PaginatedProgress, ProgressSummary } from '../progress/types.js';
+import { TutorChat } from './TutorChat.js';
 
 function message(error: unknown): string {
   return error instanceof ApiError
@@ -198,6 +199,7 @@ function LessonView({
 }) {
   return (
     <article
+      id={`lesson-${lesson.id}`}
       className={`lesson-card${lesson.isArchived ? ' archived-content' : ''}`}
     >
       <div className="managed-training-heading">
@@ -517,7 +519,7 @@ export function ContentPage() {
       </Link>
       <div className="section-heading content-heading">
         <div>
-          <span className="eyebrow">Contenu protégé</span>
+          {/* <span className="eyebrow">Contenu protégé</span> */}
           <h1>{canManage ? 'Auteur de contenu' : 'Contenu de la formation'}</h1>
         </div>
         {content !== null && (
@@ -550,6 +552,7 @@ export function ContentPage() {
               </progress>
             </div>
           )}
+          {content.access === 'LEARNER_READ' && <TutorChat content={content} />}
           {canManage && (
             <form
               className="content-card module-create-form"

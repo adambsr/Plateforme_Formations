@@ -174,7 +174,25 @@ export class DashboardService {
           categoryName: {
             $ifNull: [{ $arrayElemAt: ['$category.name', 0] }, 'Formation'],
           },
-          thumbnailUrl: 1,
+          thumbnailUrl: {
+            $ifNull: [
+              '$thumbnailExternalUrl',
+              {
+                $cond: [
+                  { $ne: ['$thumbnail', null] },
+                  {
+                    $concat: [
+                      '/trainings/',
+                      { $toString: '$_id' },
+                      '/thumbnail?v=',
+                      { $toString: { $toLong: '$thumbnail.uploadedAt' } },
+                    ],
+                  },
+                  '$$REMOVE',
+                ],
+              },
+            ],
+          },
           enrollmentCount: { $size: '$enrollments' },
           createdAt: 1,
         },

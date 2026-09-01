@@ -52,3 +52,31 @@ export interface TrainingContent {
   access: ContentAccess;
   modules: ContentModule[];
 }
+
+export type TutorMode =
+  | 'QUESTION'
+  | 'SIMPLIFY'
+  | 'EXAMPLE'
+  | 'PRACTICE'
+  | 'SUMMARY'
+  | 'REVISION';
+
+export interface TutorCitation {
+  lessonId: string;
+  lessonTitle: string;
+  moduleTitle: string;
+  href: string;
+}
+
+export interface TutorResponse {
+  answer: string;
+  grounded: boolean;
+  citations: TutorCitation[];
+  followUpQuestions: string[];
+  metadata: {
+    provider: string;
+    model: string;
+    retrievedLessonCount: number;
+    contextChars: number;
+  };
+}

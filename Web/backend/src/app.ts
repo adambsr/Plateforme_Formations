@@ -68,6 +68,20 @@ import { DashboardService } from './modules/dashboard/services/dashboard.service
 import { createDashboardRouter } from './modules/dashboard/routes/dashboard.routes.js';
 import { createContactRouter } from './modules/contact/routes/contact.routes.js';
 import { ContactService } from './modules/contact/services/contact.service.js';
+import { createTutorRouter } from './modules/tutor/routes/tutor.routes.js';
+import { AiTutorService } from './modules/tutor/services/ai-tutor.service.js';
+import { CourseTutorContextService } from './modules/tutor/services/course-tutor-context.service.js';
+import {
+  GeminiTutorGateway,
+  type TutorGenerationGateway,
+} from './modules/tutor/infrastructure/gemini-tutor.gateway.js';
+import { createPublicConciergeRouter } from './modules/public-concierge/routes/public-concierge.routes.js';
+import { PublicConciergeService } from './modules/public-concierge/services/public-concierge.service.js';
+import { PublicConciergeContextService } from './modules/public-concierge/services/public-concierge-context.service.js';
+import {
+  GeminiPublicConciergeGateway,
+  type PublicConciergeGenerationGateway,
+} from './modules/public-concierge/infrastructure/gemini-public-concierge.gateway.js';
 
 export interface AppDependencies {
   config: AppConfig;
@@ -77,6 +91,8 @@ export interface AppDependencies {
   contactMailService?: ContactMailService;
   stripeCheckoutGateway?: StripeCheckoutGateway;
   questionGenerationGateway?: QuestionGenerationGateway;
+  tutorGenerationGateway?: TutorGenerationGateway;
+  publicConciergeGenerationGateway?: PublicConciergeGenerationGateway;
 }
 
 export function createApp({
@@ -87,6 +103,8 @@ export function createApp({
   contactMailService,
   stripeCheckoutGateway,
   questionGenerationGateway,
+  tutorGenerationGateway,
+  publicConciergeGenerationGateway,
 }: AppDependencies): Express {
   const app = express();
 
@@ -122,6 +140,16 @@ export function createApp({
     evaluationService,
     new TrainingAiContextService(fileStorage, config.ai.maxContextChars),
     questionGenerationGateway ?? new GeminiQuestionGenerationGateway(config.ai),
+  );
+  const aiTutorService = new AiTutorService(
+    enrollmentAccess,
+    new CourseTutorContextService(Math.min(config.ai.maxContextChars, 24_000)),
+    tutorGenerationGateway ?? new GeminiTutorGateway(config.ai),
+  );
+  const publicConciergeService = new PublicConciergeService(
+    new PublicConciergeContextService(),
+    publicConciergeGenerationGateway ??
+      new GeminiPublicConciergeGateway(config.ai),
   );
   const certificateService = new CertificateService(
     eligibilityService,
@@ -167,6 +195,7 @@ export function createApp({
   );
   app.use(express.json());
   app.use('/api', createContactRouter(contactService));
+  app.use('/api', createPublicConciergeRouter(publicConciergeService));
 
   app.get('/api/health', (_request, response) => {
     const ready = databaseReady();
@@ -222,6 +251,7 @@ export function createApp({
   app.use('/api', createFeedbackRouter(feedbackService, tokenService));
   app.use('/api', createCostRouter(costService, tokenService));
   app.use('/api', createDashboardRouter(dashboardService, tokenService));
+  app.use('/api', createTutorRouter(aiTutorService, tokenService));
 
   app.use(notFoundHandler);
   app.use(errorHandler);

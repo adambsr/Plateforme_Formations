@@ -9,6 +9,7 @@ import footerLogo from '../../assets/hsa-logo-footer.png';
 import { useAuth } from '../../core/auth/AuthContext.js';
 import { UserMenu } from '../../shared/components/UserMenu.js';
 import { Icon } from '../../shared/components/Icon.js';
+import { PublicConcierge } from '../../features/public/PublicConcierge.js';
 
 export function PublicLayout() {
   const { user } = useAuth();
@@ -109,6 +110,7 @@ export function PublicLayout() {
           réservés.
         </p>
       </footer>
+      <PublicConcierge />
     </div>
   );
 }

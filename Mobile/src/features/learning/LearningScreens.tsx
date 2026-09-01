@@ -251,7 +251,7 @@ export function ContentScreen({
         }
       >
         <View style={styles.heading}>
-          <Text style={styles.eyebrow}>CONTENU PROTÉGÉ</Text>
+          {/* <Text style={styles.eyebrow}>CONTENU PROTÉGÉ</Text> */}
           <Text style={styles.title}>Contenu de la formation</Text>
         </View>
         <Notice message={error} />
