@@ -1,630 +1,360 @@
-# Plateforme de Formations
+<p align="center"><img src="HSA_LOGO.png" alt="High Skills Academy" width="320"></p>
 
-For a realistic local demo dataset and development-only credentials, see
-[`Docs/DEVELOPMENT_SEED.md`](Docs/DEVELOPMENT_SEED.md).
+# High Skills Academy
 
-Monorepo for the shared Web/Mobile training platform. The implementation follows
-`Docs/SOURCE_OF_TRUTH.md`, then `PLAN.md`, then the client development prompts.
+> A web platform for discovering, delivering, managing, and validating professional training.
 
-## Current implementation phase
+![Node.js 24+](https://img.shields.io/badge/Node.js-24%2B-339933?logo=node.js&logoColor=white) ![TypeScript](https://img.shields.io/badge/TypeScript-6-3178C6?logo=typescript&logoColor=white) ![MongoDB](https://img.shields.io/badge/MongoDB-8-47A248?logo=mongodb&logoColor=white) ![Docker Compose](https://img.shields.io/badge/Docker%20Compose-local-2496ED?logo=docker&logoColor=white)
 
-Phases 0 through 12 are complete. The repository provides the engineering foundation, shared
-authentication and user management, the Training catalogue and ownership slice, protected
-training content, in-person Session planning, and the Stripe test-mode payment, Enrollment, and
-Invoice access boundary, self-paced progression, in-person Attendance completion, complete
-Evaluation attempts/grading, bounded Gemini-assisted draft question generation, Certificates, and
-immutable satisfaction Feedback, explicit costs, and the Admin statistics/profitability dashboard.
-Phase 12 completes the public website, role-specific shell and dashboards, responsive and
-accessible UX states, consistent pagination, security hardening, API verification, critical
-workflow coverage, and production operations documentation.
+High Skills Academy is a French-language training platform with a public catalogue and role-based workspaces for learners, trainers, and administrators. It supports self-paced and in-person training, paid enrollment, protected content, progress and attendance, evaluations, certificates, feedback, costs, dashboards, and AI-assisted experiences.
 
-## Phase 0 status
+## Features
 
-Phase 0 provides the engineering foundation only:
+| Area              | Current capabilities                                                                                                                  |
+| ----------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
+| Public website    | Published-training catalogue and details, available sessions, FAQ, contact form, registration and password recovery                   |
+| Identity          | Learner registration; authenticated Learner, Trainer, and Admin workspaces; profile and password management                           |
+| Training delivery | Categories, draft/published/archived training, ownership, modules, lessons, protected resources, online and in-person delivery        |
+| Learning          | Paid enrollment, lesson progress, sessions, attendance, evaluations, automatic grading, certificates, immutable satisfaction feedback |
+| Reporting         | Stripe test-mode checkout and webhook fulfillment, invoices, trainer/training costs, recommendations, dashboards                      |
+| AI                | Course tutor, public website concierge, and trainer-controlled Gemini draft-question generation                                       |
+| Measurement       | Optional consent-based Firebase Analytics for page views and recommendations                                                          |
 
-- an Express/Mongoose backend in `Web/backend`;
-- a Vite/React Web client in `Web/frontend`;
-- an Expo/React Native Mobile client in `Mobile`;
-- strict TypeScript, Oxlint, Prettier, tests, and production builds;
-- typed backend configuration, structured/redacted request logs, a central error contract,
-  database-aware health, and an OpenAPI shell;
-- MongoDB 8 as a single-node replica set plus persistent database and upload volumes;
-- a CI workflow that runs all checks and starts the real Compose stack.
+## Architecture
 
-Phase 0 itself defined no business collections, indexes, data migrations, or seed data. Phase 1
-identity models now own their index declarations, which the backend initializes before it listens.
-The initial Admin seed uses `INITIAL_ADMIN_EMAIL` and `INITIAL_ADMIN_PASSWORD`; those values are
-validated only for the seed command and remain unnecessary for a normal backend start.
+This is a **modular monolith**, not a microservices system. The React client and Express API are separate processes, while the backend keeps business domains in modules within one application. Docker services supply local infrastructure; they are not independent business services.
 
-## Phase 1 status
+```mermaid
+flowchart LR
+  Browser[React + Vite\nlocalhost:5173] -->|JSON, Bearer token + refresh cookie| API[Express API\nlocalhost:3000/api]
+  Browser -->|optional consented events| Firebase[Firebase Analytics / Google Analytics]
+  API --> Mongo[(MongoDB 8\nplateforme_formations)]
+  API --> Files[(Persistent upload volume)]
+  API --> Mailpit[Mailpit SMTP]
+  API --> Stripe[Stripe test mode]
+  API --> Gemini[Google Gemini]
+  Init[mongodb-init] -->|initiates rs0| Mongo
+```
 
-Phase 1 includes:
+The browser calls `/api`; the API authorizes requests, owns access control and external-service credentials, and reads or writes MongoDB. Gemini and Stripe secret keys never reach the browser.
 
-- strict User, refresh-session, and single-use password-reset persistence with the required unique,
-  lookup, and TTL indexes;
-- public Learner-only registration, login, 15-minute access JWTs, seven-day rotating refresh
-  tokens, logout, password reset, password change, and profile updates;
-- an idempotent initial-Admin CLI seed and Admin-only Trainer creation/deactivation;
-- mandatory first password change for seeded Admins and new Trainers before other protected work;
-- backend role/self authorization that re-checks the active user on every protected request;
-- Web auth/reset/profile/Admin-user screens, in-memory access tokens, secure refresh-cookie flow,
-  guards, and role layouts;
-- synchronized OpenAPI routes plus unit, Web, and real replica-set HTTP integration coverage.
+| Layer          | Implementation                                                 |
+| -------------- | -------------------------------------------------------------- |
+| Web client     | React 19, TypeScript, Vite, React Router, React Hook Form, Zod |
+| API            | Node.js, Express 5, TypeScript, Mongoose, Zod                  |
+| Database       | MongoDB 8, single-node replica set `rs0`                       |
+| Local services | Docker Compose and Mailpit                                     |
+| Payments       | Stripe Checkout and signed webhooks                            |
+| AI             | Google Gen AI SDK / Gemini                                     |
+| Analytics      | Firebase Analytics SDK                                         |
 
-The Web refresh token is an `HttpOnly`, `SameSite=Lax` cookie (`Secure` in production). Mobile
-receives the same rotating refresh token in authenticated response bodies so its later client phase
-can store it in platform secure storage. MongoDB stores only token hashes, and password change,
-password reset, or account deactivation revokes every active refresh session for that user.
+## Getting started on a new PC
 
-## Phase 2 status
+### Prerequisites
 
-Phase 2 includes:
+| Required software                                                 | Reason                                                           |
+| ----------------------------------------------------------------- | ---------------------------------------------------------------- |
+| [Git](https://git-scm.com/downloads)                              | Clone the repository                                             |
+| Node.js **24+** and npm **11+**                                   | Install and run the project; it pins `npm@11.17.0`               |
+| [Docker Desktop](https://www.docker.com/products/docker-desktop/) | Run the API, MongoDB, database bootstrap, and local mail service |
 
-- archived-capable Training categories and strict Training persistence with catalogue/owner
-  indexes;
-- the exact immutable `SELF_PACED_ONLINE` and `IN_PERSON` types, strictly positive integer minor
-  unit EUR prices, and the in-person attendance threshold default of 80 percent;
-- backend-enforced ownership: Trainer creators own their Training, Admin creators select an active
-  Trainer, and only an Admin can transfer ownership;
-- `DRAFT` to `PUBLISHED` to `ARCHIVED` lifecycle rules, public visibility limited to published
-  Training, and conflict-safe hard deletion of unused drafts only;
-- a public responsive catalogue/detail UI and authenticated Admin/owner management workspace with
-  loading, error, empty, filtering, lifecycle, category, and ownership-transfer states;
-- complete OpenAPI descriptions plus unit, Web, and real replica-set HTTP integration coverage.
+Optional: [MongoDB Compass](https://www.mongodb.com/products/tools/compass) to inspect data; a Firebase project for analytics; Stripe test credentials for real checkout; and a Google AI Studio API key for Gemini functionality.
 
-Self-paced publication checks for at least one active Module containing an active Lesson. An
-in-person Training may be published without a Session as required.
+### 1. Clone and install
 
-## Phase 3 status
-
-Phase 3 includes:
-
-- ordered Modules, Lessons, and FILE or EXTERNAL_URL Resources, with archive and progress-safe
-  hard-deletion rules enforced by the backend;
-- self-paced publication validation against the persisted active content hierarchy;
-- Admin/owner authoring, assigned-Session-Trainer reading, and Enrollment-backed Learner reading;
-- generated, sharded local filenames and a persistent Compose upload volume, with no public static
-  file route or internal storage path in API responses;
-- extension, declared MIME, detected signature, maximum-size, SHA-256 checksum, and traversal
-  validation for PDF, PNG, JPEG, GIF, WebP, DOCX, PPTX, XLSX, ZIP, TXT, and CSV files;
-- HTTP(S)-only external links that are stored without server-side fetching;
-- a role-filtered Web content reader/authoring workspace and authenticated file downloads;
-- complete OpenAPI, unit, Web, and real replica-set HTTP integration coverage.
-
-Local files are removed only after their Resource is hard-deleted and no other Resource references
-the same stored path. Content with learner progress is archived instead of cascading history.
-Learner access depends on an Enrollment record, which Phase 5 creates only after a verified Stripe
-test webhook.
-
-## Phase 4 status
-
-Phase 4 includes:
-
-- in-person-only Sessions with the exact PLANNED, IN_PROGRESS, COMPLETED, and CANCELLED states;
-- any number of SessionSchedule dates, optional Module/Lesson associations, derived overall dates,
-  capacity, and available-seat views;
-- Admin/owner structural management and assignment of multiple active Trainers, while assigned
-  Trainers receive read/start/complete operational permissions only;
-- exact Trainer and normalized location/room overlap checks across non-cancelled Sessions, with
-  adjacent date ranges allowed;
-- cancellation blocked by Enrollment history, schedule deletion blocked by Attendance, Session
-  deletion blocked by Enrollment or Payment, and completion blocked until Attendance coverage is
-  complete;
-- a public available-Session view and a role-aware Web scheduling workspace with multiple-date,
-  assignment, lifecycle, loading, empty, error, and conflict states;
-- complete OpenAPI, unit, Web, and real replica-set HTTP integration coverage.
-
-The API accepts only ISO 8601 Session instants containing `Z` or an explicit offset and stores them
-as UTC dates. Web date inputs and displays use the IANA zone `Africa/Tunis`; server and container
-processes remain on `TZ=UTC`.
-
-## Phase 5 status
-
-Phase 5 includes:
-
-- Payment, Enrollment, Invoice, and InvoiceItem persistence with explicit uniqueness, lookup, and
-  financial-reporting indexes initialized during backend startup;
-- Learner-only hosted Stripe Checkout created from published Training and available Session data,
-  with the positive integer EUR price sourced exclusively from the backend;
-- raw-body Stripe signature verification and transaction-backed, idempotent webhook fulfillment;
-- duplicate-Enrollment protection and an atomic in-person capacity gate without seat reservations;
-- Enrollment-backed paid content access, with Admin-wide and Learner-own payment, Enrollment, and
-  Invoice views while Trainers have no financial access;
-- immutable purchase, learner, issuer, and line-item snapshots plus idempotently generated,
-  protected Invoice PDFs;
-- responsive catalogue purchase controls, Checkout-return confirmation, and payment/Enrollment/
-  Invoice views with loading, empty, error, and conflict states;
-- synchronized OpenAPI documentation plus unit, Web, signed-webhook, PDF-content, and real
-  replica-set integration coverage.
-
-No Phase 5 seed or data migration is required. Startup creates the model indexes. Existing content
-access tests may construct Enrollment prerequisites directly, but production Enrollment creation
-is owned exclusively by successful verified payment fulfillment.
-
-## Phase 6 status
-
-Phase 6 includes:
-
-- LessonProgress persistence unique per Enrollment and Lesson, with learner/training lookup indexes;
-- Learner-only mark/unmark behavior resolved through the paid self-paced Enrollment;
-- server-calculated active-Lesson counts, percentages, and exact 100-percent completion;
-- archived Module/Lesson exclusion and recalculation when applicable published content changes;
-- Certificate issuance cutoff handling: applicable completion history is preserved, later Lessons
-  do not change the issued eligibility snapshot, and served progress becomes immutable;
-- progress-aware hard-deletion conflicts, a responsive Learner overview, and lesson-level controls;
-- synchronized OpenAPI, strict DTO/index tests, Web state tests, and real replica-set lifecycle
-  coverage.
-
-## Phase 7 status
-
-Phase 7 includes:
-
-- Attendance persistence unique per Enrollment and SessionSchedule with only PRESENT and ABSENT;
-- authorized bulk upsert by Admins and Trainers assigned to the Session, while owners without an
-  assignment receive no implicit Attendance permission;
-- explicit missing-entry representation: an unsupplied Attendance remains null and is never
-  interpreted as ABSENT;
-- unweighted per-schedule percentage calculation, Training threshold evaluation, and reusable
-  in-person completion results;
-- transactional full-coverage gating before Session completion and immutable Attendance afterward;
-- enrolled-Learner Session discovery, own schedule/Attendance views, and compact Admin/Trainer
-  roster entry with loading, empty, error, and conflict states;
-- synchronized OpenAPI and integration coverage for authorization, missing coverage, thresholds,
-  completion, and immutability.
-
-Phases 6 and 7 require no seed or one-off data migration. Backend startup initializes the
-LessonProgress and Attendance indexes. Existing Enrollments remain valid and acquire progress or
-Attendance records only when users perform the corresponding actions.
-
-## Phase 8 status
-
-Phase 8 includes owner-only draft Evaluation and objective Question authoring, publication and
-archive rules, one published certifying Evaluation per Training, enrolled-Learner Attempts with
-server timestamps and optional expiry, exact-set automatic grading without partial credit,
-immutable submitted/expired answer snapshots, answer release only after a pass or final attempt,
-and owner/Admin result views. The Web workspace supports authoring, review, lifecycle actions,
-timed attempts, immediate results, and role-specific loading, empty, validation, and error states.
-
-## Phase 9 status
-
-Phase 9 adds on-demand text extraction for text PDFs, DOCX, PPTX, and TXT, a deterministic
-`AI_MAX_CONTEXT_CHARS` bound, and selected-Training-only context construction. Unsupported,
-no-text, and failed resources are reported explicitly; there is no OCR, URL crawling, embedding,
-vector store, or RAG. The backend calls Gemini with a JSON schema, validates the response again
-with the same question DTO, and transactionally imports only draft questions. The owner must
-review/edit/delete the proposals and explicitly publish; AI cannot publish or designate a
-certifying Evaluation.
-
-Phases 8 and 9 require no seed or one-off migration. Backend startup initializes the Evaluation,
-Question, Attempt, and Answer indexes. Existing Trainings and Enrollments remain valid.
-
-## Phase 10 status
-
-Phase 10 adds one shared backend eligibility calculation for self-paced completion, completed
-in-person Session attendance, and any designated certifying Evaluation. No role, including Admin,
-can force issuance or Feedback while those rules fail. Certificate generation is idempotent per
-Enrollment, snapshots Learner, Training, completion evidence, relevant dates/duration, and centre
-identity, and materializes an authorization-protected PDF without changing the Certificate number.
-Learners can submit one immutable integer 1-to-5 rating per eligible Enrollment, with no comment,
-edit, moderation, or public display. Admin statistics expose count, average, and the complete
-1-to-5 distribution globally and per Training. The Web workspace includes Learner generation,
-download, and rating controls, Admin issuance/satisfaction views, and relevant Trainer Certificate
-history.
-
-Phase 10 requires no seed, backfill, or one-off data migration. Backend startup creates unique
-Certificate indexes for Enrollment and number plus Feedback Enrollment and Training/rating
-indexes. Existing Enrollments remain valid and produce records only on an authorized request after
-current eligibility is recalculated. Generated PDFs live below the persistent configured
-`UPLOAD_DIR`; preserve and back up that volume together with MongoDB.
-
-## Phase 11 status
-
-Phase 11 adds Admin-only monthly `TrainerCost` upserts, unique by Trainer/year/month, and explicit
-dated `TrainingCost` records optionally linked to a matching Session. All money remains positive
-integer EUR centimes. The backend calculates operational counts, schedule-based participation,
-self-paced progression, Evaluation results, satisfaction, paid revenue, costs, result, and
-profitability through MongoDB aggregations over explicit inclusive `Africa/Tunis` calendar-date
-ranges. Trainer costs apply only when the selected range contains their complete calendar month.
-Zero revenue returns `null` profitability. Per-Training reporting subtracts explicit Training
-costs only and is labelled as result before fixed Trainer costs; salaries are never inferred or
-allocated to a Training.
-
-The responsive Admin Web dashboard provides period filtering, loading/error/empty states, the
-centre metrics, monthly Trainer-cost upserts, and Training-cost create/edit/delete workflows.
-OpenAPI documents every cost and dashboard endpoint.
-
-Phase 11 requires no seed, backfill, or one-off data migration. Backend startup creates the unique
-Trainer/month index and the Trainer calendar, Training-cost period, and Training/Session target
-indexes. Existing Payments, Enrollments, Attendance, progress, Evaluations, and Feedback remain
-unchanged; dashboard values are calculated from their existing persisted records.
-
-## Phase 12 status
-
-Phase 12 completes the Web product and hardening work planned after the domain slices:
-
-- public website pages, shared public/authenticated layouts, and role-specific Admin, Trainer, and
-  Learner navigation;
-- responsive catalogue, training, session, payment, content, progress, evaluation, certificate,
-  feedback, user-management, attendance, and profitability workflows;
-- consistent pagination and reusable loading, error, empty, validation, conflict, and success
-  states across the Web client;
-- keyboard-accessible controls, visible focus states, semantic labels, responsive layouts, and
-  mobile-width Web behavior;
-- completed OpenAPI coverage and backend authorization/validation for the exposed workflows;
-- security-focused checks for authentication, protected files, Stripe webhook handling, upload
-  validation, redacted logs, and test-only configuration boundaries;
-- critical Web and real-replica-set workflow verification through the existing test commands.
-
-## Phase 13 status
-
-Phase 13 completes the Expo/React Native application through roadmap item 13.9. Mobile now uses
-the same backend contracts for secure rotating-token authentication, catalogue and Training
-management, self-paced content/progress, Sessions and schedules, Stripe Checkout and paid
-Enrollments, Evaluations and AI-assisted draft review, protected Invoices/Certificates/resources,
-Feedback, Attendance, Admin users/categories/costs, and backend-calculated dashboard statistics.
-The interface uses native stacks, safe areas, touch-sized cards/forms, pull-to-refresh, system
-browser Checkout, application deep links, SecureStore, and Expo download/share/picker APIs; no
-mobile-specific backend or duplicated business rule was introduced.
-
-The only shared contract extension is client-aware return routing. `MOBILE_APP_SCHEME` must match
-`EXPO_PUBLIC_APP_SCHEME` and the Expo `scheme` value. Mobile forgot-password requests receive a
-`plateforme-formations://reset-password?token=…` link, and Mobile Stripe Checkout returns to
-`plateforme-formations://payments/success|cancel?paymentId=…`. A return link never proves payment:
-Mobile always reloads the Payment whose status is confirmed by the backend webhook.
-
-Phase 13 adds no collection, migration, database index, seed, or Firebase dependency. Firebase
-remains the optional Web Analytics preparation described below.
-
-## Prerequisites
-
-- Node.js 24.19 or newer in the Node 24 line
-- npm 11.17 or newer
-- Docker Desktop with Docker Compose
-
-## Local setup
-
-This is the reproducible setup for a fresh machine. Do not copy `node_modules`, build output,
-local uploads, or `.env` files from the old machine. Clone or copy the repository, then recreate
-those machine-specific files and restore data only when required.
-
-1. Install Node.js 24.19+ in the Node 24 line, npm 11.17+, and Docker Desktop with Docker Compose.
-   On Windows, enable the Docker Desktop WSL 2 backend and ensure Docker is running before
-   starting Compose. Git is also required if the repository will be cloned.
-2. Clone the repository and open a terminal at its root.
-3. Install the workspace dependencies:
-
-```sh
+```powershell
+git clone https://github.com/adambsr/Plateforme_Formations.git
+Set-Location Plateforme_Formations
 npm ci
 ```
 
-4. Copy the examples before running applications directly:
+### 2. Create configuration files
 
-```powershell
-Copy-Item Web/backend/.env.example Web/backend/.env
-Copy-Item Web/frontend/.env.example Web/frontend/.env
-Copy-Item Mobile/.env.example Mobile/.env
-```
-
-5. Replace every placeholder with a suitable local value. The backend fails before listening when
-   required configuration is missing or invalid. It accepts Stripe test keys only. Empty SMTP user
-   and password values select an unauthenticated local SMTP server; otherwise both values are
-   required. Keep all real secrets out of Git.
-
-To inspect the local application database in MongoDB Compass, create a connection with:
-
-```text
-mongodb://localhost:27017/plateforme_formations?directConnection=true
-```
-
-Use the `plateforme_formations` database shown by that connection. MongoDB's `admin`, `config`,
-and `local` databases are system databases and should be left intact.
-
-For the normal Docker path, the repository-root `.env` is optional. Copy `.env.example` to `.env`
-only when overriding Compose Stripe or Gemini values:
+Local `.env` files are ignored by Git. Create them from the committed templates:
 
 ```powershell
 Copy-Item .env.example .env
+Copy-Item Web/backend/.env.example Web/backend/.env
+Copy-Item Web/frontend/.env.example Web/frontend/.env
 ```
 
-The root `.env`, all workspace `.env` files, `uploads/`, and Docker volumes are intentionally
-ignored by Git. If moving an existing development installation, transfer secrets through a secure
-channel and restore data only as described in [Data backup and restore](#data-backup-and-restore).
-Never commit secrets.
+Edit them using the [environment reference](#environment-variables). Placeholder Stripe and Gemini values allow services to start, but cannot complete real payment or AI requests.
 
-Run an individual application from the repository root:
+### 3. Start API and local services
 
-```sh
-npm run dev:backend
-npm run dev:frontend
-npm run dev:mobile
-```
-
-The Web client is available at the Vite URL printed in the terminal (normally
-`http://localhost:5173`). For Android Emulator, the checked-in Mobile example uses
-`http://10.0.2.2:3000/api` because that address maps to the host machine. A physical device needs
-the host PC's LAN IP instead, and the device and PC must be on the same network. Do not expose the
-backend to an untrusted network.
-
-Copy `Mobile/.env.example` to the ignored `Mobile/.env` when its defaults do not match the target
-device. `EXPO_PUBLIC_API_BASE_URL` must end at the shared backend `/api`; do not put secrets in an
-`EXPO_PUBLIC_*` variable. Password reset and Stripe browser returns require the same scheme in
-`Mobile/app.json`, `EXPO_PUBLIC_APP_SCHEME`, and backend `MOBILE_APP_SCHEME`.
-
-Mobile verification commands are:
-
-```sh
-npm run typecheck --workspace Mobile
-npm run lint --workspace Mobile
-npm run test --workspace Mobile
-npm exec --workspace Mobile -- expo-doctor
-npm exec --workspace Mobile -- expo export --platform all --output-dir dist
-```
-
-The generated `Mobile/dist` directory is ignored. Android Emulator and physical-device API host
-rules still apply as described above.
-
-The backend expects a transaction-capable MongoDB replica set. The easiest supported local path
-is Compose:
-
-```sh
+```powershell
 npm run docker:up
 ```
 
-Compose builds the backend, initializes the idempotent `rs0` replica set, waits for database and
-API health, starts a local SMTP capture service, and binds exposed ports to loopback only. Its
-checked-in credentials and provider values are non-production placeholders used to validate
-integration boundaries; they do not grant access to any external service.
+This builds the backend when necessary and waits for MongoDB and API health checks. MongoDB replica-set setup and backend indexes happen automatically.
 
-`plateforme-formations-mongodb-init-1` is intentionally a one-shot initialization container. It
-waits for MongoDB, creates or confirms replica set `rs0`, and then exits with status 0. An
-`Exited (0)` state is success, not an unavailable database; the long-running `mongodb` and
-`backend` services should remain healthy.
+### 4. Create the initial administrator
 
-Useful endpoints after startup:
+After Docker is healthy, use the administrator credentials configured in `Web/backend/.env`:
 
-- API health: <http://127.0.0.1:3000/api/health>
-- OpenAPI JSON: <http://127.0.0.1:3000/api/openapi.json>
-- Swagger UI: <http://127.0.0.1:3000/api/docs/>
-- Mailpit development inbox: <http://127.0.0.1:8025/>
-
-Useful lifecycle commands:
-
-```sh
-npm run docker:config
-npm run docker:logs
-npm run docker:down
-```
-
-`docker:down` preserves the named `mongodb_data` and `backend_uploads` volumes. Deleting those
-volumes destroys local database and uploaded-file data and is not part of the normal workflow.
-
-After a fresh checkout, initialize a local Admin with `npm run seed:admin`, or populate the
-complete deterministic demonstration dataset using [`Docs/DEVELOPMENT_SEED.md`](Docs/DEVELOPMENT_SEED.md).
-The development seed is destructive and must target only the local MongoDB
-database `plateforme_formations`.
-
-## Initial Admin seed
-
-Set `MONGODB_URI`, `INITIAL_ADMIN_EMAIL`, and `INITIAL_ADMIN_PASSWORD` in the untracked
-`Web/backend/.env`, then run:
-
-```sh
+```powershell
 npm run seed:admin
 ```
 
-The command creates an `ADMIN` only when no Admin exists. It normalizes the email, stores only a
-salted password hash, marks the account active, and requires a password change at first login.
-Repeated runs leave the existing Admin unchanged. If the configured email already belongs to a
-non-Admin, the command fails instead of promoting that account. The MVP permits only the initial
-Admin, enforced by a partial unique database index.
+This is idempotent: it only creates the configured administrator when no administrator exists.
 
-For local development, use the MongoDB connection string
-`mongodb://localhost:27017/plateforme_formations?replicaSet=rs0&directConnection=true` in the
-ignored `.env` file. Never commit or paste database credentials into source files, issue trackers,
-or chat.
+### 5. Start the web client
 
-## Stripe test boundary
-
-Phase 5 calls Stripe only in test mode. `STRIPE_SECRET_KEY` must begin with `sk_test_`, while the
-checked-in defaults are inert placeholders that keep the local stack configurable but cannot create
-a real Checkout Session. For a directly started backend, put the account's test secret key in the
-untracked `Web/backend/.env`. For Compose, copy the repository-root `.env.example` to `.env` and
-replace its Stripe placeholders; Compose reads those ignored overrides without changing tracked
-YAML.
-
-**Important: every local Stripe Checkout test requires a running Stripe CLI listener.** Stripe
-does not deliver Dashboard events to `localhost`, and the Docker backend does not start this host
-process for you. Start this command in a separate terminal *before* testing Checkout, and leave it
-running for the entire test session:
+In a second terminal at the repository root:
 
 ```powershell
-stripe listen --forward-to http://127.0.0.1:3000/api/payments/webhook/stripe
+npm run dev:frontend
 ```
 
-Copy the `whsec_...` secret printed by that command into `STRIPE_WEBHOOK_SECRET` and restart the
-backend whenever the value changes. If the listener is stopped, Checkout can succeed in Stripe
-while the application remains at **En attente du webhook** because no event reaches
-`/api/payments/webhook/stripe`. Checkout redirects are never treated as proof of payment: the Web
-client waits for backend status, and only a verified successful webhook can create the Enrollment
-and Invoice. Automated tests use an injected Checkout adapter and locally signed webhook fixtures,
-so they create no Stripe objects or charges. Never place account secrets in Compose or Git.
-Production support for a Tunisia-established Stripe account remains a separate pre-launch
-readiness check.
+Open <http://localhost:5173>. The default API is <http://localhost:3000/api>.
 
-## Gemini AI question generation
+### 6. Verify
 
-This implementation uses the Gemini API. Create a Gemini API auth key in Google AI Studio and
-keep it backend-only. For Docker Compose, put these values in the ignored repository-root `.env`:
+| Check         | Address or command                 | Expected result                                                   |
+| ------------- | ---------------------------------- | ----------------------------------------------------------------- |
+| API health    | <http://localhost:3000/api/health> | `status: "ok"`, database `up`                                     |
+| API reference | <http://localhost:3000/api/docs>   | Swagger UI                                                        |
+| Web app       | <http://localhost:5173>            | Public High Skills Academy site                                   |
+| Local mail    | <http://localhost:8025>            | Mailpit inbox                                                     |
+| Containers    | `docker compose ps`                | `backend`, `mongodb`, `mailpit` running; `mongodb-init` completed |
 
-```dotenv
-AI_API_KEY=your_real_gemini_key
-AI_MODEL=gemini-3.7-flash
-AI_MAX_CONTEXT_CHARS=100000
-```
+The repository also provides `npm run dev:backend`. It requires `Web/backend/.env` to point to reachable MongoDB and SMTP services. The Compose path above is the supported local arrangement for normal development.
 
-For `npm run dev:backend` without Compose, put the same values in the ignored
-`Web/backend/.env` instead. Do not add the key to Web, Mobile, tracked `.env.example` files,
-source code, or `docker-compose.yml`. Leave `AI_BASE_URL` empty for Google's normal endpoint and
-restart/rebuild the backend after changing environment values.
+## Environment variables
 
-When an owner clicks **Générer avec Gemini**, the backend gathers only that Evaluation's selected
-Training context, sends bounded educational text with a strict JSON schema, validates the response
-locally, and imports editable questions into the `DRAFT` Evaluation. It never sends Learner,
-Attendance, Payment, or other Training data, and it never publishes. Production use still sends
-Training content to an external provider, so use the centre's approved Google project, quota,
-billing, and data policy.
+Never commit copied `.env` files. Do not put server secrets in `VITE_` variables: Vite exposes them to the browser bundle. Restart Vite after frontend changes; rerun `npm run docker:up` after root Docker configuration changes.
 
-## Quality and CI
+| File                | Read by                                                     | Role                                                                    |
+| ------------------- | ----------------------------------------------------------- | ----------------------------------------------------------------------- |
+| `.env`              | Docker Compose; loaded first for a directly started backend | Stripe and Gemini Compose overrides                                     |
+| `Web/backend/.env`  | Backend scripts and direct backend startup                  | Server, database, auth, SMTP, payment, uploads, Gemini, centre identity |
+| `Web/frontend/.env` | Vite client                                                 | Public API/contact display and Firebase Analytics                       |
 
-The former `Docs/DEPLOYMENT.md` and `Docs/BACKUP_RESTORE.md` files are no longer present. The
-operational instructions that were needed from them are kept in this README under [Deployment
-and operations](#deployment-and-operations) and [Data backup and restore](#data-backup-and-restore).
+### Root `.env` — Docker Compose
 
-Run the complete local quality gate:
+All have safe Compose defaults; real credentials are needed to use their integrations.
 
-```sh
-npm run check
-```
+| Variable                | Used by        | Purpose                             | Required?                          |
+| ----------------------- | -------------- | ----------------------------------- | ---------------------------------- |
+| `STRIPE_SECRET_KEY`     | Docker backend | Stripe test secret key              | For real checkout                  |
+| `STRIPE_WEBHOOK_SECRET` | Docker backend | Webhook signature secret            | For verified webhook delivery      |
+| `STRIPE_SUCCESS_URL`    | Docker backend | Checkout success return URL         | Defaults locally                   |
+| `STRIPE_CANCEL_URL`     | Docker backend | Checkout cancel return URL          | Defaults locally                   |
+| `AI_API_KEY`            | Docker backend | Server-side Gemini API key          | For Gemini functionality           |
+| `AI_MODEL`              | Docker backend | Gemini fallback/evaluation model    | No; defaults to `gemini-3.7-flash` |
+| `AI_MAX_CONTEXT_CHARS`  | Docker backend | Evaluation-generation context limit | No; defaults to `100000`           |
 
-This checks formatting, linting, strict types (including tests), all workspace tests, and backend
-and Web builds. `npm run ci` adds Compose configuration validation. GitHub Actions also builds and
-starts the stack, checks the HTTP health endpoint and writable MongoDB primary, runs the Phase 1
-through Phase 11 integration lifecycles, prints logs on failure, and removes only its disposable CI
-volumes. The workflow is defined in `.github/workflows/ci.yml` and runs on pushes to `main` and on
-pull requests.
+### `Web/backend/.env` — API
 
-To run that transaction-backed integration lifecycle locally after Compose is healthy:
+| Variable                                                     | Used by             | Purpose                                                     | Required?                                           |
+| ------------------------------------------------------------ | ------------------- | ----------------------------------------------------------- | --------------------------------------------------- |
+| `NODE_ENV`                                                   | API                 | `development`, `test`, or `production`                      | Yes                                                 |
+| `PORT`                                                       | API                 | HTTP listener port                                          | No; `3000` default                                  |
+| `MONGODB_URI`                                                | API / seed commands | MongoDB connection string                                   | Yes                                                 |
+| `WEB_APP_URL`                                                | API                 | Web origin for application links                            | Yes                                                 |
+| `CORS_ORIGINS`                                               | API                 | Comma-separated allowed browser origins                     | Yes                                                 |
+| `TZ`                                                         | API                 | Must be `UTC`                                               | No; `UTC` default                                   |
+| `LOG_LEVEL`                                                  | API                 | Pino log level                                              | No; `info` default                                  |
+| `JWT_ACCESS_SECRET`                                          | API                 | Access-token signing secret (32+ characters)                | Yes                                                 |
+| `JWT_ACCESS_TTL_MINUTES`                                     | API                 | Access-token lifetime                                       | No; `15` default                                    |
+| `REFRESH_TOKEN_TTL_DAYS`                                     | API                 | Refresh-session lifetime                                    | No; `7` default                                     |
+| `PASSWORD_RESET_TTL_MINUTES`                                 | API                 | Reset-token lifetime                                        | No; `30` default                                    |
+| `INITIAL_ADMIN_EMAIL`                                        | `seed:admin`        | Initial administrator email                                 | Only for the seed                                   |
+| `INITIAL_ADMIN_PASSWORD`                                     | `seed:admin`        | Initial administrator password (12+ characters)             | Only for the seed                                   |
+| `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`                      | API                 | SMTP endpoint and implicit-TLS setting                      | Yes                                                 |
+| `SMTP_USER`, `SMTP_PASSWORD`                                 | API                 | SMTP credentials                                            | Optional pair; set both or neither                  |
+| `SMTP_FROM`                                                  | API                 | Sender identity for reset/contact mail                      | Yes                                                 |
+| `STRIPE_SECRET_KEY`                                          | API                 | Stripe test key (`sk_test_…`)                               | Yes; real key for payments                          |
+| `STRIPE_WEBHOOK_SECRET`                                      | API                 | Webhook secret (`whsec_…`)                                  | Yes; real secret for verification                   |
+| `STRIPE_SUCCESS_URL`, `STRIPE_CANCEL_URL`                    | API                 | Checkout return URLs                                        | Yes                                                 |
+| `UPLOAD_DIR`                                                 | API                 | Protected uploads and generated documents directory         | Yes                                                 |
+| `MAX_UPLOAD_SIZE_MB`                                         | API                 | Upload-size limit                                           | No; `20` default                                    |
+| `AI_API_KEY`                                                 | API                 | Gemini API key                                              | Configuration requires a value; real key for Gemini |
+| `AI_MODEL`                                                   | API                 | Gemini evaluation/configured fallback model                 | Yes                                                 |
+| `AI_BASE_URL`                                                | API                 | Optional compatible Gemini base URL                         | No                                                  |
+| `AI_MAX_CONTEXT_CHARS`                                       | API                 | Evaluation context limit (1,000–1,000,000)                  | No; `100000` default                                |
+| `CENTER_NAME`, `CENTER_ADDRESS`, `CENTER_EMAIL`              | API                 | Centre identity used in application documents/contact       | Yes                                                 |
+| `CENTER_PHONE`, `CENTER_REGISTRATION_ID`, `CENTER_LOGO_PATH` | API                 | Optional centre phone, registration ID, local document logo | No                                                  |
+
+### `Web/frontend/.env` — browser-safe values
+
+| Variable                                                                             | Used by          | Purpose                                                   | Required?                                   |
+| ------------------------------------------------------------------------------------ | ---------------- | --------------------------------------------------------- | ------------------------------------------- |
+| `VITE_API_BASE_URL`                                                                  | Web client       | API base URL                                              | No; defaults to `http://localhost:3000/api` |
+| `VITE_CENTER_NAME`                                                                   | Web client       | Reserved; currently not read by the client                | No                                          |
+| `VITE_CENTER_ADDRESS`, `VITE_CENTER_EMAIL`, `VITE_CENTER_PHONE`, `VITE_CENTER_HOURS` | Contact page     | Public contact display                                    | No; the page has fallbacks                  |
+| `VITE_FIREBASE_ANALYTICS_ENABLED`                                                    | Analytics        | Enables Analytics only when exactly `true`                | No; disabled by default                     |
+| `VITE_FIREBASE_ANALYTICS_DEBUG`                                                      | Analytics        | Adds `debug_mode` for DebugView                           | No; validation only                         |
+| `VITE_FIREBASE_API_KEY`                                                              | Analytics        | Firebase web app API key                                  | When Analytics is enabled                   |
+| `VITE_FIREBASE_AUTH_DOMAIN`                                                          | Analytics config | Firebase auth-domain configuration value                  | Optional for current Analytics-only use     |
+| `VITE_FIREBASE_PROJECT_ID`, `VITE_FIREBASE_APP_ID`, `VITE_FIREBASE_MEASUREMENT_ID`   | Analytics        | Firebase project, web-app, and GA measurement identifiers | When Analytics is enabled                   |
+
+## Docker and local services
+
+The client is not containerized in the current development setup. `docker-compose.yml` runs these services:
+
+| Service        | Purpose            | What it does                                                                                         | Access                                 |
+| -------------- | ------------------ | ---------------------------------------------------------------------------------------------------- | -------------------------------------- |
+| `backend`      | API                | Builds/serves the API, waits for database initialization, owns protected uploads, has a health check | <http://localhost:3000/api> (loopback) |
+| `mongodb`      | Database           | MongoDB 8 with `rs0`, health check, and persistent database volume                                   | `127.0.0.1:27017` (loopback)           |
+| `mongodb-init` | Database bootstrap | Safely initiates `rs0` with `mongodb:27017`, then waits for a writable primary                       | No host port; completes and exits      |
+| `mailpit`      | Local mail capture | Receives backend SMTP and exposes a browser inbox                                                    | <http://localhost:8025> (loopback)     |
+
+`mongodb-init` is required because the application relies on a transaction-capable replica set. On later starts it verifies the existing configuration instead of recreating it.
+
+| Volume            | Contents                                  |
+| ----------------- | ----------------------------------------- |
+| `mongodb_data`    | MongoDB files                             |
+| `backend_uploads` | Protected uploads and generated documents |
 
 ```powershell
-$env:TEST_MONGODB_URI = 'mongodb://127.0.0.1:27017/plateforme_formations_integration?replicaSet=rs0&directConnection=true'
-npm run test:integration
-```
+# Build/start and wait for health
+npm run docker:up
 
-To run the consolidated Phase 12 critical Web and real-API workflow suite:
+# Follow logs
+npm run docker:logs
 
-```powershell
-$env:TEST_MONGODB_URI = 'mongodb://127.0.0.1:27017/plateforme_formations_integration?replicaSet=rs0&directConnection=true'
-npm run test:e2e
-```
-
-The suite covers learner online and in-person prerequisites, Trainer management, attendance and
-evaluation duties, and Admin identity, catalogue, Session, payment, statistics, and Certificate
-operations across the phase integration lifecycles.
-
-The integration command accepts only the dedicated
-`plateforme_formations_integration` database name and cleans that test database's phase-specific
-collections before and after each integration suite.
-
-## Deployment and operations
-
-The checked-in Compose stack is a development and integration environment, not a production
-deployment. It uses placeholder credentials, local MongoDB storage, Mailpit, loopback port
-bindings, and Stripe test mode. Before any production deployment, provide a managed or hardened
-MongoDB replica set, secret storage and rotation, TLS/reverse proxy, restricted network access,
-real SMTP, monitored persistent upload storage, and a verified Stripe account/configuration.
-
-For local operation, verify the stack before using it:
-
-```powershell
-docker compose config --quiet
-docker compose up --build --detach --wait
-Invoke-WebRequest http://127.0.0.1:3000/api/health
+# Inspect status or restart the API
 docker compose ps
+docker compose restart backend
+
+# Stop services; named volumes remain
+npm run docker:down
 ```
 
-The API is ready only when MongoDB is healthy and writable and the backend health endpoint returns
-success. The `mongodb-init` container is expected to exit with code 0 after creating or confirming
-replica set `rs0`. Monitor `docker compose logs --follow` and stop the stack with
-`docker compose down`; do not add `--volumes` unless the local data is intentionally disposable.
+## Database and MongoDB Compass
 
-## Data backup and restore
+MongoDB runs locally through the `mongodb` service. The development database is `plateforme_formations`; use this connection string in MongoDB Compass:
 
-The application state consists of the MongoDB database and the `backend_uploads` volume. Back up
-both together; restoring only MongoDB can leave Certificate or Resource file references broken.
-For a local Compose backup, first stop writes and create a Mongo archive plus an upload-volume
-archive from a temporary container:
-
-```powershell
-New-Item -ItemType Directory -Force .local-backups | Out-Null
-docker compose exec --no-TTY mongodb mongodump --archive --gzip --db plateforme_formations > .local-backups\plateforme_formations.archive.gz
-docker run --rm -v plateforme-formations_backend_uploads:/data:ro -v ${PWD}\.local-backups:/backup alpine tar czf /backup/backend_uploads.tar.gz -C /data .
+```text
+mongodb://localhost:27017/plateforme_formations?replicaSet=rs0&directConnection=true
 ```
 
-The exact volume name is based on the Compose project name; check it with `docker volume ls` if the
-project was started with a different name. Store backup files outside Git, protect them like
-production data, and test restores periodically.
+Install Compass, start the stack, choose **New Connection**, paste the URI, and select `plateforme_formations` in the sidebar. Backend startup creates Mongoose indexes; there is no separate migration command. Direct database edits can bypass API business rules, so use them carefully.
 
-To restore into a disposable local environment, start MongoDB and its dependencies, restore the
-database, restore the upload archive into the upload volume, then restart the backend:
+## Web application
 
-```powershell
-docker compose up --detach --wait mongodb mongodb-init mailpit
-Get-Content .local-backups\plateforme_formations.archive.gz -Raw -AsByteStream | docker compose exec -T mongodb mongorestore --archive --gzip --drop
-docker run --rm -v plateforme-formations_backend_uploads:/data -v ${PWD}\.local-backups:/backup alpine sh -c "rm -rf /data/*; tar xzf /backup/backend_uploads.tar.gz -C /data"
-docker compose up --detach --wait backend
+`Web/frontend` is a React single-page application. Its API client uses `VITE_API_BASE_URL`, sends credentials for refresh-cookie handling, and sends an in-memory Bearer access token on authenticated calls. `Web/backend` validates configuration and DTOs, applies role/ownership checks, and exposes OpenAPI at `/api/docs`.
+
+| Area             | Important routes                                                                                                         |
+| ---------------- | ------------------------------------------------------------------------------------------------------------------------ |
+| Public           | `/`, `/catalogue`, `/trainings/:id`, `/about`, `/faq`, `/contact`                                                        |
+| Account          | `/login`, `/register`, `/forgot-password`, `/reset-password`, `/change-password`                                         |
+| Shared workspace | `/app/profile`, `/app/catalogue`, `/app/content/:trainingId`, `/app/attendance`, `/app/evaluations`, `/app/certificates` |
+| Learner          | `/app/learner`, `/app/progress`, `/app/payments`                                                                         |
+| Trainer          | `/app/trainings`, `/app/trainings/:trainingId/content`, `/app/sessions`, `/app/evaluations/new`, `/app/trainer`          |
+| Administrator    | `/app/categories`, `/app/users`, `/app/dashboard`                                                                        |
+
+## Firebase Analytics
+
+The Firebase Web SDK is used **only for optional Firebase Analytics / Google Analytics**. The current implementation does not use Firebase Authentication, Firestore, Realtime Database, Storage, or Hosting.
+
+Configuration lives in `Web/frontend/src/core/analytics/firebase.ts`. Analytics initializes only when it is enabled, the API key/project ID/app ID/measurement ID exist, the browser supports Analytics, and the visitor explicitly accepts the in-app banner. Consent is stored as `analytics-consent` in local storage; before consent, Firebase is not initialized and no events are queued.
+
+| Event                       | Trigger                                                                                                    | Parameters                                                |
+| --------------------------- | ---------------------------------------------------------------------------------------------------------- | --------------------------------------------------------- |
+| `page_view`                 | Each client-side route after consent                                                                       | `page_location`, `page_path`, `page_title`                |
+| `recommendation_impression` | First display of a learner-dashboard recommendation                                                        | `training_id`, `training_category`, `recommendation_rank` |
+| `recommendation_click`      | Learner opens a recommendation                                                                             | `training_id`, `training_category`, `recommendation_rank` |
+| `recommendation_enrollment` | Backend-confirmed enrollment attributed to a recommendation clicked in the same session (up to seven days) | `training_id`, `training_category`, `recommendation_rank` |
+
+Attribution is held in session storage and removed after conversion. Development mode logs initialization and queued events to the browser console. Set `VITE_FIREBASE_ANALYTICS_DEBUG=true` while validating in **Firebase Console → Analytics → DebugView**; it adds `debug_mode`. Consent refusal, blockers, or unsupported browsers can prevent events from sending.
+
+## AI features
+
+Gemini calls originate only in the backend through `AI_API_KEY`. The API asks for structured JSON and validates responses before returning them.
+
+### AI Tutor — training content
+
+The **Tuteur IA de la formation** appears for an enrolled learner in `/app/content/:trainingId`. It can answer course questions; simplify concepts; give grounded examples; make short practice questions; summarize relevant material; and prepare revision aids based on the conversation. It returns clickable lesson citations and up to three follow-up questions.
+
+- `POST /api/trainings/:id/tutor/messages` requires an authenticated Learner, changed password, and training enrollment.
+- The backend ranks active, non-archived course lessons and retrieves no more than **five** relevant excerpts. A selected current lesson is boosted.
+- Gemini receives only the learner message, up to **eight** recent conversation messages, and retrieved lesson text—not identity, payment, progress, certificate, evaluation, or other account data.
+- Context is capped at the smaller of `AI_MAX_CONTEXT_CHARS` and **24,000 characters**. Messages/conversation entries are capped at 2,000 characters.
+- A supported answer must cite supplied lesson IDs. Unauthorized, fabricated, or inconsistent citations are rejected. If sources are insufficient, Gemini is instructed to return an ungrounded answer with no citations.
+- Chat history is held in the current browser UI; it is not stored by the tutor service. The in-memory IP limiter permits **30 requests per 15 minutes**.
+- Gemini uses `gemini-3.1-flash-lite` first, has a 15-second timeout and 1,600-token response cap, and can fall back to the configured model after eligible transient errors.
+
+### Public AI concierge
+
+Signed-out visitors see a floating bottom-right **Assistant HSA** widget. It has a welcome message, starter/follow-up questions, responsive layout, clickable public sources/actions, and a Gemini/privacy disclosure. It disappears after login.
+
+It is a public website concierge—not a course tutor. It explains the platform, public training information, prices and enrollment, registration and payment flow, navigation, and general public questions. It can recommend published training or registration when appropriate, and provides a Contact action if it cannot support an answer.
+
+- Anonymous endpoint: `POST /api/public/concierge/messages`.
+- Context contains curated public pages plus selected fields from up to 100 `PUBLISHED` trainings. It cannot access users, enrollments, payments, progress, lessons, evaluations, certificates, credentials, or private content.
+- It ranks up to five pages and five matching trainings; at most eight sources and **12,000 context characters** are sent. Contact is retained as a fallback.
+- URLs are resolved server-side from source IDs. Gemini cannot invent protected/external links; invalid citations/actions are rejected.
+- The system instruction treats visitor text, conversation, and sources as untrusted data; it rejects prompt injection and private-data claims.
+- Input is capped at 1,000 characters, recent conversation at four messages, response at 3,000 characters, citations at five, actions at three, and suggestions at three.
+- A hidden `website` honeypot avoids Gemini calls for bot submissions. The in-memory IP limiter permits **10 requests per 15 minutes**; conversations are not stored server-side.
+- Gemini uses `gemini-3.1-flash-lite` first, 15-second timeouts, a 1,200-token cap, and configured-model fallback.
+
+### Trainer AI question generation
+
+Trainers can create draft objective questions through `POST /api/evaluations/:id/generate-ai`. The backend builds a bounded training-only context from active modules, lessons, and extractable local PDF, DOCX, PPTX, or TXT resources. Gemini returns schema-constrained questions that are validated and imported as drafts; the trainer must review, edit, and explicitly publish. AI cannot publish an evaluation or designate it certifying. This flow uses `AI_MAX_CONTEXT_CHARS`, `AI_MODEL`, and an 8,192-token output cap; it does not crawl URLs or use OCR.
+
+## External services
+
+| Service                     | Use                                          | Configuration                                                                         |
+| --------------------------- | -------------------------------------------- | ------------------------------------------------------------------------------------- |
+| Google Gemini               | Tutor, concierge, trainer question drafts    | Backend/root `AI_API_KEY`, `AI_MODEL`, optional `AI_BASE_URL`, `AI_MAX_CONTEXT_CHARS` |
+| Stripe                      | Test Checkout and signed webhook fulfillment | Backend/root test key, webhook secret, return URLs                                    |
+| Firebase / Google Analytics | Optional consent-based measurement           | `VITE_FIREBASE_*` in `Web/frontend/.env`                                              |
+| Mailpit                     | Local password-reset/contact email capture   | Supplied by Compose; Docker backend uses its internal SMTP endpoint                   |
+
+## Useful commands
+
+Run from the repository root.
+
+| Task                         | Command                          |
+| ---------------------------- | -------------------------------- |
+| Install locked dependencies  | `npm ci`                         |
+| Start Docker services/API    | `npm run docker:up`              |
+| Stop services                | `npm run docker:down`            |
+| Follow logs                  | `npm run docker:logs`            |
+| Show service status          | `docker compose ps`              |
+| Restart API container        | `docker compose restart backend` |
+| Start web server             | `npm run dev:frontend`           |
+| Start backend watcher        | `npm run dev:backend`            |
+| Create initial administrator | `npm run seed:admin`             |
+| Build web and backend        | `npm run build`                  |
+| Render Compose configuration | `npm run docker:config`          |
+
+The repository also has a development demonstration-data seed that deliberately clears and recreates the local database. It is not part of normal setup; review its safeguards before use.
+
+## Project structure
+
+```text
+.
+├── docker-compose.yml                 # Local API, MongoDB, bootstrap, Mailpit
+├── .env.example                       # Docker Stripe/Gemini template
+├── Web/
+│   ├── backend/
+│   │   ├── src/
+│   │   │   ├── modules/               # Business modules and routes
+│   │   │   ├── infrastructure/        # DB, files, PDF, mail, Stripe, OpenAPI
+│   │   │   ├── middleware/            # Authentication and request limiting
+│   │   │   └── scripts/               # Initial-admin and development data tools
+│   │   ├── docker/init-replica-set.js
+│   │   ├── .env.example
+│   │   └── Dockerfile
+│   └── frontend/
+│       ├── src/
+│       │   ├── app/                   # Routes, layouts, guards
+│       │   ├── core/analytics/        # Firebase consent and tracking
+│       │   ├── core/auth/             # Browser authentication client
+│       │   ├── features/              # Pages, workspaces, AI UI
+│       │   └── shared/                # Reusable UI and styles
+│       ├── .env.example
+│       └── vite.config.ts
+├── HSA_LOGO.png
+└── package.json                        # Workspace scripts and engines
 ```
 
-Validate `/api/health`, login, a representative protected file download, and a certificate
-download after restoration. Do not use `--drop` or overwrite a non-disposable environment without
-an approved recovery procedure and a verified backup.
+## Local notes
 
-## Backend environment contract
-
-The complete annotated contract is in `Web/backend/.env.example`. It covers application/database,
-JWT lifetime and secret values, SMTP, Stripe test mode, local uploads, the backend-only AI adapter,
-and immutable centre identity. Defaults are limited to the values documented by `PLAN.md`:
-`PORT=3000`, `TZ=UTC`, `LOG_LEVEL=info`, access JWT 15 minutes, refresh token 7 days, password reset
-30 minutes, upload size 20 MB, and AI context 100,000 characters.
-
-Web and Mobile build-time public values live in their respective `.env.example` files. Secret
-provider values must remain backend-only.
-
-## Firebase Analytics (Web)
-
-The Web client has an optional Firebase Analytics integration. It is disabled by
-default, makes no backend/API changes, and tracks consented client-side route page
-views plus privacy-safe recommendation impressions, clicks, and backend-confirmed
-recommendation enrollments when all Firebase values below are provided and
-`VITE_FIREBASE_ANALYTICS_ENABLED=true`. The recommendation event model and reporting
-setup are documented in [`Docs/AI_RECOMMENDATIONS_PHASE1.md`](Docs/AI_RECOMMENDATIONS_PHASE1.md).
-
-Create one Firebase project for the platform and register the Web client as a Web
-app. Enable Google Analytics for the Firebase project, then copy the Web app
-configuration values from **Project settings > Your apps** into the ignored
-`Web/frontend/.env` file:
-
-```dotenv
-VITE_FIREBASE_ANALYTICS_ENABLED=true
-VITE_FIREBASE_API_KEY=...
-VITE_FIREBASE_AUTH_DOMAIN=...
-VITE_FIREBASE_PROJECT_ID=...
-VITE_FIREBASE_APP_ID=...
-VITE_FIREBASE_MEASUREMENT_ID=G-...
-```
-
-These are public client configuration identifiers, not service-account secrets.
-Do not add a Firebase service-account key to the Web client or commit `.env` files.
-Before enabling production collection, ensure the centre's privacy notice and any
-required visitor-consent process cover Analytics. Firebase Analytics must not receive
-emails, user IDs, payment references, or other personal data.
-
-When the Mobile phase starts, register the Android and iOS applications in this same
-Firebase project; they will have their own app identifiers and configuration files.
-That future FCM work will use a backend-only service-account credential.
-
-## Course-grounded AI tutor
-
-Paid Learners have a Gemini-backed chatbot on each protected Training content page.
-The backend retrieves bounded active Lesson text, validates every returned citation
-against that authorized retrieval set, and exposes clickable Lesson sources. Tutor
-questions and relevant course excerpts are processed by Gemini; identity, payment,
-progress, and Evaluation data are excluded. The complete scope, privacy boundary,
-and verification guide are in
-[`Docs/AI_TUTOR_PHASE2.md`](Docs/AI_TUTOR_PHASE2.md).
-
-## Architecture boundaries
-
-`Web/backend` is the only backend for both clients. Business rules, validation, and authorization
-belong there. Client packages may handle presentation and local interaction state but must not
-duplicate backend business decisions. New functionality should be added phase-by-phase as the
-vertical slices in `PLAN.md`; later-phase entities and workflows should not be scaffolded early.
+- Docker ports are bound to loopback interfaces and the supplied stack is intended for local use.
+- `/api/health` reports a degraded response when MongoDB is unavailable.
+- Protected files and generated PDFs live in the upload volume and are served through authorized API routes, not public static URLs.
