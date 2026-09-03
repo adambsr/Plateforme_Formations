@@ -11,6 +11,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import type { AppStackParamList } from '../../app/navigation/types';
 import { ApiError } from '../../core/api/client';
+import { trackRecommendationEnrollment } from '../../core/analytics/recommendation-analytics';
 import { useAuth } from '../../core/auth/AuthContext';
 import { shareFile } from '../../core/files/share';
 import { Button } from '../../shared/components/Button';
@@ -101,6 +102,12 @@ export function CheckoutReturnScreen({
       if (interval !== undefined) clearInterval(interval);
     };
   }, [load, payment?.status, payment]);
+
+  useEffect(() => {
+    if (payment?.status === 'PAID' && payment.enrollmentId !== undefined) {
+      void trackRecommendationEnrollment(payment.training.id);
+    }
+  }, [payment?.enrollmentId, payment?.status, payment?.training.id]);
 
   return (
     <SafeAreaView edges={['bottom']} style={styles.safeArea}>

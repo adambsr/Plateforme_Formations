@@ -17,6 +17,7 @@ import { TextField } from '../../shared/components/TextField';
 import { colors, radii, spacing } from '../../shared/theme/tokens';
 import type {
   Overview,
+  LearningInsights,
   Participation,
   Profitability,
   ProgressDashboard,
@@ -29,6 +30,7 @@ type DashboardData = {
   progress: ProgressDashboard;
   satisfaction: Satisfaction;
   profitability: Profitability;
+  learningInsights: LearningInsights;
 };
 
 function message(error: unknown) {
@@ -83,20 +85,28 @@ export function AdminDashboardScreen() {
     setError('');
     const query = `from=${appliedRange.from}&to=${appliedRange.to}`;
     try {
-      const [overview, participation, progress, satisfaction, profitability] =
-        await Promise.all([
-          request<Overview>(`/dashboard/overview?${query}`),
-          request<Participation>(`/dashboard/participation?${query}`),
-          request<ProgressDashboard>(`/dashboard/progress?${query}`),
-          request<Satisfaction>(`/dashboard/satisfaction?${query}`),
-          request<Profitability>(`/dashboard/profitability?${query}`),
-        ]);
+      const [
+        overview,
+        participation,
+        progress,
+        satisfaction,
+        profitability,
+        learningInsights,
+      ] = await Promise.all([
+        request<Overview>(`/dashboard/overview?${query}`),
+        request<Participation>(`/dashboard/participation?${query}`),
+        request<ProgressDashboard>(`/dashboard/progress?${query}`),
+        request<Satisfaction>(`/dashboard/satisfaction?${query}`),
+        request<Profitability>(`/dashboard/profitability?${query}`),
+        request<LearningInsights>(`/dashboard/learning-insights?${query}`),
+      ]);
       setData({
         overview,
         participation,
         progress,
         satisfaction,
         profitability,
+        learningInsights,
       });
     } catch (caught) {
       setError(message(caught));
@@ -208,6 +218,52 @@ export function AdminDashboardScreen() {
               />
             </View>
             <View style={styles.card}>
+              <Text style={styles.cardTitle}>
+                Complétions self-paced par mois
+              </Text>
+              {data.learningInsights.completionTrend.length === 0 ? (
+                <Text style={styles.muted}>
+                  Aucune complétion sur cette période.
+                </Text>
+              ) : (
+                data.learningInsights.completionTrend.map((point) => (
+                  <View key={point.month} style={styles.insightRow}>
+                    <Text style={styles.insightLabel}>{point.month}</Text>
+                    <Text style={styles.insightValue}>{point.completed}</Text>
+                  </View>
+                ))
+              )}
+            </View>
+            <View style={styles.card}>
+              <Text style={styles.cardTitle}>Apprenants devenus inactifs</Text>
+              <Text style={styles.muted}>
+                {data.learningInsights.inactivity.total} apprenant(s) sans
+                activité depuis au moins{' '}
+                {data.learningInsights.inactivity.thresholdDays} jours.
+              </Text>
+              {data.learningInsights.inactivity.learners.length === 0 ? (
+                <Text style={styles.muted}>Aucun apprenant à relancer.</Text>
+              ) : (
+                data.learningInsights.inactivity.learners.map((row) => (
+                  <View key={row.learner.id} style={styles.inactiveRow}>
+                    <View style={styles.insightText}>
+                      <Text style={styles.resultTitle}>
+                        {[row.learner.firstName, row.learner.lastName]
+                          .filter(Boolean)
+                          .join(' ') || row.learner.email}
+                      </Text>
+                      <Text style={styles.muted}>
+                        {row.trainingTitles.join(', ')}
+                      </Text>
+                    </View>
+                    <Text style={styles.inactiveBadge}>
+                      {row.inactiveDays} jours
+                    </Text>
+                  </View>
+                ))
+              )}
+            </View>
+            <View style={styles.card}>
               <Text style={styles.cardTitle}>Satisfaction</Text>
               <Text style={styles.highlight}>
                 {data.satisfaction.global.average === null
@@ -310,6 +366,33 @@ const styles = StyleSheet.create({
   metricValue: { color: colors.ink, fontSize: 22, fontWeight: '800' },
   highlight: { color: colors.primaryDark, fontSize: 24, fontWeight: '800' },
   distribution: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.md },
+  insightRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    borderBottomWidth: 1,
+    borderBottomColor: colors.line,
+    paddingVertical: spacing.sm,
+  },
+  insightLabel: { color: colors.ink, fontWeight: '600' },
+  insightValue: { color: colors.primaryDark, fontSize: 18, fontWeight: '800' },
+  inactiveRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    borderTopWidth: 1,
+    borderTopColor: colors.line,
+    paddingTop: spacing.md,
+  },
+  insightText: { flex: 1, gap: spacing.xs },
+  inactiveBadge: {
+    color: colors.primaryDark,
+    borderRadius: 999,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs,
+    backgroundColor: colors.primarySoft,
+    fontSize: 12,
+    fontWeight: '800',
+  },
   resultRow: {
     gap: spacing.xs,
     borderTopWidth: 1,

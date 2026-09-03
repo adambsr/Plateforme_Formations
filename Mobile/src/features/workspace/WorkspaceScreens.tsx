@@ -1,28 +1,44 @@
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useState } from 'react';
 import {
+  Animated,
   KeyboardAvoidingView,
   Platform,
+  Pressable,
   ScrollView,
   StyleSheet,
   Text,
   View,
 } from 'react-native';
+import {
+  BadgeCheck,
+  BookOpen,
+  CalendarDays,
+  ChartNoAxesCombined,
+  ClipboardCheck,
+  Home,
+  LogOut,
+  Menu,
+  Settings,
+  UserRound,
+  UsersRound,
+  WalletCards,
+  X,
+} from 'lucide-react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import type { AppStackParamList } from '../../app/navigation/types';
 import { ApiError } from '../../core/api/client';
 import { useAuth } from '../../core/auth/AuthContext';
+import { NotificationPreferences } from '../../core/notifications/NotificationPreferences';
 import { Brand } from '../../shared/components/Brand';
 import { Button } from '../../shared/components/Button';
 import { TextField } from '../../shared/components/TextField';
 import { colors, radii, spacing } from '../../shared/theme/tokens';
+import { RoleDashboardSummary } from './RoleDashboardSummary';
 import { roleWorkspace } from './role-workspace';
 
-function displayName(profile: {
-  firstName?: string;
-  lastName?: string;
-}): string {
+function displayName(profile: { firstName?: string; lastName?: string }) {
   return (
     [profile.firstName, profile.lastName].filter(Boolean).join(' ') ||
     'Votre espace'
@@ -33,12 +49,111 @@ export function WorkspaceScreen({
   navigation,
 }: NativeStackScreenProps<AppStackParamList, 'Workspace'>) {
   const { user, logout } = useAuth();
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const drawerX = useState(() => new Animated.Value(-320))[0];
   if (user === null) return null;
   const workspace = roleWorkspace(user.role);
+  const close = (after?: () => void) =>
+    Animated.timing(drawerX, {
+      toValue: -320,
+      duration: 180,
+      useNativeDriver: true,
+    }).start(() => {
+      setDrawerOpen(false);
+      after?.();
+    });
+  const open = () => {
+    setDrawerOpen(true);
+    Animated.timing(drawerX, {
+      toValue: 0,
+      duration: 180,
+      useNativeDriver: true,
+    }).start();
+  };
+  const items = [
+    {
+      label: 'Tableau de bord',
+      Icon: Home,
+      route: 'Workspace' as const,
+      active: true,
+    },
+    { label: 'Catalogue', Icon: BookOpen, route: 'Catalogue' as const },
+    ...(user.role === 'LEARNER'
+      ? [
+          {
+            label: 'Ma progression',
+            Icon: ChartNoAxesCombined,
+            route: 'Progress' as const,
+          },
+          {
+            label: 'Mes achats',
+            Icon: WalletCards,
+            route: 'Purchases' as const,
+          },
+        ]
+      : []),
+    ...(user.role !== 'LEARNER'
+      ? [
+          {
+            label: 'Formations',
+            Icon: BookOpen,
+            route: 'ManagedTrainings' as const,
+          },
+        ]
+      : []),
+    {
+      label: user.role === 'LEARNER' ? 'Mon planning' : 'Sessions',
+      Icon: CalendarDays,
+      route: 'Sessions' as const,
+    },
+    {
+      label: user.role === 'LEARNER' ? 'Mes présences' : 'Présences',
+      Icon: ClipboardCheck,
+      route: 'Attendance' as const,
+    },
+    { label: 'Évaluations', Icon: BadgeCheck, route: 'Evaluations' as const },
+    { label: 'Certificats', Icon: BadgeCheck, route: 'Certificates' as const },
+    ...(user.role === 'ADMIN'
+      ? [
+          {
+            label: 'Indicateurs',
+            Icon: ChartNoAxesCombined,
+            route: 'AdminDashboard' as const,
+          },
+          {
+            label: 'Utilisateurs',
+            Icon: UsersRound,
+            route: 'AdminUsers' as const,
+          },
+          { label: 'Coûts', Icon: WalletCards, route: 'AdminCosts' as const },
+          {
+            label: 'Catégories',
+            Icon: Settings,
+            route: 'AdminCategories' as const,
+          },
+        ]
+      : []),
+    { label: 'Mon profil', Icon: UserRound, route: 'Profile' as const },
+    { label: 'Paramètres', Icon: Settings, route: 'Settings' as const },
+  ];
   return (
     <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
-      <ScrollView contentContainerStyle={styles.content}>
-        <Brand />
+      <View style={styles.bar}>
+        <Pressable
+          accessibilityLabel="Ouvrir la navigation"
+          accessibilityHint="Ouvre les pages de votre espace"
+          hitSlop={8}
+          onPress={open}
+          style={styles.iconButton}
+        >
+          <Menu color={colors.primaryDark} size={24} />
+        </Pressable>
+        <Brand compact onPress={() => navigation.navigate('Home')} />
+      </View>
+      <ScrollView
+        contentContainerStyle={styles.content}
+        contentInsetAdjustmentBehavior="automatic"
+      >
         <View style={styles.hero}>
           <Text style={styles.eyebrow}>{workspace.eyebrow}</Text>
           <Text style={styles.title}>
@@ -46,122 +161,102 @@ export function WorkspaceScreen({
           </Text>
           <Text style={styles.description}>{workspace.description}</Text>
         </View>
+        <RoleDashboardSummary navigation={navigation} />
         <View style={styles.card}>
-          <Text style={styles.cardTitle}>Compte connecté</Text>
-          <Text style={styles.email}>{user.email}</Text>
+          <Text style={styles.cardTitle}>Votre espace</Text>
+          <Text style={styles.muted}>{user.email}</Text>
           <Text style={styles.muted}>
-            Votre navigation est adaptée au rôle {user.role.toLowerCase()}.
+            Utilisez le menu pour accéder à vos formations, sessions et
+            réglages.
           </Text>
-          {user.role === 'ADMIN' && (
-            <>
-              <Button
-                label="Tableau de bord"
-                onPress={() => navigation.navigate('AdminDashboard')}
-              />
-              <Button
-                label="Formateurs et apprenants"
-                onPress={() => navigation.navigate('AdminUsers')}
-                variant="secondary"
-              />
-              <Button
-                label="Coûts explicites"
-                onPress={() => navigation.navigate('AdminCosts')}
-                variant="secondary"
-              />
-              <Button
-                label="Catégories du catalogue"
-                onPress={() => navigation.navigate('AdminCategories')}
-                variant="secondary"
-              />
-            </>
-          )}
           <Button
-            label="Explorer le catalogue"
-            onPress={() => navigation.navigate('Catalogue')}
-          />
-          {user.role !== 'LEARNER' && (
-            <Button
-              label={
-                user.role === 'ADMIN'
-                  ? 'Gérer les Formations'
-                  : 'Mes Formations'
-              }
-              onPress={() => navigation.navigate('ManagedTrainings')}
-              variant="secondary"
-            />
-          )}
-          {user.role === 'LEARNER' && (
-            <Button
-              label="Ma progression"
-              onPress={() => navigation.navigate('Progress')}
-              variant="secondary"
-            />
-          )}
-          <Button
-            label={user.role === 'LEARNER' ? 'Mon planning' : 'Mes sessions'}
-            onPress={() => navigation.navigate('Sessions')}
+            label="Ouvrir les paramètres"
             variant="secondary"
-          />
-          <Button
-            label={
-              user.role === 'LEARNER' ? 'Mes présences' : 'Gérer les présences'
-            }
-            onPress={() => navigation.navigate('Attendance')}
-            variant="secondary"
-          />
-          {(user.role === 'LEARNER' || user.role === 'ADMIN') && (
-            <Button
-              label={
-                user.role === 'ADMIN' ? 'Paiements et factures' : 'Mes achats'
-              }
-              onPress={() => navigation.navigate('Purchases')}
-              variant="secondary"
-            />
-          )}
-          <Button
-            label="Évaluations"
-            onPress={() => navigation.navigate('Evaluations')}
-            variant="secondary"
-          />
-          <Button
-            label={
-              user.role === 'ADMIN'
-                ? 'Certificats et satisfaction'
-                : 'Certificats'
-            }
-            onPress={() => navigation.navigate('Certificates')}
-            variant="secondary"
-          />
-          <Button
-            label="Mon profil"
-            onPress={() => navigation.navigate('Profile')}
-            variant="secondary"
-          />
-          <Button
-            label="Se déconnecter"
-            onPress={() => void logout()}
-            variant="link"
+            onPress={() => navigation.navigate('Settings')}
           />
         </View>
       </ScrollView>
+      {drawerOpen && (
+        <Pressable
+          accessibilityLabel="Fermer la navigation"
+          style={styles.backdrop}
+          onPress={() => close()}
+        />
+      )}
+      {drawerOpen && (
+        <Animated.View
+          style={[styles.drawer, { transform: [{ translateX: drawerX }] }]}
+        >
+          <View style={styles.drawerHeader}>
+            <Brand
+              compact
+              onPress={() => close(() => navigation.navigate('Home'))}
+            />
+            <Pressable
+              accessibilityLabel="Fermer la navigation"
+              hitSlop={8}
+              onPress={() => close()}
+              style={styles.iconButton}
+            >
+              <X color={colors.ink} size={24} />
+            </Pressable>
+          </View>
+          <Text style={styles.drawerLabel}>NAVIGATION</Text>
+          <ScrollView
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={styles.drawerList}
+          >
+            {items.map(({ label, Icon, route, active }) => (
+              <Pressable
+                key={label}
+                accessibilityRole="button"
+                accessibilityState={{ selected: active }}
+                onPress={() => close(() => navigation.navigate(route))}
+                style={({ pressed }) => [
+                  styles.drawerItem,
+                  active && styles.drawerItemActive,
+                  pressed && styles.drawerItemPressed,
+                ]}
+              >
+                <Icon
+                  color={active ? colors.primaryDark : colors.muted}
+                  size={20}
+                />
+                <Text
+                  style={[styles.drawerText, active && styles.drawerTextActive]}
+                >
+                  {label}
+                </Text>
+              </Pressable>
+            ))}
+          </ScrollView>
+          <Pressable
+            accessibilityRole="button"
+            onPress={() => void logout()}
+            style={styles.drawerItem}
+          >
+            <LogOut color={colors.danger} size={20} />
+            <Text style={styles.drawerLogout}>Se déconnecter</Text>
+          </Pressable>
+        </Animated.View>
+      )}
     </SafeAreaView>
   );
 }
 
-export function ProfileScreen() {
-  const { user, updateProfile, logout } = useAuth();
+export function ProfileScreen({
+  navigation,
+}: NativeStackScreenProps<AppStackParamList, 'Profile'>) {
+  const { user, updateProfile } = useAuth();
   const [firstName, setFirstName] = useState(user?.profile.firstName ?? '');
   const [lastName, setLastName] = useState(user?.profile.lastName ?? '');
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   if (user === null) return null;
-
   async function submit() {
-    if (firstName.trim().length === 0 || lastName.trim().length === 0) {
-      setError('Renseignez votre prénom et votre nom.');
-      return;
-    }
+    if (!firstName.trim() || !lastName.trim())
+      return setError('Renseignez votre prénom et votre nom.');
     setError('');
     setMessage('');
     setLoading(true);
@@ -178,7 +273,6 @@ export function ProfileScreen() {
       setLoading(false);
     }
   }
-
   return (
     <SafeAreaView style={styles.safeArea} edges={['bottom']}>
       <KeyboardAvoidingView
@@ -193,26 +287,47 @@ export function ProfileScreen() {
             <Text style={styles.cardTitle}>Informations personnelles</Text>
             <Text style={styles.muted}>{user.email}</Text>
             <TextField
+              autoComplete="given-name"
               label="Prénom"
               onChangeText={setFirstName}
+              returnKeyType="next"
               value={firstName}
             />
             <TextField
+              autoComplete="family-name"
               label="Nom"
               onChangeText={setLastName}
+              onSubmitEditing={() => void submit()}
+              returnKeyType="done"
               value={lastName}
             />
-            {error !== '' && <Text style={styles.error}>{error}</Text>}
-            {message !== '' && <Text style={styles.success}>{message}</Text>}
+            {error !== '' && (
+              <Text style={styles.error} accessibilityLiveRegion="polite">
+                {error}
+              </Text>
+            )}
+            {message !== '' && (
+              <Text style={styles.success} accessibilityLiveRegion="polite">
+                {message}
+              </Text>
+            )}
             <Button
               label="Enregistrer"
               loading={loading}
               onPress={() => void submit()}
             />
+          </View>
+          <View style={styles.card}>
+            <Text style={styles.cardTitle}>Sécurité</Text>
             <Button
-              label="Se déconnecter"
-              onPress={() => void logout()}
-              variant="danger"
+              label="Changer le mot de passe"
+              variant="secondary"
+              onPress={() => navigation.navigate('ChangePassword')}
+            />
+            <Button
+              label="Réinitialiser le mot de passe"
+              variant="secondary"
+              onPress={() => navigation.navigate('ResetPassword', {})}
             />
           </View>
         </ScrollView>
@@ -221,10 +336,67 @@ export function ProfileScreen() {
   );
 }
 
+export function SettingsScreen({
+  navigation,
+}: NativeStackScreenProps<AppStackParamList, 'Settings'>) {
+  const { logout } = useAuth();
+  return (
+    <SafeAreaView style={styles.safeArea} edges={['bottom']}>
+      <ScrollView contentContainerStyle={styles.content}>
+        <View style={styles.card}>
+          <Text style={styles.cardTitle}>Notifications</Text>
+          <NotificationPreferences />
+        </View>
+        <View style={styles.card}>
+          <Text style={styles.cardTitle}>Compte et sécurité</Text>
+          <Button
+            label="Gérer mon profil"
+            variant="secondary"
+            onPress={() => navigation.navigate('Profile')}
+          />
+          <Button
+            label="Se déconnecter"
+            variant="danger"
+            onPress={() => void logout()}
+          />
+        </View>
+        <View style={styles.card}>
+          <Text style={styles.cardTitle}>À propos</Text>
+          <Text style={styles.muted}>
+            High Skills Academy · Application mobile
+          </Text>
+          <Button
+            label="Voir l’accueil public"
+            variant="link"
+            onPress={() => navigation.navigate('Home')}
+          />
+        </View>
+      </ScrollView>
+    </SafeAreaView>
+  );
+}
+
 const styles = StyleSheet.create({
   flex: { flex: 1 },
   safeArea: { flex: 1, backgroundColor: colors.canvas },
-  content: { gap: spacing.xl, padding: spacing.xl },
+  content: { gap: spacing.lg, padding: spacing.lg, paddingBottom: spacing.xxl },
+  bar: {
+    minHeight: 62,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    paddingHorizontal: spacing.lg,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.line,
+    backgroundColor: colors.surface,
+  },
+  iconButton: {
+    minWidth: 44,
+    minHeight: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 22,
+  },
   hero: {
     gap: spacing.sm,
     borderRadius: radii.md,
@@ -245,15 +417,14 @@ const styles = StyleSheet.create({
   },
   description: { color: '#dbe7f5', fontSize: 15, lineHeight: 22 },
   card: {
-    gap: spacing.lg,
+    gap: spacing.md,
     borderWidth: 1,
     borderColor: colors.line,
     borderRadius: radii.md,
-    padding: spacing.xl,
+    padding: spacing.lg,
     backgroundColor: colors.surface,
   },
   cardTitle: { color: colors.ink, fontSize: 20, fontWeight: '700' },
-  email: { color: colors.ink, fontSize: 16, fontWeight: '600' },
   muted: { color: colors.muted, fontSize: 14, lineHeight: 20 },
   error: {
     color: colors.danger,
@@ -267,4 +438,49 @@ const styles = StyleSheet.create({
     padding: spacing.md,
     borderRadius: radii.sm,
   },
+  backdrop: {
+    ...StyleSheet.absoluteFill,
+    backgroundColor: 'rgba(23,32,51,0.4)',
+  },
+  drawer: {
+    position: 'absolute',
+    zIndex: 2,
+    top: 0,
+    bottom: 0,
+    width: 310,
+    gap: spacing.xs,
+    padding: spacing.lg,
+    borderRightWidth: 1,
+    borderRightColor: colors.line,
+    backgroundColor: colors.surface,
+    elevation: 12,
+  },
+  drawerHeader: {
+    minHeight: 56,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  drawerLabel: {
+    marginTop: spacing.lg,
+    marginBottom: spacing.sm,
+    color: colors.muted,
+    fontSize: 11,
+    fontWeight: '800',
+    letterSpacing: 1,
+  },
+  drawerList: { gap: spacing.xs, paddingBottom: spacing.md },
+  drawerItem: {
+    minHeight: 48,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    borderRadius: radii.sm,
+    paddingHorizontal: spacing.md,
+  },
+  drawerItemActive: { backgroundColor: colors.primarySoft },
+  drawerItemPressed: { opacity: 0.72 },
+  drawerText: { color: colors.ink, fontSize: 15, fontWeight: '700' },
+  drawerTextActive: { color: colors.primaryDark },
+  drawerLogout: { color: colors.danger, fontSize: 15, fontWeight: '700' },
 });

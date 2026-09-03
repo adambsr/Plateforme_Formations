@@ -28,6 +28,7 @@ import type {
   TrainingContent,
 } from './types';
 import { ContentManagementPanel } from './ContentManagementPanel';
+import { TutorChat } from './TutorChat';
 
 function message(error: unknown): string {
   return error instanceof ApiError
@@ -79,6 +80,7 @@ function LessonCard({
   onToggle,
   onOpenResource,
   resourceBusyId,
+  forceOpen = false,
 }: {
   lesson: ContentLesson;
   completed: boolean;
@@ -87,14 +89,16 @@ function LessonCard({
   onToggle: () => void;
   onOpenResource: (resource: ContentResource) => void;
   resourceBusyId?: string;
+  forceOpen?: boolean;
 }) {
-  const [expanded, setExpanded] = useState(false);
+  const [manuallyExpanded, setManuallyExpanded] = useState(false);
+  const expanded = forceOpen || manuallyExpanded;
   return (
-    <View style={styles.lessonCard}>
+    <View style={[styles.lessonCard, forceOpen && styles.lessonCardFocused]}>
       <Pressable
         accessibilityRole="button"
         accessibilityState={{ expanded }}
-        onPress={() => setExpanded((value) => !value)}
+        onPress={() => setManuallyExpanded((value) => !value)}
         style={styles.lessonHeader}
       >
         <View style={styles.flex}>
@@ -152,6 +156,7 @@ export function ContentScreen({
   const [notice, setNotice] = useState('');
   const [savingLessonId, setSavingLessonId] = useState<string>();
   const [resourceBusyId, setResourceBusyId] = useState<string>();
+  const [focusedLessonId, setFocusedLessonId] = useState<string>();
   const { trainingId } = route.params;
 
   const load = useCallback(async () => {
@@ -288,6 +293,17 @@ export function ContentScreen({
                 )}
               </View>
             )}
+            {user?.role === 'LEARNER' && content.access === 'LEARNER_READ' && (
+              <TutorChat
+                content={content}
+                onOpenLesson={(lessonId) => {
+                  setFocusedLessonId(lessonId);
+                  setNotice(
+                    'La leçon source a été ouverte dans le contenu ci-dessous.',
+                  );
+                }}
+              />
+            )}
             {content.modules.length === 0 ? (
               <StatePanel message="Aucun contenu disponible." />
             ) : (
@@ -311,6 +327,7 @@ export function ContentScreen({
                         onToggle={() => void toggleLesson(lesson.id)}
                         resourceBusyId={resourceBusyId}
                         saving={savingLessonId === lesson.id}
+                        forceOpen={focusedLessonId === lesson.id}
                       />
                     ))}
                   </View>
@@ -462,6 +479,7 @@ const styles = StyleSheet.create({
     borderRadius: radii.sm,
     backgroundColor: colors.canvas,
   },
+  lessonCardFocused: { borderColor: colors.primary, borderWidth: 2 },
   lessonHeader: {
     minHeight: 64,
     flexDirection: 'row',

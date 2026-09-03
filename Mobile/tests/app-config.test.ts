@@ -6,5 +6,8 @@ describe('Expo application configuration', () => {
     expect(appConfig.expo.slug).toBe('plateforme-formations');
     expect(appConfig.expo.scheme).toBe('plateforme-formations');
     expect(appConfig.expo.plugins).toContain('expo-secure-store');
+    expect(appConfig.expo.icon).toBe('./assets/hsa-app-icon.png');
+    expect(appConfig.expo.splash?.image).toBe('./assets/hsa-app-icon.png');
+    expect(appConfig.expo.android.adaptiveIcon.backgroundImage).toBeUndefined();
   });
 });

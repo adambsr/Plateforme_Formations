@@ -60,6 +60,12 @@ const environmentSchema = z
       .max(1_000_000)
       .default(100_000),
 
+    FCM_ENABLED: z
+      .enum(['true', 'false'])
+      .transform((value) => value === 'true')
+      .default(false),
+    GOOGLE_APPLICATION_CREDENTIALS: optionalText,
+
     CENTER_NAME: z.string().trim().min(1),
     CENTER_ADDRESS: z.string().trim().min(1),
     CENTER_EMAIL: z.email(),
@@ -131,6 +137,10 @@ export interface AppConfig {
     model: string;
     baseUrl: string | undefined;
     maxContextChars: number;
+  };
+  notifications: {
+    enabled: boolean;
+    googleApplicationCredentials: string | undefined;
   };
   center: {
     name: string;
@@ -227,6 +237,10 @@ export function loadAppConfig(
       model: value.AI_MODEL,
       baseUrl: value.AI_BASE_URL,
       maxContextChars: value.AI_MAX_CONTEXT_CHARS,
+    },
+    notifications: {
+      enabled: value.FCM_ENABLED,
+      googleApplicationCredentials: value.GOOGLE_APPLICATION_CREDENTIALS,
     },
     center: {
       name: value.CENTER_NAME,

@@ -1,5 +1,5 @@
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   Image,
   Linking,
@@ -21,6 +21,7 @@ import { useAuth } from '../../core/auth/AuthContext';
 import { Brand } from '../../shared/components/Brand';
 import { Button } from '../../shared/components/Button';
 import { StatePanel } from '../../shared/components/StatePanel';
+import { ScrollToTopButton } from '../../shared/components/ScrollToTopButton';
 import { colors, radii, spacing } from '../../shared/theme/tokens';
 import { PublicSessions } from '../sessions/SessionScreens';
 import type { CheckoutResponse } from '../payments/types';
@@ -186,6 +187,7 @@ function CatalogueView({
   onLogin?: () => void;
   onOpenTraining: (trainingId: string) => void;
 }) {
+  const scrollRef = useRef<ScrollView>(null);
   const [categories, setCategories] = useState<TrainingCategory[]>([]);
   const [page, setPage] = useState<PaginatedTrainings | null>(null);
   const [pageNumber, setPageNumber] = useState(1);
@@ -193,6 +195,7 @@ function CatalogueView({
   const [type, setType] = useState<TrainingType>();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [showScrollTop, setShowScrollTop] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -233,7 +236,12 @@ function CatalogueView({
       style={styles.safeArea}
     >
       <ScrollView
+        ref={scrollRef}
         contentContainerStyle={styles.catalogueContent}
+        onScroll={(event) =>
+          setShowScrollTop(event.nativeEvent.contentOffset.y > 320)
+        }
+        scrollEventThrottle={16}
         refreshControl={
           <RefreshControl
             colors={[colors.primary]}
@@ -337,6 +345,10 @@ function CatalogueView({
           </>
         )}
       </ScrollView>
+      <ScrollToTopButton
+        visible={showScrollTop}
+        onPress={() => scrollRef.current?.scrollTo({ y: 0, animated: true })}
+      />
     </SafeAreaView>
   );
 }

@@ -11,6 +11,7 @@ import {
 } from './AuthContext';
 import type { MobileAuthSession, User } from './types';
 import { refreshMobileSession } from './mobile-session';
+import { unregisterPushDevice } from '../notifications/firebase-messaging';
 
 export function AuthProvider({ children }: React.PropsWithChildren) {
   const [status, setStatus] = useState<AuthStatus>('loading');
@@ -160,6 +161,7 @@ export function AuthProvider({ children }: React.PropsWithChildren) {
       },
       async logout() {
         try {
+          await unregisterPushDevice(request).catch(() => undefined);
           const refreshToken = await secureRefreshTokenStore.get();
           if (refreshToken !== null) {
             await apiClient.request('/auth/logout', {

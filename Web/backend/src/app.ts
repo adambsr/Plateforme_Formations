@@ -82,6 +82,8 @@ import {
   GeminiPublicConciergeGateway,
   type PublicConciergeGenerationGateway,
 } from './modules/public-concierge/infrastructure/gemini-public-concierge.gateway.js';
+import { createNotificationRouter } from './modules/notifications/routes/notification.routes.js';
+import { NotificationService } from './modules/notifications/services/notification.service.js';
 
 export interface AppDependencies {
   config: AppConfig;
@@ -167,6 +169,7 @@ export function createApp({
   const contactService = new ContactService(
     contactMailService ?? createContactMailService(config),
   );
+  const notificationService = new NotificationService(config.notifications);
 
   app.disable('x-powered-by');
   app.use(requestLogging(logger));
@@ -252,6 +255,7 @@ export function createApp({
   app.use('/api', createCostRouter(costService, tokenService));
   app.use('/api', createDashboardRouter(dashboardService, tokenService));
   app.use('/api', createTutorRouter(aiTutorService, tokenService));
+  app.use('/api', createNotificationRouter(notificationService, tokenService));
 
   app.use(notFoundHandler);
   app.use(errorHandler);

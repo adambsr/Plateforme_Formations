@@ -1,9 +1,9 @@
-# Projet 5 — Plateforme numérique de gestion des formations
+# High Skills Academy — Plateforme web de gestion des formations
 
-## Source of Truth — Spécification fonctionnelle et technique
+## Source of Truth — Spécification fonctionnelle et technique actuelle
 
-> **Statut :** document de référence unique pour le projet.  
-> **Règle fondamentale :** en cas de contradiction entre une décision de développement et ce document, ce document fait foi jusqu'à validation explicite d'une nouvelle décision.
+> **Statut :** document de référence unique de la version web actuelle.
+> **Règle fondamentale :** le code et la configuration du dépôt constituent la preuve d'implémentation; ce document formalise les règles et comportements à maintenir. Toute nouvelle décision doit mettre à jour les deux avant de devenir une référence.
 
 ---
 
@@ -16,10 +16,11 @@ La plateforme doit également fournir au centre une visibilité sur son activit�
 Le projet comprend :
 
 - une application Web ;
-- une application mobile React Native ;
-- un backend/API commun ;
-- une base de données commune ;
-- les mêmes rôles, règles métier et données pour le Web et le mobile.
+- une application mobile React Native construite avec Expo ;
+- un backend/API ;
+- une base de données MongoDB ;
+- des services locaux Docker et des intégrations externes contrôlées ;
+- des règles métier, rôles et données partagés entre les deux clients.
 
 La plateforme est conçue pour **un seul centre/organisme de formation dans cette version**. Elle ne doit pas introduire de modèle multi-tenant ou multi-organisation sans exigence fonctionnelle explicite.
 
@@ -45,7 +46,7 @@ La plateforme doit permettre de :
 14. suivre les revenus et les coûts afin de calculer la rentabilité ;
 15. fournir des statistiques de pilotage ;
 16. sécuriser les accès selon le rôle ;
-17. exposer un backend REST commun au Web et au mobile.
+17. exposer une API REST sécurisée commune aux applications Web et mobile.
 
 ---
 
@@ -213,7 +214,7 @@ L'architecture d'authentification utilise :
 - révocation de tous les refresh tokens lors d'un changement de mot de passe ou de la désactivation du compte ;
 - révocation du refresh token courant lors de la déconnexion.
 
-Le Web conserve le JWT d'accès en mémoire et reçoit le refresh token dans un cookie `HttpOnly`, `Secure` en production et configuré avec une politique `SameSite` adaptée. Le mobile conserve le refresh token dans le stockage sécurisé fourni par la plateforme mobile et le transmet à l'endpoint de refresh. Les deux clients utilisent le même backend et les mêmes règles de rotation et de révocation.
+Le Web conserve le JWT d'accès en mémoire et reçoit le refresh token dans un cookie `HttpOnly`, `Secure` en production et configuré avec `SameSite=Lax`. Le refresh cookie est limité au chemin `/api/auth`. Les règles de rotation et de révocation sont appliquées par le backend.
 
 Chaque requête protégée vérifie que l'utilisateur existe toujours et que son compte est actif. La désactivation d'un compte bloque donc immédiatement l'accès backend, même si un JWT non expiré existe encore.
 
@@ -370,7 +371,7 @@ Une Session contient une ou plusieurs entrées de planning (`SessionSchedule`). 
 
 Les entrées d'une même Session peuvent être réparties sur plusieurs dates calendaires. Par exemple, une Session organisée sur dix dates possède dix entrées de planning. Il ne faut pas créer dix Sessions distinctes pour représenter ces dix dates.
 
-La timezone métier unique de la plateforme est la timezone IANA `Africa/Tunis`. Le Web et le mobile affichent et saisissent les horaires dans cette timezone. Le backend convertit les horaires en instants UTC pour le stockage et les comparaisons. Les timestamps échangés par l'API utilisent le format ISO 8601 avec un offset explicite ou le suffixe `Z`.
+La timezone métier unique de la plateforme est la timezone IANA `Africa/Tunis`. Le Web affiche et saisit les horaires dans cette timezone. Le backend convertit les horaires en instants UTC pour le stockage et les comparaisons. Les timestamps échangés par l'API utilisent le format ISO 8601 avec un offset explicite ou le suffixe `Z`.
 
 Une entrée peut contenir :
 
@@ -748,7 +749,42 @@ Le dashboard Admin utilise les Feedbacks pour présenter au minimum le nombre de
 
 ---
 
-# 12. Certificats
+# 12. Assistance IA au contenu et orientation publique
+
+## 12.1 Tuteur IA de la formation
+
+Le tuteur IA est une fonctionnalité distincte de la génération de questions d'évaluation. Il est affiché dans l'espace de lecture `/app/content/:trainingId` uniquement lorsque le contenu est consulté avec l'accès `LEARNER_READ`.
+
+L'endpoint `POST /api/trainings/:id/tutor/messages` exige :
+
+- un Apprenant authentifié ;
+- un changement de mot de passe effectué lorsque celui-ci est requis ;
+- une inscription à la formation demandée.
+
+Le tuteur peut répondre à une question de cours, simplifier une notion, donner un exemple fondé sur le cours, créer de courtes questions d'entraînement, résumer ou proposer une aide à la révision. Il ne doit utiliser que le contenu autorisé de la formation.
+
+Le backend classe les leçons actives et non archivées à partir de la question, de la conversation et de la leçon courante. Il récupère au plus cinq leçons et plafonne le contexte au minimum de `AI_MAX_CONTEXT_CHARS` et de 24 000 caractères. Gemini reçoit seulement le message, au plus huit éléments récents de conversation et les extraits de leçons sélectionnés. Il ne reçoit ni identité, ni paiement, ni progression, ni certificat, ni résultat d'évaluation.
+
+La réponse doit respecter un schéma JSON et renvoyer uniquement des identifiants de leçons présents dans le contexte autorisé. Une réponse fondée exige au moins une citation; les citations inventées, non autorisées ou incohérentes sont rejetées. En l'absence de source suffisante, la réponse est marquée non fondée et ne contient aucune citation. L'interface affiche des liens cliquables vers les leçons citées.
+
+Les messages sont limités à 2 000 caractères. L'historique existe dans l'interface ouverte et n'est pas persisté par le serveur. La route est limitée en mémoire à 30 requêtes par adresse IP et par fenêtre de 15 minutes. Le fournisseur utilise d'abord `gemini-3.1-flash-lite`, applique un délai maximal de 15 secondes et limite la sortie à 1 600 jetons; le modèle configuré peut servir de repli lors de certaines erreurs transitoires.
+
+## 12.2 Concierge IA public
+
+Le concierge est un assistant public distinct du tuteur. Il apparaît comme un widget flottant en bas à droite pour les visiteurs déconnectés et disparaît après connexion. Il affiche un message d'accueil, des questions suggérées, des sources publiques et des actions cliquables, ainsi qu'un avertissement sur le traitement Gemini et les informations sensibles à ne pas partager.
+
+La route anonyme est `POST /api/public/concierge/messages`. Elle ne consulte que :
+
+- des pages publiques sélectionnées (accueil, catalogue, inscription, paiement, déroulement, à propos et contact) ;
+- les champs autorisés des formations `PUBLISHED`, avec une limite de lecture de 100 formations.
+
+Le concierge ne possède aucun accès aux utilisateurs, inscriptions, paiements, progression, leçons, évaluations, certificats, identifiants ou contenus privés. Il sélectionne jusqu'à cinq pages et cinq formations pertinentes, puis envoie au plus huit sources et 12 000 caractères au fournisseur.
+
+Les citations et actions doivent référencer les identifiants de sources reçus. Le serveur résout les URL à partir de cette liste : Gemini ne peut donc pas créer de lien protégé ou externe. Les messages, la conversation et les sources sont explicitement traités comme des données non fiables afin d'ignorer les tentatives d'injection. Si le contexte public ne suffit pas, le concierge répond prudemment et propose l'action Contact.
+
+Le message est limité à 1 000 caractères et la conversation à quatre messages de 1 000 caractères. La réponse comporte au plus cinq citations, trois actions, trois suggestions et 3 000 caractères. Un champ caché `website` sert de honeypot et évite un appel Gemini lorsqu'il est rempli. La route est limitée en mémoire à 10 requêtes par adresse IP sur 15 minutes, ne conserve aucun historique serveur, applique un délai de 15 secondes et une sortie maximale de 1 200 jetons.
+
+# 13. Certificats
 
 Le système utilise **uniquement des Certificats**.
 
@@ -756,7 +792,7 @@ Il n'existe **aucune fonctionnalité d'Attestation** dans le périmètre actuel.
 
 Les termes `Attestation`, `Attestation PDF` et les fonctionnalités associées ne doivent pas apparaître dans l'implémentation finale.
 
-## 12.1 Condition d'obtention
+## 13.1 Condition d'obtention
 
 Un certificat est généré uniquement lorsque l'Apprenant satisfait toutes les conditions d'éligibilité applicables.
 
@@ -788,7 +824,7 @@ La génération du Certificat est effectuée à la demande par une opération ba
 
 Une inscription peut produire au maximum un Certificat. Une nouvelle demande de génération retourne le Certificat existant. Si le fichier PDF doit être recréé pour une raison technique, il est régénéré à partir du même enregistrement sans créer un nouveau Certificat ni un nouveau numéro.
 
-## 12.2 Contenu du certificat
+## 13.2 Contenu du certificat
 
 Le certificat doit notamment contenir :
 
@@ -803,13 +839,13 @@ Le certificat doit notamment contenir :
 
 Le design final du certificat sera défini pendant la conception UI/document.
 
-## 12.3 Historique
+## 13.3 Historique
 
 La suppression ou l'archivage d'une formation ne doit pas supprimer les certificats déjà délivrés.
 
 ---
 
-# 13. Inscriptions
+# 14. Inscriptions
 
 Le modèle d'inscription dépend du type de formation.
 
@@ -843,7 +879,7 @@ Un Apprenant peut s'inscrire à des Sessions différentes d'une même Formation 
 
 ---
 
-# 14. Présences
+# 15. Présences
 
 Les présences concernent les formations présentielles.
 
@@ -881,9 +917,9 @@ La plateforme ne doit pas prétendre détecter automatiquement la présence via 
 
 ---
 
-# 15. Paiements
+# 16. Paiements
 
-## 15.1 Principe
+## 16.1 Principe
 
 Les revenus du centre proviennent des **paiements d'inscription des Apprenants**.
 
@@ -897,7 +933,7 @@ Il n'existe pas de concept métier séparé appelé **« Impayé »**.
 
 Le fait qu'un paiement soit en attente ou échoué doit être représenté par son statut de paiement, pas par une entité ou un état métier supplémentaire « Impayé ».
 
-## 15.2 Statuts
+## 16.2 Statuts
 
 Les statuts de paiement sont exactement :
 
@@ -910,7 +946,7 @@ Les statuts de paiement sont exactement :
 
 Ces statuts appartiennent exclusivement à `Payment`. Ils ne doivent pas être reproduits sous forme d'états de paiement dans `Enrollment`.
 
-## 15.3 Stripe
+## 16.3 Stripe
 
 Le paiement en ligne doit utiliser **Stripe en mode test/développement** pendant l'implémentation.
 
@@ -946,7 +982,7 @@ Le frontend ne doit jamais être considéré comme la preuve suffisante d'un pai
 
 Il n'existe ni `Enrollment` en attente de paiement ni entité `SeatReservation`. Pour une session présentielle, la création de l'inscription après paiement confirmé doit appliquer la capacité comme une contrainte atomique afin que la capacité ne soit jamais dépassée.
 
-## 15.4 Sécurité du paiement
+## 16.4 Sécurité du paiement
 
 Le backend doit :
 
@@ -958,7 +994,7 @@ Le backend doit :
 - conserver les références Stripe nécessaires à la traçabilité ;
 - ne jamais stocker les données de carte bancaire sensibles.
 
-## 15.5 Factures
+## 16.5 Factures
 
 La plateforme utilise une seule devise : le euro, code ISO 4217 `EUR`. Les requêtes Stripe utilisent le code `eur`.
 
@@ -990,7 +1026,7 @@ Le backend de la plateforme génère le document PDF. La Facture doit pouvoir ê
 
 ---
 
-# 16. Modèle financier et rentabilité
+# 17. Modèle financier et rentabilité
 
 Le système doit distinguer :
 
@@ -1005,7 +1041,7 @@ COÛTS
 RÉSULTAT / RENTABILITÉ
 ```
 
-## 16.1 Coût Formateur
+## 17.1 Coût Formateur
 
 Le centre emploie ses Formateurs et leur verse un coût fixe/salaire.
 
@@ -1025,7 +1061,7 @@ Le système ne doit pas inventer un coût.
 
 Le montant doit être explicitement renseigné. Le système ne génère pas automatiquement de salaire, ne le répartit pas entre les Formations et ne le calcule pas à partir du propriétaire d'une Formation, des heures, des Sessions, des inscriptions ou des revenus.
 
-## 16.2 Autres coûts
+## 17.2 Autres coûts
 
 Le système peut prévoir d'autres coûts de formation lorsqu'ils sont explicitement ajoutés, par exemple :
 
@@ -1037,7 +1073,7 @@ Ils ne doivent pas être créés automatiquement sans donnée source.
 
 Un `TrainingCost` contient au minimum la Formation concernée, une date, un montant et une catégorie ou un libellé. Il peut référencer une Session lorsque la dépense concerne spécifiquement cette Session.
 
-## 16.3 Rentabilité
+## 17.3 Rentabilité
 
 Le dashboard doit au minimum distinguer :
 
@@ -1067,7 +1103,7 @@ Aucun salaire de Formateur n'est automatiquement attribué à une Formation. Une
 
 ---
 
-# 17. Tableau de bord et statistiques
+# 18. Tableau de bord, recommandations et Analytics
 
 Le dashboard Admin doit fournir des indicateurs tels que :
 
@@ -1094,17 +1130,30 @@ Le dashboard Apprenant présente au maximum trois Formations publiées auxquelle
 
 L'inactivité du dashboard Admin désigne uniquement l'absence d'activité pédagogique sur une inscription self-paced non terminée. La dernière activité correspond à la date la plus récente entre l'inscription et la mise à jour d'une progression de lesson. Elle ne représente pas la dernière connexion globale de l'utilisateur.
 
+## 18.1 Recommandations Apprenant
+
+Le tableau de bord Apprenant affiche au plus trois formations publiées auxquelles l'Apprenant n'est pas déjà inscrit. Le classement est explicable et déterministe : continuité avec les catégories de l'historique d'inscription, puis popularité et récence. Une recommandation ne modifie jamais les règles d'accès, de paiement ou d'inscription du backend.
+
+## 18.2 Firebase Analytics
+
+Firebase est utilisé uniquement pour Firebase Analytics / Google Analytics. Il n'y a pas d'usage de Firebase Authentication, Firestore, Realtime Database, Storage ou Hosting.
+
+L'initialisation nécessite simultanément `VITE_FIREBASE_ANALYTICS_ENABLED=true`, une configuration Firebase complète (`VITE_FIREBASE_API_KEY`, `VITE_FIREBASE_PROJECT_ID`, `VITE_FIREBASE_APP_ID`, `VITE_FIREBASE_MEASUREMENT_ID`), un navigateur compatible et le consentement explicite du visiteur. Le consentement `granted` ou `denied` est conservé sous la clé locale `analytics-consent`. Sans consentement, le SDK n'est pas initialisé et aucun événement n'est transmis.
+
+Les événements mis en œuvre sont :
+
+| Événement | Déclencheur | Paramètres |
+| --- | --- | --- |
+| `page_view` | Chaque route côté client après consentement | `page_location`, `page_path`, `page_title` |
+| `recommendation_impression` | Première impression d'une recommandation | `training_id`, `training_category`, `recommendation_rank` |
+| `recommendation_click` | Ouverture d'une recommandation | `training_id`, `training_category`, `recommendation_rank` |
+| `recommendation_enrollment` | Inscription confirmée par le backend et attribuée à une recommandation cliquée dans la même session, au plus sept jours auparavant | `training_id`, `training_category`, `recommendation_rank` |
+
+L'attribution est conservée en session navigateur et supprimée après conversion. Les événements ne contiennent ni nom, ni e-mail, ni identifiant utilisateur, ni montant de paiement, ni réponses ou résultats d'évaluation. `VITE_FIREBASE_ANALYTICS_DEBUG=true` ajoute `debug_mode` afin de valider les événements dans Firebase Analytics DebugView.
+
 ---
 
-Les mesures facultatives de recommandations peuvent être envoyées à Firebase Analytics uniquement après consentement explicite dans le navigateur et lorsque la configuration de déploiement active ce service. Elles se limitent à l'identifiant technique de la Formation, sa catégorie et son rang de recommandation. Elles n'incluent jamais l'email, le nom, l'identifiant de l'Apprenant, le montant d'un paiement, les réponses ou résultats d'Évaluation. Une conversion de recommandation est mesurée seulement lorsque le backend a confirmé le paiement et créé l'inscription.
-
----
-
-Les mesures facultatives de recommandations peuvent être envoyées à Firebase Analytics uniquement après consentement explicite dans le navigateur et lorsque la configuration de déploiement active ce service. Elles se limitent à l'identifiant technique de la Formation, sa catégorie et son rang de recommandation. Elles n'incluent jamais l'email, le nom, l'identifiant de l'Apprenant, le montant d'un paiement, les réponses ou résultats d'Évaluation. Une conversion de recommandation est mesurée seulement lorsque le backend a confirmé le paiement et créé l'inscription.
-
----
-
-# 18. Gestion des utilisateurs
+# 19. Gestion des utilisateurs
 
 L'Admin peut :
 
@@ -1120,7 +1169,7 @@ L'Apprenant crée son propre compte via l'inscription publique.
 
 ---
 
-# 19. Paramètres et périmètre organisationnel
+# 20. Paramètres et périmètre organisationnel
 
 La plateforme est destinée à être utilisée par un centre de formation, mais le modèle conceptuel doit rester simple.
 
@@ -1159,7 +1208,7 @@ L'objectif est de conserver un modèle centré sur la gestion réelle des format
 
 ---
 
-# 20. API REST — Concepts
+# 21. API REST — Concepts
 
 L'API doit couvrir au minimum les domaines suivants :
 
@@ -1184,11 +1233,14 @@ L'API doit couvrir au minimum les domaines suivants :
 /certificates
 /costs
 /dashboard
+/contact
+/public/concierge/messages
+/trainings/{id}/tutor/messages
 ```
 
-Les endpoints exacts seront définis pendant la conception de l'API.
+La documentation OpenAPI générée est disponible sur `/api/openapi.json` et Swagger UI est disponible sur `/api/docs` lorsque le backend est démarré.
 
-## 20.1 Authentification
+## 21.1 Authentification
 
 Exemples :
 
@@ -1201,7 +1253,7 @@ POST /api/auth/forgot-password
 POST /api/auth/reset-password
 ```
 
-## 20.2 Formateurs
+## 21.2 Utilisateurs et Formateurs
 
 Exemples :
 
@@ -1213,7 +1265,7 @@ PUT  /api/trainers/{id}
 POST /api/trainers/{id}/disable
 ```
 
-## 20.3 Formations et contenu
+## 21.3 Formations et contenu
 
 Exemples :
 
@@ -1238,7 +1290,7 @@ PUT    /api/resources/{id}
 DELETE /api/resources/{id}
 ```
 
-## 20.4 Sessions
+## 21.4 Sessions
 
 Les sessions sont réservées aux formations présentielles.
 
@@ -1256,7 +1308,7 @@ DELETE /api/schedules/{id}
 
 L'annulation d'une Session est autorisée uniquement lorsqu'elle ne possède aucune inscription.
 
-## 20.5 Inscriptions et progression
+## 21.5 Inscriptions et progression
 
 ```text
 GET  /api/enrollments
@@ -1267,7 +1319,7 @@ PUT  /api/progress/{id}
 
 L'inscription payante n'est pas créée directement par un appel public à `/api/enrollments`. Elle est créée par le backend après confirmation du paiement par le webhook Stripe.
 
-## 20.6 Paiements
+## 21.6 Paiements
 
 ```text
 POST /api/payments/checkout
@@ -1279,7 +1331,7 @@ POST /api/payments/webhook/stripe
 
 Le webhook Stripe doit être protégé et vérifié selon les mécanismes officiels de Stripe.
 
-## 20.7 Évaluations
+## 21.7 Évaluations
 
 Exemples :
 
@@ -1295,7 +1347,7 @@ GET  /api/evaluations/{id}/results
 
 La génération IA ne publie pas automatiquement l'évaluation.
 
-## 20.8 Feedback
+## 21.8 Feedback
 
 ```text
 POST /api/feedback
@@ -1304,7 +1356,7 @@ GET  /api/feedback              # Admin uniquement
 
 La création vérifie l'éligibilité côté backend et refuse toute seconde note pour la même inscription.
 
-## 20.9 Certificats
+## 21.9 Certificats
 
 ```text
 GET  /api/certificates
@@ -1317,7 +1369,7 @@ La génération doit vérifier l'éligibilité côté backend.
 
 La génération est idempotente et ne doit pas créer de doublons lorsqu'elle est demandée plusieurs fois pour la même éligibilité.
 
-## 20.10 Coûts
+## 21.10 Coûts
 
 ```text
 GET  /api/costs/trainers
@@ -1331,7 +1383,7 @@ DELETE /api/costs/trainings/{id}
 
 Ces endpoints sont réservés à l'Admin et n'acceptent que des montants explicitement saisis en EUR.
 
-## 20.11 Dashboard
+## 21.11 Dashboard, tuteur et concierge
 
 ```text
 GET /api/dashboard/overview
@@ -1344,100 +1396,76 @@ GET /api/dashboard/profitability
 
 L'API finale doit être documentée avec Swagger/OpenAPI.
 
----
-
-# 21. Architecture technique
-
-## 21.1 Stack Web
-
-### Frontend
-
-- React ;
-- TypeScript ;
-- React Router ;
-- React Hook Form ou équivalent ;
-- Fetch/Axios ou équivalent ;
-- composants réutilisables ;
-- protected routes ;
-- gestion cohérente des états loading/error/empty.
-
-### Backend
-
-- Node.js ;
-- TypeScript ;
-- Express.js ou framework Node.js équivalent validé ;
-- API REST ;
-- validation backend ;
-- services métier ;
-- Swagger/OpenAPI.
-
-### Base de données
-
-- MongoDB ;
-- Mongoose ou ODM équivalent validé.
-
-### Authentification
-
-- JWT Bearer ;
-- rôle unique par utilisateur ;
-- Admin / Formateur / Apprenant.
-
-### Paiement
-
-- Stripe en mode test/développement.
-
-### IA
-
-Une intégration IA est prévue pour l'assistance à la génération d'évaluations.
-
-L'IA doit être appelée côté backend et ne doit pas exposer de clé secrète au frontend.
-
----
-
-# 22. Architecture backend recommandée
-
-Structure indicative :
+Les routes IA actuelles complètent les domaines précédents :
 
 ```text
-backend/
-├── src/
-│   ├── config/
-│   ├── controllers/
-│   ├── routes/
-│   ├── services/
-│   ├── models/
-│   ├── middlewares/
-│   ├── validators/
-│   ├── utils/
-│   ├── types/
-│   └── app.ts
-├── tests/
-├── package.json
-└── tsconfig.json
+POST /api/trainings/{id}/tutor/messages
+POST /api/public/concierge/messages
+POST /api/evaluations/{id}/generate-ai
 ```
 
-Principes :
-
-- séparation routes/controllers/services/models ;
-- logique métier dans les services ;
-- validation côté backend ;
-- DTOs/types d'entrée et sortie ;
-- async/await ;
-- gestion centralisée des erreurs ;
-- accès MongoDB isolé de la logique HTTP ;
-- architecture simple ;
-- éviter la sur-ingénierie.
+La première impose le rôle Apprenant et une inscription; la deuxième est anonyme et strictement publique; la troisième impose le rôle Formateur et la propriété de l'évaluation brouillon.
 
 ---
 
-# 23. Modèle de données conceptuel
+# 22. Architecture technique et exploitation locale
 
-Entités principales proposées :
+| Couche | Implémentation actuelle |
+| --- | --- |
+| Frontend | React 19, TypeScript, Vite, React Router, React Hook Form, Zod et Fetch |
+| Mobile | React Native 0.86, Expo 57, TypeScript, React Navigation et Expo SecureStore |
+| Backend | Node.js, Express 5, TypeScript, Mongoose, Zod, OpenAPI/Swagger UI |
+| Base de données | MongoDB 8, replica set mono-nœud `rs0` |
+| Paiement | Stripe Checkout et webhook signé, clés de test |
+| Fichiers et documents | Stockage local protégé, PDFKit et Nodemailer |
+| IA | SDK `@google/genai` / Gemini, uniquement côté serveur |
+| Analytics | Firebase Analytics, uniquement côté navigateur après consentement |
+
+L'environnement Docker Compose contient `backend`, `mongodb`, `mongodb-init` et `mailpit`. Le service `mongodb-init` prépare ou vérifie le replica set `rs0` et attend un primaire inscriptible; il est nécessaire aux flux transactionnels. Les volumes `mongodb_data` et `backend_uploads` conservent respectivement les données MongoDB et les fichiers protégés. Le backend est exposé localement sur le port 3000, MongoDB sur 27017 et Mailpit sur 8025. Le client Vite s'exécute séparément sur le port 5173.
+
+La configuration est répartie dans trois fichiers ignorés par Git :
+
+| Fichier | Responsabilité |
+| --- | --- |
+| `.env` | Surcharges Docker Compose pour Stripe, Gemini et le schéma de retour mobile |
+| `Web/backend/.env` | Application, MongoDB, JWT, SMTP, Stripe, fichiers, Gemini et identité du centre |
+| `Web/frontend/.env` | URL API, coordonnées publiques et Firebase Analytics |
+| `Mobile/.env` | URL API mobile, nom du centre et schéma de deep link |
+
+Les secrets JWT, Stripe, SMTP et Gemini restent exclusivement dans les fichiers serveur. Les variables `VITE_` et `EXPO_PUBLIC_` sont visibles par leur client et ne peuvent contenir aucun secret.
+
+---
+
+# 23. Architecture backend
+
+La structure réellement utilisée est modulaire :
+
+```text
+Web/backend/src/
+├── config/                 # Environnement et journalisation
+├── infrastructure/         # MongoDB, fichiers, mail, PDF, Stripe, HTTP, OpenAPI
+├── middleware/             # Authentification et limitation de requêtes
+├── modules/                # Domaines métier : auth, trainings, content, payments,
+│                           # enrollments, progress, sessions, attendance, evaluations,
+│                           # certificates, feedback, costs, dashboard, tutor, concierge
+├── scripts/                # Bootstrap Administrateur et données de développement
+├── shared/                 # Erreurs, auth, base de données et utilitaires communs
+├── app.ts
+└── server.ts
+```
+
+Les routes délèguent aux services métier. Les DTO Zod valident les requêtes, les middlewares établissent l'identité et les services appliquent les règles d'autorisation avant la persistance. Les erreurs suivent un contrat centralisé. `server.ts` charge la configuration, établit MongoDB, initialise les index et démarre le serveur HTTP.
+
+---
+
+# 24. Modèle de données conceptuel
+
+Entités principales implémentées :
 
 ```text
 User
-TrainerProfile
-LearnerProfile
+RefreshSession
+PasswordResetToken
 
 TrainingCategory
 Training
@@ -1468,9 +1496,9 @@ TrainerCost
 TrainingCost
 ```
 
-Les noms finaux peuvent évoluer pendant la conception technique, mais les concepts fonctionnels doivent être conservés.
+Il n'existe pas de collections `TrainerProfile` ou `LearnerProfile` séparées : les informations communes de profil sont portées par `User`. Les modèles ci-dessus correspondent à la persistance actuellement utilisée.
 
-## 23.1 Relations principales
+## 24.1 Relations principales
 
 ```text
 Training 1 ───── N TrainingModule
@@ -1517,11 +1545,11 @@ Training 1 ───── N TrainingCost
 TrainingSession 1 ───── N TrainingCost optionnellement rattaché
 ```
 
-Les cardinalités et stratégies de référence/embedding seront validées pendant la conception MongoDB.
+Les relations utilisent des références MongoDB, complétées par les identifiants parents nécessaires au filtrage, aux agrégations et à l'autorisation. Les index d'unicité et les transactions protègent les relations critiques, notamment autour du paiement, de l'inscription et de la facture.
 
 ---
 
-# 24. Sécurité
+# 25. Sécurité
 
 Le backend doit appliquer les contrôles d'autorisation.
 
@@ -1554,7 +1582,7 @@ Exemples :
 
 ---
 
-# 25. Gestion des fichiers
+# 26. Gestion des fichiers
 
 Les fichiers pédagogiques ne doivent pas être stockés directement dans MongoDB lorsque leur taille ou leur nature rend cela inadapté.
 
@@ -1597,38 +1625,7 @@ Le changement de fournisseur de stockage ne doit pas modifier le concept métier
 
 ---
 
-# 26. Application mobile
-
-L'application mobile React Native fait partie du même projet.
-
-Elle :
-
-- utilise le même backend ;
-- utilise la même API REST ;
-- utilise la même base de données via l'API ;
-- utilise la même authentification ;
-- utilise les mêmes rôles ;
-- respecte les mêmes permissions ;
-- respecte les mêmes règles métier ;
-- affiche les mêmes données ;
-- reprend la même identité visuelle ;
-- ne possède pas de backend séparé ;
-- ne possède pas une logique métier indépendante.
-
-La logique critique reste côté backend.
-
-Les écrans mobiles doivent être adaptés au tactile tout en conservant :
-
-- terminologie ;
-- identité visuelle ;
-- hiérarchie ;
-- composants cohérents ;
-- états loading/error/empty ;
-- workflows fonctionnellement équivalents.
-
----
-
-# 27. Écrans principaux
+# 27. Écrans Web principaux
 
 ## Public
 
@@ -1638,6 +1635,7 @@ Les écrans mobiles doivent être adaptés au tactile tout en conservant :
 - Sessions disponibles pour les formations présentielles ;
 - Connexion ;
 - Inscription Apprenant.
+- Concierge IA public flottant pour les visiteurs déconnectés.
 
 Aucune inscription Formateur.
 
@@ -1689,7 +1687,103 @@ Aucun écran obligatoire `SiteSettings` ou `CompanySettings`.
 - Évaluations ;
 - Certificats ;
 - Feedback de satisfaction ;
+- Tuteur IA de la formation dans la lecture de contenu autorisée ;
 - Profil.
+
+## 27.1 Application mobile React Native
+
+L'application mobile React Native fait partie du même projet. Son code se trouve dans `Mobile/` et utilise Expo, React Navigation et TypeScript. Elle constitue un client de l'API existante, sans serveur, base de données ou logique métier indépendante.
+
+Elle :
+
+- utilise le même backend Express ;
+- utilise la même API REST et les mêmes contrats JSON ;
+- utilise la même base MongoDB uniquement via l'API ;
+- utilise la même authentification, les mêmes rôles et les mêmes permissions ;
+- respecte les mêmes règles de propriété, d'inscription, de paiement, de progression, de présence, d'évaluation et de certification ;
+- affiche les mêmes données métier adaptées à une interface tactile ;
+- reprend l'identité visuelle de High Skills Academy grâce aux tokens de thème partagés dans l'application ;
+- ne possède ni backend séparé, ni API propre, ni logique métier dupliquée.
+
+La logique critique reste côté backend. En particulier, un retour de paiement, une décision d'autorisation, le calcul d'éligibilité d'un certificat ou la validation d'une réponse IA ne doivent jamais être décidés par le client mobile.
+
+### Navigation et écrans actuellement implémentés
+
+La navigation utilise React Navigation avec trois piles : invité, utilisateur authentifié et changement de mot de passe obligatoire. Les routes natives comprennent notamment :
+
+| Espace | Écrans mobiles présents |
+| --- | --- |
+| Invité | Catalogue, détail de formation, connexion, inscription Apprenant, mot de passe oublié et réinitialisation |
+| Commun authentifié | Espace de rôle, profil, catalogue, détail, contenu, sessions, achats/factures, évaluations et certificats |
+| Apprenant | Progression, contenu autorisé, planning/sessions, paiements, factures, évaluations, certificats et feedback |
+| Formateur | Formations gérées, édition de contenu avec documents, gestion des sessions et présences, évaluations, génération de questions IA, revue/publication et résultats |
+| Administrateur | Dashboard, utilisateurs et Formateurs, catégories, coûts, supervision des formations/sessions/paiements/évaluations/certificats |
+
+Le client mobile offre des états de chargement, vide, erreur et nouvelle tentative; la navigation est filtrée par le rôle connecté. Les écrans mobiles doivent rester adaptés au tactile tout en conservant :
+
+- la terminologie et les règles du Web ;
+- l'identité visuelle, les couleurs et la hiérarchie de contenu ;
+- des composants cohérents, des zones d'action accessibles et des formulaires compacts ;
+- des listes à une colonne, le défilement, le rafraîchissement et les alertes natives lorsque pertinents ;
+- des workflows fonctionnellement équivalents, sans reproduction aveugle des grilles de bureau.
+
+### Authentification et session mobile
+
+Le jeton d'accès reste uniquement en mémoire. Le refresh token est reçu dans le corps des réponses lorsque `client: "MOBILE"` est envoyé à l'API, puis stocké dans `expo-secure-store` sous la clé `plateforme-formations.refresh-token`.
+
+Au lancement, `AuthProvider` tente de rafraîchir la session. Le renouvellement est à vol unique afin d'éviter des appels concurrents. Lorsqu'un appel authentifié renvoie `401`, le client tente une rotation du refresh token, rejoue la requête une fois avec le nouveau jeton, puis repasse en état invité si le renouvellement échoue. La déconnexion appelle l'API lorsque possible puis efface SecureStore.
+
+### Configuration et réseau mobile
+
+`Mobile/.env` est construit à partir de `Mobile/.env.example` :
+
+| Variable | Rôle | Valeur de développement / règle |
+| --- | --- | --- |
+| `EXPO_PUBLIC_API_BASE_URL` | URL de base de l'API | L'exemple utilise `http://10.0.2.2:3000/api` pour l'émulateur Android; un appareil réel doit utiliser une adresse réseau joignable du poste de développement, jamais `localhost` |
+| `EXPO_PUBLIC_CENTER_NAME` | Nom affiché du centre | Valeur publique uniquement |
+| `EXPO_PUBLIC_APP_SCHEME` | Schéma de deep link | Doit correspondre à `MOBILE_APP_SCHEME` côté backend; valeur par défaut `plateforme-formations` |
+
+L'application valide ces trois valeurs au démarrage. L'URL API doit utiliser HTTP ou HTTPS et le schéma ne doit pas contenir `://`.
+
+Le schéma Expo déclaré est `plateforme-formations`. Les deep links actuellement configurés couvrent la réinitialisation de mot de passe (`plateforme-formations://reset-password`) et le retour de paiement (`plateforme-formations://payments/:result`). Le backend utilise `MOBILE_APP_SCHEME` pour construire les retours Mobile de réinitialisation et Stripe Checkout.
+
+Les commandes de travail existantes depuis la racine du dépôt sont :
+
+```powershell
+# Démarrer Expo
+npm run dev:mobile
+
+# Ouvrir Expo pour Android
+npm run android --workspace @plateforme-formations/mobile
+
+# Vérifier le typage, le lint et les tests mobiles
+npm run typecheck --workspace @plateforme-formations/mobile
+npm run lint --workspace @plateforme-formations/mobile
+npm run test --workspace @plateforme-formations/mobile
+```
+
+Le lancement sur un émulateur Android utilise l'adresse spéciale `10.0.2.2` de l'exemple. Pour un appareil physique, la valeur `EXPO_PUBLIC_API_BASE_URL` doit être adaptée à une adresse LAN HTTPS/HTTP réellement accessible depuis l'appareil.
+
+### Fonctions natives intégrées
+
+- `expo-secure-store` pour le refresh token;
+- `expo-document-picker` pour sélectionner les ressources de contenu;
+- `expo-image-picker` pour choisir une miniature de formation;
+- `expo-file-system` et `expo-sharing` pour télécharger puis partager les ressources, factures et certificats protégés;
+- `Linking.openURL` pour les liens externes et la redirection Stripe Checkout dans le navigateur système;
+- `react-native-safe-area-context`, défilement et composants natifs pour les interactions tactiles.
+
+Le retour du navigateur après Stripe ne prouve jamais le paiement. L'écran `CheckoutReturn` interroge `/payments/:id` jusqu'à ce que le statut géré par le webhook backend ne soit plus `PENDING`; l'accès n'est proposé que lorsqu'une inscription est retournée.
+
+### Limites de parité actuelles à respecter
+
+Le mobile couvre déjà les domaines métier principaux ci-dessus, mais il ne possède pas actuellement :
+
+- de widget concierge IA public ;
+- d'interface de tuteur IA dans la lecture de contenu ;
+- de dépendance Firebase, d'Analytics Firebase, de fichier de configuration Firebase natif ou de notification FCM.
+
+Firebase reste une mesure Analytics propre au client Web dans la version actuelle. Tout ajout mobile futur de Firebase Analytics ou FCM devra enregistrer les applications natives dans le projet Firebase, conserver les secrets privilégiés côté backend et définir explicitement le consentement et les événements avant implémentation. Le tuteur et le concierge ne doivent être ajoutés au mobile qu'en réutilisant strictement les endpoints, rôles, limites et règles de grounding décrits aux sections 12.1 et 12.2.
 
 ---
 
@@ -1727,7 +1821,6 @@ Aucun écran obligatoire `SiteSettings` ou `CompanySettings`.
 30. Les autres coûts ne sont pris en compte que s'ils sont explicitement enregistrés.
 31. Les données financières doivent permettre de distinguer revenus, coûts et résultat.
 32. L'archivage d'une formation ne détruit pas son historique.
-33. Le mobile utilise le même backend et les mêmes règles métier.
 34. Il n'existe pas de multi-tenant ou multi-organisation.
 35. Il n'existe pas de `SiteSettings` ou `CompanySettings` sans besoin fonctionnel concret.
 36. Il n'existe pas de mode self-paced en dehors du type explicitement défini `SELF_PACED_ONLINE`.
@@ -1816,7 +1909,7 @@ Aucun écran obligatoire `SiteSettings` ou `CompanySettings`.
 | NFR-03 | Performance adaptée aux opérations courantes | Haute |
 | NFR-04 | Interface responsive et ergonomique | Haute |
 | NFR-05 | Architecture maintenable et extensible | Haute |
-| NFR-06 | Compatibilité Web et mobile via API commune | Haute |
+| NFR-06 | Compatibilité Web et mobile avec une API métier commune | Haute |
 | NFR-07 | Traçabilité des paiements et certificats | Haute |
 | NFR-08 | Protection minimale des données personnelles : collecte limitée aux besoins du projet, contrôle d'accès, modification du profil, désactivation du compte et absence de données sensibles dans les logs ; aucun module RGPD dédié | Haute |
 
@@ -1848,6 +1941,8 @@ Les tests doivent couvrir au minimum :
 - factures ;
 - évaluations ;
 - génération IA ;
+- tuteur IA, citations et accès par inscription ;
+- concierge public, sources autorisées, honeypot et limitations ;
 - validation Formateur ;
 - certificats ;
 - feedbacks et contrôle de leur éligibilité ;
@@ -1870,12 +1965,17 @@ Les tests doivent couvrir au minimum :
 - certificats ;
 - feedback de satisfaction ;
 - états loading/error/empty.
+- consentement Firebase, page views et mesure des recommandations.
 
 ## Mobile
 
-Les parcours principaux doivent être testés avec le même backend que le Web.
-
----
+- validation de l'environnement `EXPO_PUBLIC_*` ;
+- stockage SecureStore, rotation de session et reprise après `401` ;
+- navigation par rôle et deep links de réinitialisation/paiement ;
+- catalogue, détail, contenu, progression, sessions et présences ;
+- paiement Checkout, interrogation du statut backend et partage des documents protégés ;
+- évaluations, génération de questions, certificats, feedback, coûts et écrans d'administration ;
+- états de chargement, vide, erreur, nouvelle tentative et adaptation tactile.
 
 # 31. Workflow métier principal
 
@@ -1953,15 +2053,20 @@ Feedback de satisfaction
 
 ---
 
-# 32. Architecture de dépôt indicative
+# 32. Architecture de dépôt actuelle
 
 ```text
 training-platform/
-├── backend/
-├── frontend/
-├── mobile/
-├── docs/
-├── tests/
+├── Web/
+│   ├── backend/
+│   └── frontend/
+├── Mobile/
+│   ├── src/
+│   ├── assets/
+│   ├── tests/
+│   ├── .env.example
+│   └── app.json
+├── Docs/
 ├── .gitignore
 ├── README.md
 └── docker-compose.yml
@@ -1983,7 +2088,7 @@ Une fonctionnalité est considérée comme terminée lorsque, selon sa nature, e
 - autorisation ;
 - gestion des erreurs ;
 - interface Web si pertinente ;
-- interface mobile si pertinente ;
+- interface mobile équivalente ou décision de non-parité explicitement documentée ;
 - états loading/error/empty ;
 - tests ;
 - documentation technique pertinente.
@@ -2001,8 +2106,6 @@ Ne pas implémenter spontanément :
 - self-paced alternatif au type défini ;
 - visioconférence propriétaire ;
 - streaming vidéo propriétaire ;
-- backend mobile séparé ;
-- logique métier mobile séparée ;
 - intégrations propriétaires Zoom/Teams/Google Meet ;
 - stockage de cartes bancaires ;
 - paiement réel pendant le développement ;
@@ -2012,40 +2115,19 @@ Ne pas implémenter spontanément :
 - concept métier « Impayé » ;
 - fonctionnalités financières non alimentées par des données réelles ;
 - module RGPD dédié, workflow automatisé d'export/effacement, moteur d'anonymisation, gestion de consentements versionnés ou planificateur de rétention ;
-- recommandations automatiques ;
 - prédiction d'abandon ;
 - prédiction d'inscription ;
 - fonctionnalités non demandées.
 
-Stripe en **mode test** et l'assistance IA pour la génération d'évaluations font partie du périmètre prévu et ne doivent donc pas être traités comme des fonctionnalités hors MVP.
+Stripe en **mode test**, le tuteur IA, le concierge IA public, la génération IA d'évaluations et Firebase Analytics après consentement font partie du périmètre actuel et ne doivent donc pas être traités comme des fonctionnalités hors MVP.
 
 ---
 
-# 35. Priorité de développement fonctionnelle
+# 35. État d'implémentation et priorités futures
 
-L'ordre recommandé est :
+Les domaines suivants sont implémentés dans la version actuelle : architecture et configuration, MongoDB, authentification, utilisateurs, formations, contenu, progression, sessions, paiements Stripe de test, inscriptions, factures, présences, évaluations, certificats, feedbacks, coûts, tableaux de bord, tuteur IA, concierge IA public et Firebase Analytics avec consentement.
 
-```text
-1. Architecture et configuration
-2. Base de données
-3. Authentification et rôles
-4. Gestion des utilisateurs
-5. Formations
-6. Modules / Lessons / Resources
-7. Formations self-paced + progression
-8. Sessions / Planning présentiel
-9. Stripe test + paiements + webhook + inscriptions + factures
-10. Présences
-11. Évaluations
-12. Assistance IA à la génération des évaluations
-13. Certificats et Feedbacks
-14. Coûts et rentabilité
-15. Dashboard
-16. Tests / sécurité / documentation
-17. Application mobile React Native
-```
-
-Cet ordre est indicatif pour l'implémentation et ne remplace pas les dépendances techniques réelles.
+Les priorités restantes relèvent d'une évolution de déploiement plutôt que d'un manque de domaine métier : gestion de secrets de production, stockage objet et sauvegardes, observabilité, mécanisme de limitation partagé entre plusieurs instances, validation Stripe de production et étude d'utilisabilité avec des utilisateurs réels.
 
 ---
 
@@ -2053,16 +2135,15 @@ Cet ordre est indicatif pour l'implémentation et ne remplace pas les dépendanc
 
 1. Le backend est la source de vérité pour les règles métier.
 2. Le frontend ne doit jamais être la seule barrière de sécurité.
-3. Le mobile consomme le même backend.
-4. Les règles métier ne doivent pas être dupliquées arbitrairement entre Web et mobile.
-5. L'IA assiste le Formateur ; elle ne remplace pas sa décision.
-6. Stripe confirme les paiements via le webhook backend.
-7. Les coûts financiers doivent provenir de données explicites.
-8. Le modèle de données doit rester simple et centré sur les besoins réels.
-9. Ne pas créer une abstraction uniquement pour anticiper une fonctionnalité future.
-10. Ne pas ajouter de fonctionnalité importante sans exigence correspondante ou validation explicite.
-11. Toute ambiguïté architecturale importante doit être signalée avant implémentation.
-12. Les décisions nouvelles doivent être répercutées dans ce Source of Truth avant de devenir une nouvelle référence de développement.
+3. Le mobile consomme le même backend, les mêmes contrats et les mêmes règles métier; il ne les réimplémente pas côté client.
+4. L'IA assiste les utilisateurs dans une frontière de sources autorisées; elle ne remplace pas une décision métier.
+5. Stripe confirme les paiements via le webhook backend.
+6. Les coûts financiers doivent provenir de données explicites.
+7. Le modèle de données doit rester simple et centré sur les besoins réels.
+8. Ne pas créer une abstraction uniquement pour anticiper une fonctionnalité future.
+9. Ne pas ajouter de fonctionnalité importante sans exigence correspondante ou validation explicite.
+10. Toute ambiguïté architecturale importante doit être signalée avant implémentation.
+11. Les décisions nouvelles doivent être répercutées dans ce Source of Truth avant de devenir une nouvelle référence de développement.
 
 ---
 
@@ -2079,4 +2160,4 @@ Il décrit :
 - ses contraintes ;
 - son architecture fonctionnelle et technique de référence.
 
-Les instructions spécifiques destinées aux agents de développement Web et mobile sont maintenues dans des documents séparés.
+Les instructions de développement Web sont maintenues dans des documents séparés lorsque cela est nécessaire.

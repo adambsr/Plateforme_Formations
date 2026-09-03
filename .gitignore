@@ -7,6 +7,14 @@ coverage/
 .env.*
 !.env.example
 
+# Native Firebase app registration files are supplied per build environment.
+Mobile/google-services.json
+Mobile/GoogleService-Info.plist
+
+# FCM Admin credentials are server-only and must never be committed.
+Web/backend/firebase-service-account*.json
+docker-compose.fcm.yml
+
 uploads/
 logs/
 *.log
@@ -16,4 +24,3 @@ Thumbs.db
 .idea/
 .vscode/*
 !.vscode/extensions.json
-

@@ -1,4 +1,6 @@
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
+import { Menu } from 'lucide-react-native';
+import { Pressable } from 'react-native';
 
 import { useAuth } from '../../core/auth/AuthContext';
 import {
@@ -6,7 +8,6 @@ import {
   ForgotPasswordScreen,
   LoginScreen,
   AuthenticatedResetPasswordScreen,
-  PasswordRequiredResetScreen,
   RegisterScreen,
   ResetPasswordScreen,
 } from '../../features/auth/AuthScreens';
@@ -42,9 +43,17 @@ import { AdminCostsScreen } from '../../features/admin/AdminCostsScreen';
 import { AdminCategoriesScreen } from '../../features/admin/AdminCategoriesScreen';
 import {
   ProfileScreen,
+  SettingsScreen,
   WorkspaceScreen,
 } from '../../features/workspace/WorkspaceScreens';
 import { ScreenMessage } from '../../shared/components/ScreenMessage';
+import {
+  AboutScreen,
+  ContactScreen,
+  FaqScreen,
+  HomeScreen,
+} from '../../features/public/PublicScreens';
+import { PublicConcierge } from '../../features/public/PublicConcierge';
 import { colors } from '../../shared/theme/tokens';
 import type {
   AppStackParamList,
@@ -58,10 +67,34 @@ const PasswordStack = createNativeStackNavigator<PasswordStackParamList>();
 
 const screenOptions = {
   headerShadowVisible: false,
+  headerBackTitleVisible: false,
   headerStyle: { backgroundColor: colors.surface },
   headerTintColor: colors.ink,
   contentStyle: { backgroundColor: colors.canvas },
 };
+
+const appScreenOptions = ({
+  navigation,
+}: {
+  navigation: { navigate: (route: 'Workspace') => void };
+}) => ({
+  ...screenOptions,
+  headerRight: () => (
+    <Pressable
+      accessibilityLabel="Ouvrir le tableau de bord"
+      hitSlop={8}
+      onPress={() => navigation.navigate('Workspace')}
+      style={{
+        minWidth: 44,
+        minHeight: 44,
+        alignItems: 'center',
+        justifyContent: 'center',
+      }}
+    >
+      <Menu color={colors.primaryDark} size={22} />
+    </Pressable>
+  ),
+});
 
 export function RootNavigator() {
   const { status, user } = useAuth();
@@ -70,41 +103,64 @@ export function RootNavigator() {
   }
   if (user === null) {
     return (
-      <GuestStack.Navigator
-        initialRouteName="Catalogue"
-        screenOptions={screenOptions}
-      >
-        <GuestStack.Screen
-          name="Catalogue"
-          component={GuestCatalogueScreen}
-          options={{ headerShown: false }}
-        />
-        <GuestStack.Screen
-          name="TrainingDetail"
-          component={GuestTrainingDetailScreen}
-          options={{ title: 'Formation' }}
-        />
-        <GuestStack.Screen
-          name="Login"
-          component={LoginScreen}
-          options={{ headerShown: false }}
-        />
-        <GuestStack.Screen
-          name="Register"
-          component={RegisterScreen}
-          options={{ headerShown: false }}
-        />
-        <GuestStack.Screen
-          name="ForgotPassword"
-          component={ForgotPasswordScreen}
-          options={{ headerShown: false }}
-        />
-        <GuestStack.Screen
-          name="ResetPassword"
-          component={ResetPasswordScreen}
-          options={{ headerShown: false }}
-        />
-      </GuestStack.Navigator>
+      <>
+        <GuestStack.Navigator
+          initialRouteName="Home"
+          screenOptions={screenOptions}
+        >
+          <GuestStack.Screen
+            name="Home"
+            component={HomeScreen}
+            options={{ headerShown: false }}
+          />
+          <GuestStack.Screen
+            name="Catalogue"
+            component={GuestCatalogueScreen}
+            options={{ title: 'Catalogue' }}
+          />
+          <GuestStack.Screen
+            name="TrainingDetail"
+            component={GuestTrainingDetailScreen}
+            options={{ title: 'Formation' }}
+          />
+          <GuestStack.Screen
+            name="About"
+            component={AboutScreen}
+            options={{ title: 'À propos' }}
+          />
+          <GuestStack.Screen
+            name="Faq"
+            component={FaqScreen}
+            options={{ title: 'Questions fréquentes' }}
+          />
+          <GuestStack.Screen
+            name="Contact"
+            component={ContactScreen}
+            options={{ title: 'Contact' }}
+          />
+          <GuestStack.Screen
+            name="Login"
+            component={LoginScreen}
+            options={{ title: 'Connexion' }}
+          />
+          <GuestStack.Screen
+            name="Register"
+            component={RegisterScreen}
+            options={{ title: 'Cr\u00e9er un compte' }}
+          />
+          <GuestStack.Screen
+            name="ForgotPassword"
+            component={ForgotPasswordScreen}
+            options={{ title: 'Mot de passe oubli\u00e9' }}
+          />
+          <GuestStack.Screen
+            name="ResetPassword"
+            component={ResetPasswordScreen}
+            options={{ title: 'R\u00e9initialiser le mot de passe' }}
+          />
+        </GuestStack.Navigator>
+        <PublicConcierge />
+      </>
     );
   }
   if (user.mustChangePassword) {
@@ -118,15 +174,16 @@ export function RootNavigator() {
     );
   }
   return (
-    <AppStack.Navigator screenOptions={screenOptions}>
+    <AppStack.Navigator screenOptions={appScreenOptions}>
+      <AppStack.Screen
+        name="Home"
+        component={HomeScreen as never}
+        options={{ headerShown: false }}
+      />
       <AppStack.Screen
         name="Workspace"
         component={WorkspaceScreen}
         options={{ headerShown: false }}
-      />
-      <PasswordStack.Screen
-        name="ResetPassword"
-        component={PasswordRequiredResetScreen}
       />
       <AppStack.Screen
         name="Catalogue"
@@ -186,7 +243,7 @@ export function RootNavigator() {
       <AppStack.Screen
         name="ResetPassword"
         component={AuthenticatedResetPasswordScreen}
-        options={{ headerShown: false }}
+        options={{ title: 'R\u00e9initialiser le mot de passe' }}
       />
       <AppStack.Screen
         name="Evaluations"
@@ -222,6 +279,16 @@ export function RootNavigator() {
         name="AdminCategories"
         component={AdminCategoriesScreen}
         options={{ title: 'Catégories' }}
+      />
+      <AppStack.Screen
+        name="ChangePassword"
+        component={ChangePasswordScreen}
+        options={{ title: 'Changer le mot de passe' }}
+      />
+      <AppStack.Screen
+        name="Settings"
+        component={SettingsScreen}
+        options={{ title: 'Paramètres' }}
       />
       <AppStack.Screen
         name="Profile"

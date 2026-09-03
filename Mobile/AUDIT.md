@@ -1,13 +1,36 @@
 # Mobile parity audit
 
-Audit date: 2026-08-25
+Audit date: 2026-09-02
 
 ## Authority and scope
 
 Implementation was audited against, in order, `Docs/SOURCE_OF_TRUTH.md`, `PLAN.md`, and
 `Docs/MOBILE_DEVELOPMENT_PROMPT.md`, then against every Web feature and shared backend route.
-Phase 13 is complete through 13.9. Mobile uses `Web/backend`; it has no database, Firebase data
-access, Mobile-only API, or duplicated backend business rule.
+Phase 13 is complete through 13.9 and the post-Phase-13 Web additions have been reconciled.
+Mobile uses `Web/backend`; it has no database access, Mobile-only API, AI-provider secret, or
+duplicated backend business rule.
+
+## Current Web parity reconciliation
+
+The second route, endpoint, role, and recent-commit audit found and closed these gaps:
+
+- public Home, About, FAQ, and Contact screens, including the shared `POST /contact` flow;
+- the anonymous Public Concierge with suggestions, bounded history, grounding state, public
+  sources/actions, rate-limit errors, loading state, and Gemini privacy warning;
+- the paid-Learner course Tutor with all six modes, Lesson priority, bounded conversation,
+  timeout/error handling, grounding warnings, source Lesson actions, and follow-up prompts;
+- the Learner dashboard recommendation cards, empty state, explainable reasons, impression/click
+  attribution, and backend-confirmed paid conversion event;
+- Trainer dashboard totals and recent assigned Sessions;
+- Admin monthly self-paced completion and inactive-Learner insights;
+- native Firebase Analytics, opt-in consent, manual screen views, and privacy-safe recommendation
+  funnel events;
+- current HSA logo and a square native HSA application icon.
+
+The existing catalogue, content authoring, Sessions/schedules, Checkout, Payments, Enrollments,
+Invoices, progress, attendance, Evaluations and AI quiz generation, Certificates, Feedback,
+users, categories, costs, protected downloads/sharing, auth, role guards, and deep links were
+rechecked and remain represented on Mobile.
 
 ## Phase 13 completion map
 
@@ -48,20 +71,26 @@ No migrations, collection/index changes, backfill, or seed changes are required.
 
 ## Firebase state
 
-Firebase remains optional Web Analytics only. Mobile has no Firebase dependency, Android/iOS
-Firebase registration file, service-account credential, Analytics, Auth, database, storage, or
-FCM integration. Future Mobile Analytics/FCM work must register native apps in the existing
-Firebase project and keep privileged credentials backend-only.
+Mobile now uses React Native Firebase Analytics and an Expo development/native build. Collection
+and automatic screen reporting are disabled by default in `firebase.json`. The consent UI enables
+collection only after an explicit opt-in. Mobile records manual screen views and the same
+privacy-safe recommendation impression, click, and backend-confirmed enrollment events as Web.
+
+Release environments must register Android package and iOS bundle ID
+`com.highskillsacademy.formations` in the existing Firebase project and provide
+`GOOGLE_SERVICES_JSON` and `GOOGLE_SERVICE_INFO_PLIST`. These public native registration files
+are intentionally not fabricated or committed. No service-account credential belongs in Mobile.
+Firebase Auth, database, Storage, and FCM remain out of scope because Web does not use them.
 
 ## Verification record
 
-- Mobile strict TypeScript and Oxlint: passed.
-- Mobile Jest: 11 suites / 32 tests, including auth, content/progress, Sessions/planning,
+- Mobile strict TypeScript, Oxlint, and Prettier: passed.
+- Mobile Jest: 12 suites / 34 tests, including auth, content/progress, Sessions/planning,
   attendance, purchases, evaluations, Certificates, loading/empty/error states, deep links, role
-  navigation, and the Checkout-return backend-status integration.
+  navigation, Checkout-return backend-status integration, course Tutor, and Admin learning insights.
 - Expo Doctor: 21/21 checks passed.
-- Production Expo export: Android and iOS Hermes bundles generated successfully in ignored
-  `Mobile/dist`.
+- Production Expo export: Android and iOS Hermes bundles generated successfully; the temporary
+  verification output was removed after inspection.
 - Backend strict TypeScript and Oxlint: passed.
 - Backend Vitest default suite: 23 files / 90 tests passed; the 8 database files are intentionally
   skipped when `TEST_MONGODB_URI` is absent.

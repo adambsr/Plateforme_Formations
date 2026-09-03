@@ -22,6 +22,7 @@ import { CertificateModel } from '../../modules/certificates/models/certificate.
 import { FeedbackModel } from '../../modules/feedback/models/feedback.model.js';
 import { TrainerCostModel } from '../../modules/costs/models/trainer-cost.model.js';
 import { TrainingCostModel } from '../../modules/costs/models/training-cost.model.js';
+import { NotificationDeviceModel } from '../../modules/notifications/models/notification-device.model.js';
 
 export async function initializeDatabaseIndexes(): Promise<void> {
   await Promise.all([
@@ -49,5 +50,6 @@ export async function initializeDatabaseIndexes(): Promise<void> {
     FeedbackModel.init(),
     TrainerCostModel.init(),
     TrainingCostModel.init(),
+    NotificationDeviceModel.init(),
   ]);
 }

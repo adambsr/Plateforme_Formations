@@ -1,15 +1,25 @@
-import { StyleSheet, Text, View } from 'react-native';
+import { Image, Pressable, StyleSheet, View } from 'react-native';
 
 import { appConfig } from '../../core/config/environment';
-import { colors, radii, spacing } from '../theme/tokens';
 
-export function Brand({ compact = false }: { compact?: boolean }) {
+export function Brand({
+  compact = false,
+  onPress,
+}: {
+  compact?: boolean;
+  onPress?: () => void;
+}) {
+  const logo = (
+    <Image
+      accessibilityIgnoresInvertColors
+      resizeMode="contain"
+      source={require('../../../../HSA_LOGO.png')}
+      style={compact ? styles.compactLogo : styles.logo}
+    />
+  );
   return (
     <View style={styles.brand} accessibilityLabel={appConfig.centerName}>
-      <View style={styles.mark} accessibilityElementsHidden>
-        <Text style={styles.markText}>HS</Text>
-      </View>
-      {!compact && <Text style={styles.name}>{appConfig.centerName}</Text>}
+      {onPress === undefined ? logo : <Pressable accessibilityLabel="Accueil public" onPress={onPress}>{logo}</Pressable>}
     </View>
   );
 }
@@ -18,27 +28,7 @@ const styles = StyleSheet.create({
   brand: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.md,
   },
-  mark: {
-    width: 42,
-    height: 42,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: radii.md,
-    backgroundColor: colors.primaryDark,
-  },
-  markText: {
-    color: colors.surface,
-    fontSize: 12,
-    fontWeight: '800',
-    letterSpacing: -0.3,
-  },
-  name: {
-    flexShrink: 1,
-    color: colors.ink,
-    fontSize: 17,
-    fontWeight: '700',
-    letterSpacing: -0.3,
-  },
+  logo: { width: 210, height: 76 },
+  compactLogo: { width: 80, height: 44 },
 });

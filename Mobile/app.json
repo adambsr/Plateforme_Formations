@@ -5,15 +5,39 @@
     "version": "0.1.0",
     "scheme": "plateforme-formations",
     "orientation": "portrait",
-    "icon": "./assets/icon.png",
+    "icon": "./assets/hsa-app-icon.png",
+    "splash": {
+      "image": "./assets/hsa-app-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#FFFFFF"
+    },
     "userInterfaceStyle": "light",
     "plugins": [
       "expo-secure-store",
       "expo-sharing",
+      "expo-notifications",
       [
         "expo-image-picker",
         {
           "photosPermission": "Autoriser l’application à choisir une miniature de formation."
+        }
+      ],
+      "@react-native-firebase/app",
+      "@react-native-firebase/messaging",
+      [
+        "@react-native-firebase/analytics",
+        {
+          "ios": {
+            "withoutAdIdSupport": true
+          }
+        }
+      ],
+      [
+        "expo-build-properties",
+        {
+          "ios": {
+            "useFrameworks": "dynamic"
+          }
         }
       ]
     ],
@@ -21,10 +45,10 @@
       "supportsTablet": true
     },
     "android": {
+      "permissions": ["android.permission.POST_NOTIFICATIONS"],
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/android-icon-foreground.png",
-        "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
       },
       "predictiveBackGestureEnabled": false

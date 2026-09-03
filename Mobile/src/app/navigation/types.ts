@@ -1,6 +1,10 @@
 export type GuestStackParamList = {
+  Home: undefined;
   Catalogue: undefined;
   TrainingDetail: { trainingId: string };
+  About: undefined;
+  Faq: undefined;
+  Contact: undefined;
   Login: undefined;
   Register: undefined;
   ForgotPassword: undefined;
@@ -8,6 +12,7 @@ export type GuestStackParamList = {
 };
 
 export type AppStackParamList = {
+  Home: undefined;
   Workspace: undefined;
   Catalogue: undefined;
   TrainingDetail: { trainingId: string };
@@ -29,6 +34,8 @@ export type AppStackParamList = {
   AdminCosts: undefined;
   AdminCategories: undefined;
   Profile: undefined;
+  Settings: undefined;
+  ChangePassword: undefined;
 };
 
 export type PasswordStackParamList = {
