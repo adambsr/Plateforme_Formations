@@ -65,6 +65,12 @@ function referencedId(
   return typeof value === 'string' ? value : value.id;
 }
 
+function normalizeReturnUrl(value: string): string {
+  const url = new URL(value);
+  url.pathname = url.pathname.replace(/\/+/g, '/');
+  return url.toString().replace(/\/$/, '');
+}
+
 export class StripeSdkCheckoutGateway implements StripeCheckoutGateway {
   readonly #stripe: Stripe;
   readonly #webhookSecret: string;
@@ -118,8 +124,12 @@ export class StripeSdkCheckoutGateway implements StripeCheckoutGateway {
       trainingId: input.trainingId,
       ...(input.sessionId === undefined ? {} : { sessionId: input.sessionId }),
     };
-    const successUrl = input.returnUrls?.success ?? this.#successUrl;
-    const cancelUrl = input.returnUrls?.cancel ?? this.#cancelUrl;
+    const successUrl = normalizeReturnUrl(
+      input.returnUrls?.success ?? this.#successUrl,
+    );
+    const cancelUrl = normalizeReturnUrl(
+      input.returnUrls?.cancel ?? this.#cancelUrl,
+    );
     const separator = successUrl.includes('?') ? '&' : '?';
     const cancelSeparator = cancelUrl.includes('?') ? '&' : '?';
     let session: Stripe.Checkout.Session;

@@ -304,7 +304,7 @@ export function ContentScreen({
                 }}
               />
             )}
-            {content.modules.length === 0 ? (
+            {content.access === 'MANAGE' ? null : content.modules.length === 0 ? (
               <StatePanel message="Aucun contenu disponible." />
             ) : (
               content.modules.map((module) => (

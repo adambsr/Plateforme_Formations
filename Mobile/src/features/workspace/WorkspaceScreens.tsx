@@ -1,5 +1,5 @@
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   Animated,
   KeyboardAvoidingView,
@@ -25,9 +25,11 @@ import {
   WalletCards,
   X,
 } from 'lucide-react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import type { AppStackParamList } from '../../app/navigation/types';
+import { navigationRef } from '../../app/navigation/navigation-ref';
+import { useDrawer } from '../../app/navigation/drawer-context';
 import { ApiError } from '../../core/api/client';
 import { useAuth } from '../../core/auth/AuthContext';
 import { NotificationPreferences } from '../../core/notifications/NotificationPreferences';
@@ -48,94 +50,10 @@ function displayName(profile: { firstName?: string; lastName?: string }) {
 export function WorkspaceScreen({
   navigation,
 }: NativeStackScreenProps<AppStackParamList, 'Workspace'>) {
-  const { user, logout } = useAuth();
-  const [drawerOpen, setDrawerOpen] = useState(false);
-  const drawerX = useState(() => new Animated.Value(-320))[0];
+  const { user } = useAuth();
+  const { openDrawer } = useDrawer();
   if (user === null) return null;
   const workspace = roleWorkspace(user.role);
-  const close = (after?: () => void) =>
-    Animated.timing(drawerX, {
-      toValue: -320,
-      duration: 180,
-      useNativeDriver: true,
-    }).start(() => {
-      setDrawerOpen(false);
-      after?.();
-    });
-  const open = () => {
-    setDrawerOpen(true);
-    Animated.timing(drawerX, {
-      toValue: 0,
-      duration: 180,
-      useNativeDriver: true,
-    }).start();
-  };
-  const items = [
-    {
-      label: 'Tableau de bord',
-      Icon: Home,
-      route: 'Workspace' as const,
-      active: true,
-    },
-    { label: 'Catalogue', Icon: BookOpen, route: 'Catalogue' as const },
-    ...(user.role === 'LEARNER'
-      ? [
-          {
-            label: 'Ma progression',
-            Icon: ChartNoAxesCombined,
-            route: 'Progress' as const,
-          },
-          {
-            label: 'Mes achats',
-            Icon: WalletCards,
-            route: 'Purchases' as const,
-          },
-        ]
-      : []),
-    ...(user.role !== 'LEARNER'
-      ? [
-          {
-            label: 'Formations',
-            Icon: BookOpen,
-            route: 'ManagedTrainings' as const,
-          },
-        ]
-      : []),
-    {
-      label: user.role === 'LEARNER' ? 'Mon planning' : 'Sessions',
-      Icon: CalendarDays,
-      route: 'Sessions' as const,
-    },
-    {
-      label: user.role === 'LEARNER' ? 'Mes présences' : 'Présences',
-      Icon: ClipboardCheck,
-      route: 'Attendance' as const,
-    },
-    { label: 'Évaluations', Icon: BadgeCheck, route: 'Evaluations' as const },
-    { label: 'Certificats', Icon: BadgeCheck, route: 'Certificates' as const },
-    ...(user.role === 'ADMIN'
-      ? [
-          {
-            label: 'Indicateurs',
-            Icon: ChartNoAxesCombined,
-            route: 'AdminDashboard' as const,
-          },
-          {
-            label: 'Utilisateurs',
-            Icon: UsersRound,
-            route: 'AdminUsers' as const,
-          },
-          { label: 'Coûts', Icon: WalletCards, route: 'AdminCosts' as const },
-          {
-            label: 'Catégories',
-            Icon: Settings,
-            route: 'AdminCategories' as const,
-          },
-        ]
-      : []),
-    { label: 'Mon profil', Icon: UserRound, route: 'Profile' as const },
-    { label: 'Paramètres', Icon: Settings, route: 'Settings' as const },
-  ];
   return (
     <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
       <View style={styles.bar}>
@@ -143,7 +61,7 @@ export function WorkspaceScreen({
           accessibilityLabel="Ouvrir la navigation"
           accessibilityHint="Ouvre les pages de votre espace"
           hitSlop={8}
-          onPress={open}
+          onPress={openDrawer}
           style={styles.iconButton}
         >
           <Menu color={colors.primaryDark} size={24} />
@@ -176,71 +94,83 @@ export function WorkspaceScreen({
           />
         </View>
       </ScrollView>
-      {drawerOpen && (
-        <Pressable
-          accessibilityLabel="Fermer la navigation"
-          style={styles.backdrop}
-          onPress={() => close()}
-        />
-      )}
-      {drawerOpen && (
-        <Animated.View
-          style={[styles.drawer, { transform: [{ translateX: drawerX }] }]}
-        >
-          <View style={styles.drawerHeader}>
-            <Brand
-              compact
-              onPress={() => close(() => navigation.navigate('Home'))}
-            />
-            <Pressable
-              accessibilityLabel="Fermer la navigation"
-              hitSlop={8}
-              onPress={() => close()}
-              style={styles.iconButton}
-            >
-              <X color={colors.ink} size={24} />
-            </Pressable>
-          </View>
-          <Text style={styles.drawerLabel}>NAVIGATION</Text>
-          <ScrollView
-            showsVerticalScrollIndicator={false}
-            contentContainerStyle={styles.drawerList}
-          >
-            {items.map(({ label, Icon, route, active }) => (
-              <Pressable
-                key={label}
-                accessibilityRole="button"
-                accessibilityState={{ selected: active }}
-                onPress={() => close(() => navigation.navigate(route))}
-                style={({ pressed }) => [
-                  styles.drawerItem,
-                  active && styles.drawerItemActive,
-                  pressed && styles.drawerItemPressed,
-                ]}
-              >
-                <Icon
-                  color={active ? colors.primaryDark : colors.muted}
-                  size={20}
-                />
-                <Text
-                  style={[styles.drawerText, active && styles.drawerTextActive]}
-                >
-                  {label}
-                </Text>
-              </Pressable>
-            ))}
-          </ScrollView>
-          <Pressable
-            accessibilityRole="button"
-            onPress={() => void logout()}
-            style={styles.drawerItem}
-          >
-            <LogOut color={colors.danger} size={20} />
-            <Text style={styles.drawerLogout}>Se déconnecter</Text>
-          </Pressable>
-        </Animated.View>
-      )}
     </SafeAreaView>
+  );
+}
+
+export function AuthenticatedDrawer() {
+  const { user, logout } = useAuth();
+  const { isOpen, closeDrawer } = useDrawer();
+  const insets = useSafeAreaInsets();
+  const drawerX = useState(() => new Animated.Value(-320))[0];
+  useEffect(() => {
+    if (isOpen) {
+      Animated.timing(drawerX, { toValue: 0, duration: 180, useNativeDriver: true }).start();
+    }
+  }, [drawerX, isOpen]);
+  if (user === null || !isOpen) return null;
+  const currentRoute = navigationRef.getCurrentRoute()?.name;
+  const items = [
+    { label: 'Tableau de bord', Icon: Home, route: 'Workspace' as const },
+    { label: 'Catalogue', Icon: BookOpen, route: 'Catalogue' as const },
+    ...(user.role === 'LEARNER'
+      ? [
+          { label: 'Ma progression', Icon: ChartNoAxesCombined, route: 'Progress' as const },
+          { label: 'Mes achats', Icon: WalletCards, route: 'Purchases' as const },
+        ]
+      : [{ label: 'Formations', Icon: BookOpen, route: 'ManagedTrainings' as const }]),
+    { label: user.role === 'LEARNER' ? 'Mon planning' : 'Sessions', Icon: CalendarDays, route: 'Sessions' as const },
+    { label: user.role === 'LEARNER' ? 'Mes présences' : 'Présences', Icon: ClipboardCheck, route: 'Attendance' as const },
+    { label: 'Évaluations', Icon: ClipboardCheck, route: 'Evaluations' as const },
+    { label: 'Certificats', Icon: BadgeCheck, route: 'Certificates' as const },
+    ...(user.role === 'ADMIN'
+      ? [
+          { label: 'Indicateurs', Icon: ChartNoAxesCombined, route: 'AdminDashboard' as const },
+          { label: 'Utilisateurs', Icon: UsersRound, route: 'AdminUsers' as const },
+          { label: 'Coûts', Icon: WalletCards, route: 'AdminCosts' as const },
+          { label: 'Catégories', Icon: Settings, route: 'AdminCategories' as const },
+        ]
+      : []),
+    { label: 'Mon profil', Icon: UserRound, route: 'Profile' as const },
+    { label: 'Paramètres', Icon: Settings, route: 'Settings' as const },
+  ];
+  function close(after?: () => void) {
+    Animated.timing(drawerX, { toValue: -320, duration: 180, useNativeDriver: true }).start(() => {
+      closeDrawer();
+      after?.();
+    });
+  }
+  return (
+    <>
+      <Pressable accessibilityLabel="Fermer la navigation" style={styles.backdrop} onPress={() => close()} />
+      <Animated.View
+        style={[
+          styles.drawer,
+          { top: insets.top, paddingTop: spacing.md, paddingBottom: insets.bottom + spacing.md },
+          { transform: [{ translateX: drawerX }] },
+        ]}
+      >
+        <View style={styles.drawerHeader}>
+          <Brand compact />
+          <Pressable accessibilityLabel="Fermer la navigation" hitSlop={8} onPress={() => close()} style={styles.iconButton}>
+            <X color={colors.ink} size={24} />
+          </Pressable>
+        </View>
+        <Text style={styles.drawerLabel}>NAVIGATION</Text>
+        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.drawerList}>
+          {items.map(({ label, Icon, route }) => (
+            <Pressable key={label} accessibilityRole="button" accessibilityState={{ selected: currentRoute === route }} onPress={() => close(() => navigationRef.navigate(route as never))} style={({ pressed }) => [styles.drawerItem, currentRoute === route && styles.drawerItemActive, pressed && styles.drawerItemPressed]}>
+              <Icon color={currentRoute === route ? colors.primaryDark : colors.muted} size={22} />
+              <Text style={[styles.drawerText, currentRoute === route && styles.drawerTextActive]}>{label}</Text>
+            </Pressable>
+          ))}
+        </ScrollView>
+        <Pressable accessibilityRole="button" onPress={() => void logout()} style={styles.drawerItem}>
+          <LogOut color={colors.danger} size={22} />
+          <Text style={styles.drawerLogout}>Se déconnecter</Text>
+        </Pressable>
+      </Animated.View>
+    </>
   );
 }
 

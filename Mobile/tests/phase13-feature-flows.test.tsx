@@ -188,14 +188,13 @@ describe('Phase 13 Mobile feature flows', () => {
     );
   });
 
-  it('loads backend-confirmed payments, enrollments, and invoices', async () => {
+  it('loads backend-confirmed payments and invoices', async () => {
     const request = jest.fn().mockResolvedValue(emptyPage);
     mockedUseAuth.mockReturnValue(authContext('LEARNER', request));
     const screen = await render(<PurchasesScreen {...appProps('Purchases')} />);
 
-    expect((await screen.findAllByText(/^Aucune/)).length).toBe(3);
+    expect((await screen.findAllByText(/^Aucune/)).length).toBe(2);
     expect(request).toHaveBeenCalledWith('/payments?page=1&pageSize=10');
-    expect(request).toHaveBeenCalledWith('/enrollments?page=1&pageSize=10');
     expect(request).toHaveBeenCalledWith('/invoices?page=1&pageSize=10');
   });
 

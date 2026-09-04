@@ -11,7 +11,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ApiError } from '../../core/api/client';
 import { useAuth } from '../../core/auth/AuthContext';
-import { shareFile } from '../../core/files/share';
+import { saveDownloadedFile } from '../../core/files/download';
 import { Button } from '../../shared/components/Button';
 import { Notice } from '../../shared/components/Notice';
 import { StatePanel } from '../../shared/components/StatePanel';
@@ -27,6 +27,16 @@ function message(error: unknown): string {
     : error instanceof Error
       ? error.message
       : 'Une erreur inattendue est survenue.';
+}
+
+function eligibilityFailureLabel(failure: string): string {
+  return {
+    TRAINING_INCOMPLETE: 'Formation non terminée : consultez les leçons restantes.',
+    CERTIFYING_EVALUATION_NOT_PASSED:
+      'Évaluation certifiante non réussie : une nouvelle tentative est nécessaire.',
+    ATTENDANCE_INCOMPLETE: 'Présence insuffisante : vérifiez votre planning.',
+    PAYMENT_NOT_CONFIRMED: 'Paiement non confirmé : le certificat sera disponible après validation.',
+  }[failure] ?? failure.replaceAll('_', ' ').toLowerCase();
 }
 
 export function CertificatesScreen() {
@@ -128,11 +138,12 @@ export function CertificatesScreen() {
     setBusy(`download:${certificate.id}`);
     setError('');
     try {
-      await shareFile(
+      await saveDownloadedFile(
         await download(
           `/certificates/${certificate.id}/pdf`,
           `${certificate.number}.pdf`,
         ),
+        `${certificate.number}.pdf`,
         'application/pdf',
       );
     } catch (caught) {
@@ -203,11 +214,14 @@ export function CertificatesScreen() {
                       </Text>
                       {certificate === undefined &&
                         enrollment.eligibility?.eligible === true && (
-                          <Button
-                            label="Générer le certificat"
-                            loading={busy === `certificate:${enrollment.id}`}
-                            onPress={() => void generate(enrollment.id)}
-                          />
+                          <>
+                            <Text style={[styles.status, styles.statusReady]}>Éligible au certificat</Text>
+                            <Button
+                              label="Générer le certificat"
+                              loading={busy === `certificate:${enrollment.id}`}
+                              onPress={() => void generate(enrollment.id)}
+                            />
+                          </>
                         )}
                       {certificate !== undefined && (
                         <Button
@@ -219,10 +233,14 @@ export function CertificatesScreen() {
                       )}
                       {certificate === undefined &&
                         enrollment.eligibility?.eligible === false && (
-                          <Text style={styles.muted}>
-                            Conditions restantes :{' '}
-                            {enrollment.eligibility.failures.join(', ')}
-                          </Text>
+                          <View style={styles.statusBlock}>
+                            <Text style={[styles.status, styles.statusBlocked]}>Conditions à compléter</Text>
+                            {enrollment.eligibility.failures.map((failure) => (
+                              <Text key={failure} style={styles.muted}>
+                                {eligibilityFailureLabel(failure)}
+                              </Text>
+                            ))}
+                          </View>
                         )}
                       {user.role === 'LEARNER' &&
                         enrollment.eligibility?.eligible === true &&
@@ -333,6 +351,17 @@ const styles = StyleSheet.create({
   },
   cardTitle: { color: colors.ink, fontSize: 16, fontWeight: '700' },
   muted: { color: colors.muted, fontSize: 13, lineHeight: 20 },
+  status: {
+    alignSelf: 'flex-start',
+    borderRadius: 999,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs,
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  statusReady: { color: '#176b42', backgroundColor: '#d9f5e6' },
+  statusBlocked: { color: '#8a5a00', backgroundColor: '#fff1c7' },
+  statusBlock: { gap: spacing.xs },
   body: { color: colors.ink, fontSize: 14 },
   ratingRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
   rating: {

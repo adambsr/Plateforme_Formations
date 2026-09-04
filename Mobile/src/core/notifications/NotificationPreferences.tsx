@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Modal, StyleSheet, Text, View } from 'react-native';
+import * as SecureStore from 'expo-secure-store';
 
 import { useAuth } from '../auth/AuthContext';
 import { Button } from '../../shared/components/Button';
@@ -10,7 +11,13 @@ import {
   notificationPermissionState,
 } from './firebase-messaging';
 
-export function NotificationPreferences() {
+const authPromptShownKey = 'notification-auth-prompt-shown';
+
+export function NotificationPreferences({
+  autoPrompt = false,
+}: {
+  autoPrompt?: boolean;
+}) {
   const { request } = useAuth();
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
@@ -18,11 +25,17 @@ export function NotificationPreferences() {
   const [promptVisible, setPromptVisible] = useState(false);
 
   useEffect(() => {
-    void notificationPermissionState().then((next) => {
+    void notificationPermissionState().then(async (next) => {
       setState(next);
-      setPromptVisible(next === 'undecided');
+      if (autoPrompt && next === 'undecided') {
+        const alreadyShown = await SecureStore.getItemAsync(authPromptShownKey);
+        if (alreadyShown !== 'true') {
+          await SecureStore.setItemAsync(authPromptShownKey, 'true');
+          setPromptVisible(true);
+        }
+      }
     });
-  }, []);
+  }, [autoPrompt]);
 
   async function enable() {
     setLoading(true);
@@ -33,11 +46,11 @@ export function NotificationPreferences() {
       setPromptVisible(false);
       setMessage(
         enabled
-          ? 'Notifications activÃ©es pour cet appareil.'
-          : 'Vous pouvez les autoriser depuis les rÃ©glages Android.',
+          ? 'Notifications activées sur cet appareil.'
+          : 'Vous pouvez les autoriser depuis les réglages Android.',
       );
     } catch {
-      setMessage('Impossible dâ€™activer les notifications pour le moment.');
+      setMessage('Impossible d’activer les notifications pour le moment.');
     } finally {
       setLoading(false);
     }
@@ -51,18 +64,29 @@ export function NotificationPreferences() {
   }
 
   return (
-    <View style={styles.card}>
-      <Text style={styles.title}>Notifications</Text>
-      <Text style={styles.body}>
-        Recevez les informations importantes concernant vos formations et vos
-        sessions.
-      </Text>
-      {message !== '' && <Text style={styles.message}>{message}</Text>}
-      {state === 'enabled' ? (
-        <Text style={styles.message}>Notifications activées sur cet appareil.</Text>
-      ) : (
-        <Button label="Gérer les notifications" loading={loading} onPress={() => void enable()} />
+    <View style={autoPrompt ? styles.promptHost : styles.card}>
+      {!autoPrompt && <Text style={styles.title}>Notifications</Text>}
+      {!autoPrompt && (
+        <Text style={styles.body}>
+          Recevez les informations importantes concernant vos formations et vos
+          sessions.
+        </Text>
       )}
+      {!autoPrompt && message !== '' && (
+        <Text style={styles.message}>{message}</Text>
+      )}
+      {!autoPrompt &&
+        (state === 'enabled' ? (
+          <Text style={styles.message}>
+            Notifications activées sur cet appareil.
+          </Text>
+        ) : (
+          <Button
+            label="Gérer les notifications"
+            loading={loading}
+            onPress={() => void enable()}
+          />
+        ))}
       <Modal animationType="fade" transparent visible={promptVisible} onRequestClose={() => void decline()}>
         <View style={styles.overlay}>
           <View style={styles.modal}>
@@ -78,6 +102,7 @@ export function NotificationPreferences() {
 }
 
 const styles = StyleSheet.create({
+  promptHost: { position: 'absolute', width: 0, height: 0 },
   card: {
     gap: spacing.md,
     borderWidth: 1,

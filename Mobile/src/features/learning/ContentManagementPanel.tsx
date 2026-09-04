@@ -1,6 +1,7 @@
 import * as DocumentPicker from 'expo-document-picker';
 import { useState } from 'react';
 import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Archive, BookPlus, Edit3, Trash2 } from 'lucide-react-native';
 
 import { ApiError } from '../../core/api/client';
 import type { AuthContextValue } from '../../core/auth/AuthContext';
@@ -336,6 +337,7 @@ export function ContentManagementPanel({
           </Text>
           <Button
             label="Modifier le module"
+              icon={Edit3}
             onPress={() =>
               setModuleDraft({
                 id: module.id,
@@ -350,6 +352,7 @@ export function ContentManagementPanel({
             label={
               module.isArchived ? 'Restaurer le module' : 'Archiver le module'
             }
+            icon={Archive}
             disabled={busy}
             onPress={() =>
               archive(`/modules/${module.id}`, module.isArchived, 'Module')
@@ -358,6 +361,7 @@ export function ContentManagementPanel({
           />
           <Button
             label="Supprimer le module"
+            icon={Trash2}
             disabled={busy}
             onPress={() => remove(`/modules/${module.id}`, 'le module')}
             variant="danger"
@@ -372,6 +376,7 @@ export function ContentManagementPanel({
           ) : (
             <Button
               label="Ajouter une leçon"
+              icon={BookPlus}
               onPress={() =>
                 setLessonDraft(
                   emptyLesson(module.id, module.lessons.length + 1),
@@ -391,6 +396,7 @@ export function ContentManagementPanel({
               </Text>
               <Button
                 label="Modifier la leçon"
+                icon={Edit3}
                 onPress={() =>
                   setLessonDraft({
                     moduleId: module.id,
@@ -409,6 +415,7 @@ export function ContentManagementPanel({
                   lesson.isArchived ? 'Restaurer la leçon' : 'Archiver la leçon'
                 }
                 disabled={busy}
+                icon={Archive}
                 onPress={() =>
                   archive(`/lessons/${lesson.id}`, lesson.isArchived, 'Leçon')
                 }
@@ -416,6 +423,7 @@ export function ContentManagementPanel({
               />
               <Button
                 label="Supprimer la leçon"
+                icon={Trash2}
                 disabled={busy}
                 onPress={() => remove(`/lessons/${lesson.id}`, 'la leçon')}
                 variant="danger"

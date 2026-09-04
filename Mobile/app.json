@@ -48,8 +48,8 @@
       "permissions": ["android.permission.POST_NOTIFICATIONS"],
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
-        "foregroundImage": "./assets/android-icon-foreground.png",
-        "monochromeImage": "./assets/android-icon-monochrome.png"
+        "foregroundImage": "./assets/hsa-app-icon.png",
+        "monochromeImage": "./assets/hsa-app-icon.png"
       },
       "predictiveBackGestureEnabled": false
     }

@@ -13,7 +13,7 @@ import type { AppStackParamList } from '../../app/navigation/types';
 import { ApiError } from '../../core/api/client';
 import { trackRecommendationEnrollment } from '../../core/analytics/recommendation-analytics';
 import { useAuth } from '../../core/auth/AuthContext';
-import { shareFile } from '../../core/files/share';
+import { saveDownloadedFile } from '../../core/files/download';
 import { Button } from '../../shared/components/Button';
 import { Notice } from '../../shared/components/Notice';
 import { StatePanel } from '../../shared/components/StatePanel';
@@ -21,7 +21,6 @@ import { colors, radii, spacing } from '../../shared/theme/tokens';
 import { formatTunisDateTime } from '../../shared/utils/format';
 import { formatEur } from '../trainings/format';
 import type {
-  Enrollment,
   Invoice,
   Page,
   Payment,
@@ -40,6 +39,15 @@ function statusLabel(status: PaymentStatus): string {
     PAID: 'Payé',
     FAILED: 'Échoué',
     CANCELLED: 'Annulé',
+  }[status];
+}
+
+function statusStyle(status: PaymentStatus) {
+  return {
+    PENDING: styles.statusPending,
+    PAID: styles.statusPaid,
+    FAILED: styles.statusFailed,
+    CANCELLED: styles.statusCancelled,
   }[status];
 }
 
@@ -130,7 +138,9 @@ export function CheckoutReturnScreen({
           <StatePanel loading message="Vérification du paiement…" />
         ) : (
           <View style={styles.card}>
-            <Text style={styles.status}>{statusLabel(payment.status)}</Text>
+            <Text style={[styles.status, statusStyle(payment.status)]}>
+              {statusLabel(payment.status)}
+            </Text>
             <Text style={styles.cardTitle}>{payment.training.title}</Text>
             <Text style={styles.amount}>{formatEur(payment.amountMinor)}</Text>
             {payment.status === 'PENDING' && (
@@ -163,15 +173,11 @@ export function CheckoutReturnScreen({
   );
 }
 
-export function PurchasesScreen({
-  navigation,
-}: NativeStackScreenProps<AppStackParamList, 'Purchases'>) {
+export function PurchasesScreen() {
   const { user, request, download } = useAuth();
   const [payments, setPayments] = useState<Page<Payment> | null>(null);
-  const [enrollments, setEnrollments] = useState<Page<Enrollment> | null>(null);
   const [invoices, setInvoices] = useState<Page<Invoice> | null>(null);
   const [paymentPage, setPaymentPage] = useState(1);
-  const [enrollmentPage, setEnrollmentPage] = useState(1);
   const [invoicePage, setInvoicePage] = useState(1);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -181,23 +187,18 @@ export function PurchasesScreen({
     setLoading(true);
     setError('');
     try {
-      const [paymentResult, enrollmentResult, invoiceResult] =
-        await Promise.all([
-          request<Page<Payment>>(`/payments?page=${paymentPage}&pageSize=10`),
-          request<Page<Enrollment>>(
-            `/enrollments?page=${enrollmentPage}&pageSize=10`,
-          ),
-          request<Page<Invoice>>(`/invoices?page=${invoicePage}&pageSize=10`),
-        ]);
+      const [paymentResult, invoiceResult] = await Promise.all([
+        request<Page<Payment>>(`/payments?page=${paymentPage}&pageSize=10`),
+        request<Page<Invoice>>(`/invoices?page=${invoicePage}&pageSize=10`),
+      ]);
       setPayments(paymentResult);
-      setEnrollments(enrollmentResult);
       setInvoices(invoiceResult);
     } catch (caught) {
       setError(message(caught));
     } finally {
       setLoading(false);
     }
-  }, [enrollmentPage, invoicePage, paymentPage, request]);
+  }, [invoicePage, paymentPage, request]);
 
   useEffect(() => {
     // Pages synchronize webhook-confirmed financial records.
@@ -209,8 +210,9 @@ export function PurchasesScreen({
     setDownloadingId(invoice.id);
     setError('');
     try {
-      await shareFile(
+      await saveDownloadedFile(
         await download(`/invoices/${invoice.id}/pdf`, `${invoice.number}.pdf`),
+        `${invoice.number}.pdf`,
         'application/pdf',
       );
     } catch (caught) {
@@ -259,42 +261,12 @@ export function PurchasesScreen({
                       {formatEur(payment.amountMinor)}
                     </Text>
                   </View>
-                  <Text style={styles.status}>
+                    <Text style={[styles.status, statusStyle(payment.status)]}>
                     {statusLabel(payment.status)}
                   </Text>
                 </View>
               ))}
               {payments && <Pager page={payments} setPage={setPaymentPage} />}
-            </View>
-            <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Inscriptions actives</Text>
-              {enrollments?.items.length === 0 && (
-                <Text style={styles.muted}>Aucune inscription confirmée.</Text>
-              )}
-              {enrollments?.items.map((enrollment) => (
-                <View key={enrollment.id} style={styles.card}>
-                  <Text style={styles.cardTitle}>
-                    {enrollment.training.title}
-                  </Text>
-                  <Text style={styles.muted}>
-                    {enrollment.session?.title ?? 'Formation autonome'}
-                  </Text>
-                  {user?.role === 'LEARNER' && (
-                    <Button
-                      label="Ouvrir"
-                      onPress={() =>
-                        navigation.navigate('Content', {
-                          trainingId: enrollment.training.id,
-                        })
-                      }
-                      variant="secondary"
-                    />
-                  )}
-                </View>
-              ))}
-              {enrollments && (
-                <Pager page={enrollments} setPage={setEnrollmentPage} />
-              )}
             </View>
             <View style={styles.section}>
               <Text style={styles.sectionTitle}>Factures</Text>
@@ -383,6 +355,10 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '700',
   },
+  statusPending: { color: '#8a5a00', backgroundColor: '#fff1c7' },
+  statusPaid: { color: '#176b42', backgroundColor: '#d9f5e6' },
+  statusFailed: { color: '#a52b35', backgroundColor: '#ffe0e3' },
+  statusCancelled: { color: colors.muted, backgroundColor: colors.canvas },
   pager: { gap: spacing.sm, alignItems: 'center' },
   downloadAction: { width: 84 },
 });

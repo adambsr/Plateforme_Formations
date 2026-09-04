@@ -17,7 +17,7 @@ export function AuthScaffold({
   children,
 }: React.PropsWithChildren<{ title: string; subtitle: string }>) {
   return (
-    <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
+    <SafeAreaView style={styles.safeArea} edges={['bottom']}>
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         style={styles.flex}

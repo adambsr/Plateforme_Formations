@@ -17,6 +17,7 @@ export type AppStackParamList = {
   Catalogue: undefined;
   TrainingDetail: { trainingId: string };
   ManagedTrainings: undefined;
+  TrainingCreate: undefined;
   Content: { trainingId: string };
   Progress: undefined;
   Sessions: undefined;

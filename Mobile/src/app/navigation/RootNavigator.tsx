@@ -17,7 +17,7 @@ import {
   GuestCatalogueScreen,
   GuestTrainingDetailScreen,
 } from '../../features/trainings/TrainingScreens';
-import { ManagedTrainingsScreen } from '../../features/trainings/ManagedTrainingsScreen';
+import { ManagedTrainingsScreen, TrainingCreateScreen } from '../../features/trainings/ManagedTrainingsScreen';
 import {
   ContentScreen,
   ProgressScreen,
@@ -45,6 +45,7 @@ import {
   ProfileScreen,
   SettingsScreen,
   WorkspaceScreen,
+  AuthenticatedDrawer,
 } from '../../features/workspace/WorkspaceScreens';
 import { ScreenMessage } from '../../shared/components/ScreenMessage';
 import {
@@ -53,7 +54,9 @@ import {
   FaqScreen,
   HomeScreen,
 } from '../../features/public/PublicScreens';
-import { PublicConcierge } from '../../features/public/PublicConcierge';
+import { NotificationPreferences } from '../../core/notifications/NotificationPreferences';
+import { useDrawer } from './drawer-context';
+import { DrawerProvider } from './drawer-provider';
 import { colors } from '../../shared/theme/tokens';
 import type {
   AppStackParamList,
@@ -73,17 +76,13 @@ const screenOptions = {
   contentStyle: { backgroundColor: colors.canvas },
 };
 
-const appScreenOptions = ({
-  navigation,
-}: {
-  navigation: { navigate: (route: 'Workspace') => void };
-}) => ({
-  ...screenOptions,
-  headerRight: () => (
+function AppMenuButton() {
+  const { openDrawer } = useDrawer();
+  return (
     <Pressable
-      accessibilityLabel="Ouvrir le tableau de bord"
+      accessibilityLabel="Ouvrir la navigation"
       hitSlop={8}
-      onPress={() => navigation.navigate('Workspace')}
+      onPress={openDrawer}
       style={{
         minWidth: 44,
         minHeight: 44,
@@ -93,7 +92,12 @@ const appScreenOptions = ({
     >
       <Menu color={colors.primaryDark} size={22} />
     </Pressable>
-  ),
+  );
+}
+
+const appScreenOptions = () => ({
+  ...screenOptions,
+  headerRight: () => <AppMenuButton />,
 });
 
 export function RootNavigator() {
@@ -159,7 +163,6 @@ export function RootNavigator() {
             options={{ title: 'R\u00e9initialiser le mot de passe' }}
           />
         </GuestStack.Navigator>
-        <PublicConcierge />
       </>
     );
   }
@@ -174,7 +177,12 @@ export function RootNavigator() {
     );
   }
   return (
-    <AppStack.Navigator screenOptions={appScreenOptions}>
+    <>
+      <DrawerProvider>
+        <AppStack.Navigator
+          initialRouteName="Workspace"
+          screenOptions={appScreenOptions}
+        >
       <AppStack.Screen
         name="Home"
         component={HomeScreen as never}
@@ -199,6 +207,11 @@ export function RootNavigator() {
         name="ManagedTrainings"
         component={ManagedTrainingsScreen}
         options={{ title: 'Formations gérées' }}
+      />
+      <AppStack.Screen
+        name="TrainingCreate"
+        component={TrainingCreateScreen}
+        options={{ title: 'Créer une formation' }}
       />
       <AppStack.Screen
         name="Content"
@@ -295,6 +308,10 @@ export function RootNavigator() {
         component={ProfileScreen}
         options={{ title: 'Mon profil' }}
       />
-    </AppStack.Navigator>
+        </AppStack.Navigator>
+        <AuthenticatedDrawer />
+        <NotificationPreferences autoPrompt />
+      </DrawerProvider>
+    </>
   );
 }

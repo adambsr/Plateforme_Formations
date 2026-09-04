@@ -24,6 +24,7 @@ import { colors, radii, spacing } from '../../shared/theme/tokens';
 import { formatDuration, formatEur } from '../trainings/format';
 import { trainingApi } from '../trainings/training-api';
 import type { Training, TrainingCategory } from '../trainings/types';
+import { useAuth } from '../../core/auth/AuthContext';
 
 const centerAddress =
   process.env.EXPO_PUBLIC_CENTER_ADDRESS ??
@@ -43,6 +44,7 @@ function message(error: unknown): string {
 export function HomeScreen({
   navigation,
 }: NativeStackScreenProps<GuestStackParamList, 'Home'>) {
+  const { user } = useAuth();
   const scrollRef = useRef<ScrollView>(null);
   const [trainings, setTrainings] = useState<Training[]>();
   const [categories, setCategories] = useState<TrainingCategory[]>([]);
@@ -103,11 +105,19 @@ export function HomeScreen({
             label="Explorer les formations"
             onPress={() => navigation.navigate('Catalogue')}
           />
-          <Button
-            label="Créer mon compte"
-            variant="secondary"
-            onPress={() => navigation.navigate('Register')}
-          />
+          {user === null ? (
+            <Button
+              label="Créer mon compte"
+              variant="secondary"
+              onPress={() => navigation.navigate('Register')}
+            />
+          ) : (
+            <Button
+              label="Retour au tableau de bord"
+              variant="secondary"
+              onPress={() => navigation.navigate('Workspace' as never)}
+            />
+          )}
           <View style={styles.proofRow}>
             <Proof title="2 modalités" text="En ligne et présentiel" />
             <Proof title="Suivi clair" text="Progression et planning" />
@@ -209,11 +219,13 @@ export function HomeScreen({
             variant="link"
             onPress={() => navigation.navigate('Contact')}
           />
-          <Button
-            label="Se connecter"
-            variant="link"
-            onPress={() => navigation.navigate('Login')}
-          />
+          {user === null && (
+            <Button
+              label="Se connecter"
+              variant="link"
+              onPress={() => navigation.navigate('Login')}
+            />
+          )}
         </View>
       </ScrollView>
       <ScrollToTopButton

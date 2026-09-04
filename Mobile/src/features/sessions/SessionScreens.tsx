@@ -266,7 +266,7 @@ export function SessionsScreen({
                   }
                   session={session}
                 />
-                {user !== null && user.role !== 'LEARNER' && (
+                {user !== null && user.role !== 'LEARNER' && session.status !== 'COMPLETED' && (
                   <Button
                     label="Gérer cette Session"
                     onPress={() =>
@@ -276,6 +276,11 @@ export function SessionsScreen({
                     }
                     variant="secondary"
                   />
+                )}
+                {session.status === 'COMPLETED' && (
+                  <Text style={styles.completedNotice}>
+                    Session terminée : la gestion n’est plus disponible.
+                  </Text>
                 )}
               </View>
             ))}
@@ -438,6 +443,7 @@ const styles = StyleSheet.create({
   body: { color: colors.ink, fontSize: 15, lineHeight: 22 },
   muted: { color: colors.muted, fontSize: 14, lineHeight: 21 },
   pageText: { color: colors.muted, textAlign: 'center' },
+  completedNotice: { color: colors.muted, fontSize: 13, lineHeight: 19 },
   hero: {
     gap: spacing.md,
     borderRadius: radii.md,

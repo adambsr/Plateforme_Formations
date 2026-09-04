@@ -5,6 +5,7 @@ import {
   Text,
   type PressableProps,
 } from 'react-native';
+import type { LucideIcon } from 'lucide-react-native';
 
 import { colors, radii, spacing } from '../theme/tokens';
 
@@ -15,11 +16,13 @@ export function Button({
   loading = false,
   variant = 'primary',
   disabled,
+  icon: Icon,
   ...props
 }: Omit<PressableProps, 'children'> & {
   label: string;
   loading?: boolean;
   variant?: ButtonVariant;
+  icon?: LucideIcon;
 }) {
   const blocked = disabled === true || loading;
   return (
@@ -40,7 +43,15 @@ export function Button({
           color={variant === 'primary' ? colors.surface : colors.primary}
         />
       ) : (
-        <Text style={[styles.label, styles[`${variant}Label`]]}>{label}</Text>
+        <>
+          {Icon !== undefined && (
+            <Icon
+              color={variant === 'primary' ? colors.surface : colors.primary}
+              size={18}
+            />
+          )}
+          <Text style={[styles.label, styles[`${variant}Label`]]}>{label}</Text>
+        </>
       )}
     </Pressable>
   );
@@ -48,6 +59,8 @@ export function Button({
 
 const styles = StyleSheet.create({
   base: {
+    flexDirection: 'row',
+    gap: spacing.sm,
     minHeight: 48,
     alignItems: 'center',
     justifyContent: 'center',

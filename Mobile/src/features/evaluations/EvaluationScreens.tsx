@@ -529,11 +529,7 @@ export function EvaluationsScreen({
             message="Les évaluations disponibles apparaîtront ici."
           />
         ) : (
-          <ScrollView
-            horizontal
-            contentContainerStyle={styles.tabs}
-            showsHorizontalScrollIndicator={false}
-          >
+          <View style={styles.tabs}>
             {page?.items.map((item) => (
               <Pressable
                 key={item.id}
@@ -547,7 +543,7 @@ export function EvaluationsScreen({
                 <Text style={styles.muted}>{item.training.title}</Text>
               </Pressable>
             ))}
-          </ScrollView>
+          </View>
         )}
         {busy && selected === null && (
           <StatePanel loading message="Préparation de l’évaluation…" />
@@ -933,14 +929,14 @@ const styles = StyleSheet.create({
   },
   muted: { color: colors.muted, fontSize: 13, lineHeight: 20 },
   body: { color: colors.ink, fontSize: 14, lineHeight: 21 },
-  tabs: { gap: spacing.sm },
+  tabs: { gap: spacing.md },
   tab: {
-    width: 210,
+    width: '100%',
     gap: spacing.xs,
     borderWidth: 1,
     borderColor: colors.line,
-    borderRadius: radii.sm,
-    padding: spacing.md,
+    borderRadius: radii.md,
+    padding: spacing.lg,
     backgroundColor: colors.surface,
   },
   tabSelected: {

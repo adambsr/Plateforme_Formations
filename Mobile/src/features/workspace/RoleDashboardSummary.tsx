@@ -1,6 +1,6 @@
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useCallback, useEffect, useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import type { AppStackParamList } from '../../app/navigation/types';
 import {
@@ -13,6 +13,8 @@ import { Button } from '../../shared/components/Button';
 import { StatePanel } from '../../shared/components/StatePanel';
 import { colors, radii, spacing } from '../../shared/theme/tokens';
 import { formatDuration, formatEur } from '../trainings/format';
+import { apiAssetUrl } from '../../core/api/client';
+import { formatTunisDate } from '../../shared/utils/format';
 
 interface Page<T> {
   items: T[];
@@ -21,8 +23,14 @@ interface Page<T> {
 interface Named {
   id: string;
   title?: string;
-  training?: { title: string };
+  training?: { title: string; thumbnailUrl?: string };
   status?: string;
+}
+interface TrainerSessionSummary extends Named {
+  startAt?: string;
+  endAt?: string;
+  location?: string;
+  room?: string;
 }
 interface Progress {
   training: { title: string };
@@ -63,7 +71,7 @@ export function RoleDashboardSummary({
   }>();
   const [trainer, setTrainer] = useState<{
     trainings: Page<Named>;
-    sessions: Page<Named>;
+    sessions: Page<TrainerSessionSummary>;
     evaluations: Page<Named>;
   }>();
   const [error, setError] = useState('');
@@ -98,7 +106,7 @@ export function RoleDashboardSummary({
       } else {
         const [trainings, sessions, evaluations] = await Promise.all([
           request<Page<Named>>('/trainings?view=MANAGED&page=1&pageSize=5'),
-          request<Page<Named>>('/sessions?view=MANAGED&page=1&pageSize=5'),
+          request<Page<TrainerSessionSummary>>('/sessions?view=MANAGED&page=1&pageSize=5'),
           request<Page<Named>>('/evaluations?view=MANAGED&page=1&pageSize=5'),
         ]);
         setTrainer({ trainings, sessions, evaluations });
@@ -144,10 +152,21 @@ export function RoleDashboardSummary({
           </Text>
         ) : (
           trainer.sessions.items.map((item) => (
-            <Text key={item.id} style={styles.row}>
-              • {item.title ?? item.training?.title ?? 'Session'}{' '}
-              {item.status ? `· ${item.status}` : ''}
-            </Text>
+            <View key={item.id} style={styles.sessionCard}>
+              {item.training?.thumbnailUrl !== undefined && (
+                <Image source={{ uri: apiAssetUrl(item.training.thumbnailUrl) }} style={styles.sessionThumbnail} />
+              )}
+              <Text style={styles.cardTitle}>{item.training?.title ?? 'Formation'}</Text>
+              <Text style={styles.muted}>{item.title ?? 'Session'}</Text>
+              {item.startAt !== undefined && (
+                <Text style={styles.muted}>
+                  {formatTunisDate(item.startAt)}{item.endAt !== undefined ? ` au ${formatTunisDate(item.endAt)}` : ''}
+                  {item.location !== undefined ? ` · ${item.location}` : ''}
+                  {item.room !== undefined ? ` · ${item.room}` : ''}
+                </Text>
+              )}
+              {item.status && <Text style={styles.sessionStatus}>{item.status}</Text>}
+            </View>
           ))
         )}
       </View>
@@ -260,4 +279,14 @@ const styles = StyleSheet.create({
   reason: { color: colors.primaryDark, fontSize: 13, fontWeight: '700' },
   meta: { color: colors.ink, fontSize: 13, fontWeight: '700' },
   row: { color: colors.ink, fontSize: 14, lineHeight: 21 },
+  sessionCard: {
+    gap: spacing.xs,
+    borderWidth: 1,
+    borderColor: colors.line,
+    borderRadius: radii.sm,
+    padding: spacing.md,
+    backgroundColor: colors.surface,
+  },
+  sessionThumbnail: { width: '100%', height: 96, borderRadius: radii.sm },
+  sessionStatus: { color: colors.primaryDark, fontSize: 12, fontWeight: '700' },
 });

@@ -232,7 +232,7 @@ function CatalogueView({
 
   return (
     <SafeAreaView
-      edges={guest ? ['top', 'bottom'] : ['bottom']}
+      edges={['bottom']}
       style={styles.safeArea}
     >
       <ScrollView

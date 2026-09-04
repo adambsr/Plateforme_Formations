@@ -3,6 +3,7 @@ import * as ImagePicker from 'expo-image-picker';
 import {
   Alert,
   Image,
+  Modal,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -10,6 +11,7 @@ import {
   Text,
   View,
 } from 'react-native';
+import { Archive, BookOpen, Edit3, Eye, Plus, Send, Trash2 } from 'lucide-react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -351,7 +353,8 @@ export function ManagedTrainingsScreen({
         {!editorOpen && (
           <Button
             label="Créer une Formation"
-            onPress={() => setEditorOpen(true)}
+            icon={Plus}
+            onPress={() => navigation.navigate('TrainingCreate')}
           />
         )}
         <Notice message={error} />
@@ -522,11 +525,13 @@ export function ManagedTrainingsScreen({
                 </Text>
                 <Button
                   label="Modifier"
+                  icon={Edit3}
                   onPress={() => edit(training)}
                   variant="secondary"
                 />
                 <Button
                   label="Gérer le contenu"
+                  icon={BookOpen}
                   onPress={() =>
                     navigation.navigate('Content', { trainingId: training.id })
                   }
@@ -534,6 +539,7 @@ export function ManagedTrainingsScreen({
                 />
                 <Button
                   label="Voir la fiche"
+                  icon={Eye}
                   onPress={() =>
                     navigation.navigate('TrainingDetail', {
                       trainingId: training.id,
@@ -545,6 +551,7 @@ export function ManagedTrainingsScreen({
                   <Button
                     disabled={saving}
                     label="Publier"
+                    icon={Send}
                     onPress={() => void transition(training, 'publish')}
                   />
                 )}
@@ -552,6 +559,7 @@ export function ManagedTrainingsScreen({
                   <Button
                     disabled={saving}
                     label="Archiver"
+                    icon={Archive}
                     onPress={() => void transition(training, 'archive')}
                     variant="danger"
                   />
@@ -568,6 +576,7 @@ export function ManagedTrainingsScreen({
                   <Button
                     disabled={saving}
                     label="Supprimer"
+                    icon={Trash2}
                     onPress={() => remove(training)}
                     variant="danger"
                   />
@@ -591,6 +600,125 @@ export function ManagedTrainingsScreen({
             </View>
           </>
         )}
+      </ScrollView>
+    </SafeAreaView>
+  );
+}
+
+export function TrainingCreateScreen({
+  navigation,
+}: NativeStackScreenProps<AppStackParamList, 'TrainingCreate'>) {
+  const { user, request } = useAuth();
+  const [categories, setCategories] = useState<TrainingCategory[]>([]);
+  const [trainers, setTrainers] = useState<User[]>([]);
+  const [ownerTrainerId, setOwnerTrainerId] = useState('');
+  const [categoryId, setCategoryId] = useState('');
+  const [categoryOpen, setCategoryOpen] = useState(false);
+  const [title, setTitle] = useState('');
+  const [description, setDescription] = useState('');
+  const [level, setLevel] = useState('');
+  const [type, setType] = useState<TrainingType>('SELF_PACED_ONLINE');
+  const [durationMinutes, setDurationMinutes] = useState('');
+  const [price, setPrice] = useState('');
+  const [minimumAttendancePercent, setMinimumAttendancePercent] = useState('80');
+  const [objectives, setObjectives] = useState('');
+  const [prerequisites, setPrerequisites] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    void Promise.all([
+      request<TrainingCategory[]>('/categories'),
+      user?.role === 'ADMIN'
+        ? request<UserPage>('/trainers?pageSize=100')
+        : Promise.resolve(undefined),
+    ]).then(([categoryList, trainerPage]) => {
+      setCategories(categoryList);
+      setTrainers(trainerPage?.items.filter(({ isActive }) => isActive) ?? []);
+    }).catch((caught) => setError(message(caught)));
+  }, [request, user?.role]);
+
+  async function submit() {
+    const priceMinor = Math.round(Number(price.replace(',', '.')) * 100);
+    const duration = Number(durationMinutes);
+    const minimum = Number(minimumAttendancePercent);
+    if (title.trim() === '' || description.trim() === '' || categoryId === '' || level.trim() === '' || !Number.isInteger(duration) || duration <= 0 || !Number.isInteger(priceMinor) || priceMinor <= 0 || (type === 'IN_PERSON' && (!Number.isInteger(minimum) || minimum < 1 || minimum > 100)) || (user?.role === 'ADMIN' && ownerTrainerId === '')) {
+      setError('Complétez les champs obligatoires avec des valeurs valides.');
+      return;
+    }
+    setBusy(true);
+    setError('');
+    try {
+      await request('/trainings', {
+        method: 'POST',
+        body: JSON.stringify({
+          title: title.trim(), description: description.trim(), categoryId,
+          level: level.trim(), durationMinutes: duration, priceMinor,
+          objectives: lines(objectives), prerequisites: lines(prerequisites), type,
+          ...(type === 'IN_PERSON' ? { minimumAttendancePercent: minimum } : {}),
+          ...(user?.role === 'ADMIN' ? { ownerTrainerId } : {}),
+        }),
+      });
+      navigation.replace('ManagedTrainings');
+    } catch (caught) {
+      setError(message(caught));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  if (user === null || user.role === 'LEARNER') return null;
+  const selectedCategory = categories.find(({ id }) => id === categoryId);
+  return (
+    <SafeAreaView edges={['bottom']} style={styles.safeArea}>
+      <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+        <View style={styles.heading}>
+          <Text style={styles.eyebrow}>GESTION PÉDAGOGIQUE</Text>
+          <Text style={styles.title}>Créer une formation</Text>
+          <Text style={styles.muted}>Créez un brouillon, puis complétez son contenu pédagogique.</Text>
+        </View>
+        <Notice message={error} />
+        <View style={styles.card}>
+          <TextField label="Titre" onChangeText={setTitle} value={title} />
+          <TextField label="Description" multiline onChangeText={setDescription} value={description} />
+          <Text style={styles.label}>Catégorie</Text>
+          <Pressable style={styles.choice} onPress={() => setCategoryOpen(true)}>
+            <Text style={styles.choiceText}>{selectedCategory?.name ?? 'Sélectionner une catégorie'}</Text>
+          </Pressable>
+          <Modal transparent visible={categoryOpen} animationType="fade" onRequestClose={() => setCategoryOpen(false)}>
+            <Pressable style={styles.modalOverlay} onPress={() => setCategoryOpen(false)}>
+              <View style={styles.modalCard}>
+                <Text style={styles.cardTitle}>Choisir une catégorie</Text>
+                {categories.map((category) => (
+                  <Choice key={category.id} label={category.name} selected={category.id === categoryId} onPress={() => { setCategoryId(category.id); setCategoryOpen(false); }} />
+                ))}
+              </View>
+            </Pressable>
+          </Modal>
+          <TextField label="Niveau" onChangeText={setLevel} value={level} />
+          <Text style={styles.label}>Type</Text>
+          <View style={styles.optionsRow}>
+            <Choice label="En ligne autonome" selected={type === 'SELF_PACED_ONLINE'} onPress={() => setType('SELF_PACED_ONLINE')} />
+            <Choice label="Présentiel" selected={type === 'IN_PERSON'} onPress={() => setType('IN_PERSON')} />
+          </View>
+          <TextField inputMode="numeric" label="Durée en minutes" onChangeText={setDurationMinutes} value={durationMinutes} />
+          <TextField inputMode="decimal" label="Prix EUR" onChangeText={setPrice} value={price} />
+          {type === 'IN_PERSON' && <TextField inputMode="numeric" label="Présence minimale (%)" onChangeText={setMinimumAttendancePercent} value={minimumAttendancePercent} />}
+          <TextField label="Objectifs (un par ligne)" multiline onChangeText={setObjectives} value={objectives} />
+          <TextField label="Prérequis (un par ligne)" multiline onChangeText={setPrerequisites} value={prerequisites} />
+          {user.role === 'ADMIN' && (
+            <>
+              <Text style={styles.label}>Formateur propriétaire</Text>
+              <View style={styles.options}>
+                {trainers.map((trainer) => (
+                  <Choice key={trainer.id} label={userName(trainer)} selected={trainer.id === ownerTrainerId} onPress={() => setOwnerTrainerId(trainer.id)} />
+                ))}
+              </View>
+            </>
+          )}
+          <Button label="Créer le brouillon" icon={Plus} loading={busy} onPress={() => void submit()} />
+          <Button label="Annuler" onPress={() => navigation.goBack()} variant="secondary" />
+        </View>
       </ScrollView>
     </SafeAreaView>
   );
@@ -666,5 +794,18 @@ const styles = StyleSheet.create({
     aspectRatio: 16 / 9,
     borderRadius: radii.sm,
     backgroundColor: colors.line,
+  },
+  modalOverlay: {
+    flex: 1,
+    justifyContent: 'center',
+    padding: spacing.lg,
+    backgroundColor: 'rgba(23,32,51,0.45)',
+  },
+  modalCard: {
+    gap: spacing.sm,
+    maxHeight: '80%',
+    borderRadius: radii.md,
+    padding: spacing.lg,
+    backgroundColor: colors.surface,
   },
 });

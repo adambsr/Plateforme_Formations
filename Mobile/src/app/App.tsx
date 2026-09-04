@@ -11,6 +11,7 @@ import { linking } from './navigation/linking';
 import { navigationRef } from './navigation/navigation-ref';
 import { openPendingNotification } from './navigation/notification-navigation';
 import { NotificationProvider } from '../core/notifications/NotificationProvider';
+import { PublicConcierge } from '../features/public/PublicConcierge';
 
 export function App() {
   return (
@@ -33,6 +34,7 @@ export function App() {
           <StatusBar style="dark" />
           <NotificationProvider>
             <RootNavigator />
+            <PublicConcierge />
             <AnalyticsConsentBanner />
           </NotificationProvider>
         </NavigationContainer>

@@ -29,6 +29,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
   },
-  logo: { width: 210, height: 76 },
-  compactLogo: { width: 80, height: 44 },
+  logo: { width: 176, height: 64 },
+  compactLogo: { width: 128, height: 48 },
 });
