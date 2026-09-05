@@ -119,6 +119,7 @@ export function App() {
             <Route path="content/:trainingId" element={<ContentPage />} />
             <Route path="attendance" element={<AttendancePage />} />
             <Route path="evaluations" element={<EvaluationPage />} />
+            <Route path="evaluations/:evaluationId" element={<EvaluationPage />} />
             <Route element={<RequireRole roles={['TRAINER']} />}>
               <Route
                 path="evaluations/new"

@@ -1,6 +1,7 @@
 import { Image, Pressable, StyleSheet, View } from 'react-native';
 
 import { appConfig } from '../../core/config/environment';
+import { spacing } from '../theme/tokens';
 
 export function Brand({
   compact = false,
@@ -29,6 +30,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
   },
-  logo: { width: 176, height: 64 },
-  compactLogo: { width: 128, height: 48 },
+  logo: { width: 152, height: 56, marginHorizontal: spacing.xs },
+  compactLogo: { width: 108, height: 42, marginHorizontal: spacing.xs },
 });

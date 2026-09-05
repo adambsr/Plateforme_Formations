@@ -13,6 +13,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ApiError, apiClient } from '../../core/api/client';
+import { useAuth } from '../../core/auth/AuthContext';
 import { Button } from '../../shared/components/Button';
 import { TextField } from '../../shared/components/TextField';
 import { colors, radii, spacing } from '../../shared/theme/tokens';
@@ -45,6 +46,7 @@ const starters = [
 ];
 
 export function PublicConcierge() {
+  const { status } = useAuth();
   const linkTo = useLinkTo();
   const nextId = useRef(1);
   const [open, setOpen] = useState(false);
@@ -60,6 +62,8 @@ export function PublicConcierge() {
       grounded: true,
     },
   ]);
+
+  if (status !== 'guest') return null;
 
   async function send(value: string) {
     const trimmed = value.trim();

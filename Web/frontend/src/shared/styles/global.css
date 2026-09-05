@@ -3609,6 +3609,25 @@ label,
   border-color: #8eb4dc;
   box-shadow: 0 12px 26px rgba(24, 89, 166, 0.16);
 }
+.evaluation-detail-route .evaluation-list {
+  display: none;
+}
+.evaluation-detail-route .evaluation-modal-backdrop {
+  position: static;
+  min-height: auto;
+  padding: 0;
+  background: transparent;
+}
+.evaluation-detail-route .evaluation-modal {
+  width: 100%;
+  max-width: none;
+  max-height: none;
+  border-radius: var(--radius-lg);
+  box-shadow: none;
+}
+.evaluation-detail-route .modal-close {
+  display: none;
+}
 
 .back-to-top {
   position: fixed;

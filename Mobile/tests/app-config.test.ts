@@ -9,5 +9,11 @@ describe('Expo application configuration', () => {
     expect(appConfig.expo.icon).toBe('./assets/hsa-app-icon.png');
     expect(appConfig.expo.splash?.image).toBe('./assets/hsa-app-icon.png');
     expect(appConfig.expo.android.adaptiveIcon.backgroundImage).toBeUndefined();
+    expect(appConfig.expo.android.adaptiveIcon.foregroundImage).toBe(
+      './assets/android-icon-foreground.png',
+    );
+    expect(appConfig.expo.android.adaptiveIcon.monochromeImage).toBe(
+      './assets/android-icon-monochrome.png',
+    );
   });
 });

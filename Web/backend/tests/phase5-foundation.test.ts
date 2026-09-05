@@ -37,8 +37,10 @@ describe('Phase 5 persistence and request boundaries', () => {
       client: 'WEB',
     });
     expect(mobileCheckoutReturnUrls('plateforme-formations')).toEqual({
-      success: 'plateforme-formations://payments/success',
-      cancel: 'plateforme-formations://payments/cancel',
+      success:
+        'intent://payments/success#Intent;scheme=plateforme-formations;end',
+      cancel:
+        'intent://payments/cancel#Intent;scheme=plateforme-formations;end',
     });
   });
 

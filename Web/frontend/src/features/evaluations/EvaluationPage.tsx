@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react';
-import { Link, useNavigate } from 'react-router';
+import { Link, useNavigate, useParams } from 'react-router';
 import { ApiError } from '../../core/api/client.js';
 import { useAuth } from '../../core/auth/AuthContext.js';
 import { Pagination } from '../../shared/components/Pagination.js';
@@ -30,6 +30,8 @@ const questionTypeLabel = (type: Question['type']) =>
 
 export function EvaluationPage() {
   const { user, request } = useAuth();
+  const { evaluationId } = useParams<{ evaluationId?: string }>();
+  const navigate = useNavigate();
   const [page, setPage] = useState<Page<Evaluation> | null>(null);
   const [pageNumber, setPageNumber] = useState(1);
   const [selected, setSelected] = useState<Evaluation | null>(null);
@@ -75,18 +77,23 @@ export function EvaluationPage() {
         setEnrollments(
           (await request<Page<Enrollment>>('/enrollments?pageSize=100')).items,
         );
-      setSelected(null);
-      setAttempt(null);
+      if (evaluationId === undefined) {
+        setSelected(null);
+        setAttempt(null);
+      }
     } catch (caught) {
       setError(message(caught));
     }
-  }, [pageNumber, request, user]);
+  }, [evaluationId, pageNumber, request, user]);
 
   useEffect(() => {
     // Route entry synchronizes role-filtered Evaluation state with the backend.
     // oxlint-disable-next-line react/set-state-in-effect
     void load();
   }, [load]);
+  useEffect(() => {
+    if (evaluationId !== undefined) void detail(evaluationId);
+  }, [detail, evaluationId]);
   useEffect(() => {
     if (attempt?.status !== 'IN_PROGRESS' || attempt.expiresAt === undefined)
       return;
@@ -308,6 +315,7 @@ export function EvaluationPage() {
     );
   }
   async function selectEvaluation(evaluation: Evaluation) {
+    navigate(`/app/evaluations/${evaluation.id}`);
     if (user?.role !== 'LEARNER') {
       await detail(evaluation.id);
       return;
@@ -390,6 +398,7 @@ export function EvaluationPage() {
           0,
           Math.ceil((new Date(attempt.expiresAt).getTime() - now) / 1000),
         );
+  const inDetailView = evaluationId !== undefined;
   return (
     <section>
       <div className="section-heading">
@@ -401,6 +410,11 @@ export function EvaluationPage() {
               : 'Mes évaluations'}
           </h1>
         </div>
+        {inDetailView && (
+          <Link className="secondary-button" to="/app/evaluations">
+            Retour aux évaluations
+          </Link>
+        )}
         {page !== null && <span className="count-badge">{page.total}</span>}
         {owner && (
           <Link className="primary-button" to="/app/evaluations/new">
@@ -422,7 +436,7 @@ export function EvaluationPage() {
           <p className="muted">Les évaluations disponibles apparaîtront ici.</p>
         </div>
       ) : (
-        <div className="evaluation-layout">
+        <div className={inDetailView ? 'evaluation-layout evaluation-detail-route' : 'evaluation-layout'}>
           <aside className="evaluation-list">
             {page?.items.map((evaluation) => (
               <button
@@ -464,10 +478,12 @@ export function EvaluationPage() {
               className="evaluation-modal-backdrop"
               role="presentation"
               onMouseDown={(event) => {
+                if (inDetailView) return;
                 if (
                   event.target === event.currentTarget &&
                   attempt?.status !== 'IN_PROGRESS'
                 ) {
+                  navigate('/app/evaluations');
                   setSelected(null);
                   setResults(null);
                 }
@@ -485,6 +501,7 @@ export function EvaluationPage() {
                   aria-label="Fermer l’évaluation"
                   disabled={attempt?.status === 'IN_PROGRESS'}
                   onClick={() => {
+                    navigate('/app/evaluations');
                     setSelected(null);
                     setResults(null);
                   }}

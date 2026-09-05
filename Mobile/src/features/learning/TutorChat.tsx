@@ -1,4 +1,5 @@
 import { useRef, useState } from 'react';
+import { ChevronDown, ChevronUp } from 'lucide-react-native';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { ApiError } from '../../core/api/client';
@@ -74,6 +75,7 @@ export function TutorChat({
   const [currentLessonId, setCurrentLessonId] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  const [expanded, setExpanded] = useState(true);
 
   async function send(value: string, mode: TutorMode = 'QUESTION') {
     const trimmed = value.trim();
@@ -143,6 +145,20 @@ export function TutorChat({
       <Text style={styles.muted}>
         Réponses limitées au contenu du cours, avec sources vérifiables.
       </Text>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityState={{ expanded }}
+        onPress={() => setExpanded((value) => !value)}
+        style={styles.toggle}
+      >
+        <Text style={styles.toggleText}>{expanded ? 'Réduire' : 'Ouvrir le tuteur'}</Text>
+        {expanded ? (
+          <ChevronUp color={colors.primaryDark} size={18} />
+        ) : (
+          <ChevronDown color={colors.primaryDark} size={18} />
+        )}
+      </Pressable>
+      {!expanded ? null : <>
       <Text style={styles.label}>Leçon à privilégier</Text>
       <ScrollView
         horizontal
@@ -249,6 +265,7 @@ export function TutorChat({
         L’IA peut se tromper : utilisez les sources pour vérifier dans le cours.
         Ne partagez aucune donnée personnelle ou de paiement.
       </Text>
+      </>}
     </View>
   );
 }
@@ -292,6 +309,16 @@ const styles = StyleSheet.create({
   },
   title: { color: colors.ink, fontSize: 21, fontWeight: '800' },
   muted: { color: colors.muted, fontSize: 13, lineHeight: 19 },
+  toggle: {
+    minHeight: 40,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    borderRadius: radii.sm,
+    paddingHorizontal: spacing.md,
+    backgroundColor: colors.primarySoft,
+  },
+  toggleText: { color: colors.primaryDark, fontWeight: '700' },
   label: { color: colors.ink, fontSize: 14, fontWeight: '700' },
   chips: { gap: spacing.sm, paddingVertical: spacing.xs },
   chip: {

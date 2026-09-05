@@ -32,8 +32,8 @@ function passwordReady(principal: AuthenticatedPrincipal): void {
 
 export function mobileCheckoutReturnUrls(mobileAppScheme: string) {
   return {
-    success: `${mobileAppScheme}://payments/success`,
-    cancel: `${mobileAppScheme}://payments/cancel`,
+    success: `intent://payments/success#Intent;scheme=${mobileAppScheme};end`,
+    cancel: `intent://payments/cancel#Intent;scheme=${mobileAppScheme};end`,
   } as const;
 }
 

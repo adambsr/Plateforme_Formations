@@ -7,6 +7,8 @@ const Icon = () => <View />;
 export const BookOpen = Icon;
 export const BadgeCheck = Icon;
 export const CalendarDays = Icon;
+export const ChevronDown = Icon;
+export const ChevronUp = Icon;
 export const ChartNoAxesCombined = Icon;
 export const ClipboardCheck = Icon;
 export const Home = Icon;

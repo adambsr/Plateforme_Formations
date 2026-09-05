@@ -71,6 +71,14 @@ function normalizeReturnUrl(value: string): string {
   return url.toString().replace(/\/$/, '');
 }
 
+function appendQuery(value: string, query: string): string {
+  const hashIndex = value.indexOf('#');
+  const base = hashIndex === -1 ? value : value.slice(0, hashIndex);
+  const hash = hashIndex === -1 ? '' : value.slice(hashIndex);
+  const separator = base.includes('?') ? '&' : '?';
+  return `${base}${separator}${query}${hash}`;
+}
+
 export class StripeSdkCheckoutGateway implements StripeCheckoutGateway {
   readonly #stripe: Stripe;
   readonly #webhookSecret: string;
@@ -130,16 +138,17 @@ export class StripeSdkCheckoutGateway implements StripeCheckoutGateway {
     const cancelUrl = normalizeReturnUrl(
       input.returnUrls?.cancel ?? this.#cancelUrl,
     );
-    const separator = successUrl.includes('?') ? '&' : '?';
-    const cancelSeparator = cancelUrl.includes('?') ? '&' : '?';
     let session: Stripe.Checkout.Session;
     try {
       session = await this.#stripe.checkout.sessions.create({
         mode: 'payment',
         client_reference_id: input.paymentId,
         customer_email: input.learnerEmail,
-        success_url: `${successUrl}${separator}paymentId=${input.paymentId}&session_id={CHECKOUT_SESSION_ID}`,
-        cancel_url: `${cancelUrl}${cancelSeparator}paymentId=${input.paymentId}`,
+        success_url: appendQuery(
+          successUrl,
+          'paymentId=' + input.paymentId + '&session_id={CHECKOUT_SESSION_ID}',
+        ),
+        cancel_url: appendQuery(cancelUrl, `paymentId=${input.paymentId}`),
         metadata,
         payment_intent_data: { metadata },
         line_items: [
