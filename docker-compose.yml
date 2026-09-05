@@ -87,8 +87,8 @@ services:
       AI_BASE_URL: ${AI_BASE_URL:-}
       AI_MAX_CONTEXT_CHARS: ${AI_MAX_CONTEXT_CHARS:-100000}
       CENTER_NAME: High Skills Academy
-      CENTER_ADDRESS: Adresse du centre
-      CENTER_EMAIL: contact@example.com
+      CENTER_ADDRESS: Route Manzel Chaker km 2.5 en face Magasin Général (MG), Sfax, Tunisia
+      CENTER_EMAIL: highskills.ac@gmail.com
       CENTER_LOGO_PATH: /app/Web/backend/assets/hsa-logo-blue.png
     ports:
       - '127.0.0.1:3000:3000'

@@ -370,6 +370,7 @@ function PaymentLedger({
   const invoicesByPayment = new Map(
     invoices?.items.map((invoice) => [invoice.paymentId, invoice]) ?? [],
   );
+  const isAdmin = user.role === 'ADMIN';
   return (
     <section>
       <div className="section-heading">
@@ -389,9 +390,10 @@ function PaymentLedger({
             <span className="count-badge">{payments?.total ?? 0}</span>
           </div>
           {payments?.items.length === 0 ? <p className="muted">Aucun paiement.</p> : (
-            <div className="responsive-table payment-table" role="table">
+            <div className={`responsive-table payment-table${isAdmin ? ' payment-table-admin' : ''}`} role="table">
               <div className="table-row table-head" role="row">
-                <span role="columnheader">Utilisateur</span><span role="columnheader">Formation</span><span role="columnheader">Statut</span><span role="columnheader">Facture</span>
+                {isAdmin && <span role="columnheader">Utilisateur</span>}
+                <span role="columnheader">Formation</span><span role="columnheader">Statut</span><span role="columnheader">Facture</span>
               </div>
               {payments?.items.map((payment) => {
                 const invoice = invoicesByPayment.get(payment.id);
@@ -399,7 +401,7 @@ function PaymentLedger({
                   ? (user.profile.firstName ?? user.email)
                   : [invoice.learner.firstName, invoice.learner.lastName].filter(Boolean).join(' ') || invoice.learner.email;
                 return <div className="table-row" role="row" key={payment.id}>
-                  <span role="cell"><strong>{name}</strong><small>{invoice?.learner.email ?? user.email}</small></span>
+                  {isAdmin && <span role="cell"><strong>{name}</strong><small>{invoice?.learner.email ?? user.email}</small></span>}
                   <span role="cell"><strong>{payment.training.title}</strong><small>{date(payment.createdAt)} · {money(payment.amountMinor)}</small></span>
                   <span role="cell" className={`status-pill status-${payment.status.toLowerCase()}`}>{statusLabel(payment.status)}</span>
                   <span role="cell">{invoice ? <button className="secondary-button compact-button" onClick={() => void downloadInvoice(invoice)}><Download aria-hidden="true" size={16} /> Télécharger</button> : <span className="muted">Non disponible</span>}</span>

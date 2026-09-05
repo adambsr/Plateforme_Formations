@@ -3709,6 +3709,86 @@ label,
 .financial-list li > div { min-width: 0; }
 .financial-list li > div span { display: block; }
 .financial-list li .secondary-button { margin-left: auto; }
+.payment-ledger {
+  overflow: hidden;
+  padding: 0;
+}
+.ledger-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1.35rem 1.5rem;
+  border-bottom: 1px solid var(--line);
+  background: linear-gradient(135deg, #f8fbff, #fff);
+}
+.ledger-heading h2,
+.ledger-heading p {
+  margin: 0;
+}
+.ledger-heading p {
+  margin-top: 0.3rem;
+  font-size: 0.9rem;
+}
+.responsive-table {
+  width: 100%;
+  overflow-x: auto;
+}
+.payment-table .table-row {
+  display: grid;
+  grid-template-columns: minmax(150px, 1.1fr) minmax(180px, 1.5fr) 150px minmax(150px, 0.9fr);
+  align-items: center;
+  gap: 1rem;
+  min-width: 720px;
+  padding: 1rem 1.5rem;
+  border-bottom: 1px solid #edf0f4;
+}
+.payment-table:not(.payment-table-admin) .table-row {
+  grid-template-columns: minmax(180px, 1.6fr) 150px minmax(150px, 0.9fr);
+  min-width: 600px;
+}
+.payment-table .table-row:last-child {
+  border-bottom: 0;
+}
+.payment-table .table-head {
+  padding-block: 0.7rem;
+  color: var(--muted);
+  background: #fbfcfe;
+  font-size: 0.72rem;
+  font-weight: 750;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.payment-table .table-row > span {
+  min-width: 0;
+}
+.payment-table .table-row > span:not(.status-pill) {
+  display: grid;
+  gap: 0.2rem;
+}
+.payment-table strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.payment-table small {
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 0.82rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.payment-table .status-pill {
+  justify-self: start;
+}
+.payment-table .secondary-button {
+  white-space: nowrap;
+}
+.payment-ledger > .pagination-controls {
+  margin: 0;
+  border-top: 1px solid #edf0f4;
+  padding: 1rem 1.5rem;
+}
 .satisfaction-distribution { display: grid; gap: .6rem; margin: 1rem 0; }
 .satisfaction-row { display: grid; grid-template-columns: 7rem minmax(0, 1fr) 2rem; align-items: center; gap: .7rem; color: #b9822e; }
 .satisfaction-row > span { display: flex; gap: .1rem; }

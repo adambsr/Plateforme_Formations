@@ -13,19 +13,18 @@ export async function loadDocumentLogo(
 
 export function drawDocumentBrand(
   document: PDFKit.PDFDocument,
-  _issuerName: string,
+  issuerName: string,
   logo: Buffer | undefined,
   x: number,
   y: number,
 ): void {
-  const brandName = 'High Skills Academy';
   if (logo !== undefined) {
     try {
       document.image(logo, x, y, { fit: [86, 48] });
       document
         .fontSize(12)
         .fillColor('#17365f')
-        .text(brandName, x + 100, y + 15, { width: 250 });
+        .text(issuerName, x + 100, y + 15, { width: 250 });
       return;
     } catch {
       // A damaged optional logo falls back to the replaceable placeholder.
@@ -39,5 +38,5 @@ export function drawDocumentBrand(
   document
     .fontSize(12)
     .fillColor('#17365f')
-    .text(brandName, x + 60, y + 15, { width: 270 });
+    .text(issuerName, x + 60, y + 15, { width: 270 });
 }
