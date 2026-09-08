@@ -243,11 +243,6 @@ label,
   padding: 1rem;
   background: transparent;
 }
-.auth-back-link {
-  justify-self: center;
-  color: var(--muted);
-  font-size: 0.9rem;
-}
 .auth-card {
   padding: 1.6rem;
 }

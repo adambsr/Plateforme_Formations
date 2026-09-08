@@ -14,21 +14,21 @@
 
 High Skills Academy est une plateforme web de gestion de formations professionnelles. Elle centralise la publication des offres, les inscriptions, les paiements, l'accès au contenu, les sessions présentielles, le suivi pédagogique, les évaluations, la certification et les indicateurs de gestion.
 
-Le projet répond au problème de la fragmentation des opérations d'un centre de formation entre outils de bureautique, échanges manuels, plateformes de paiement et documents isolés. La solution propose une application web structurée autour d'une API sécurisée, d'une base MongoDB et de services externes sélectionnés : Stripe pour le paiement, Gemini pour des fonctionnalités d'assistance intelligente et Firebase Analytics pour une mesure optionnelle du produit.
+Le projet répond au problème de la fragmentation des opérations d'un centre de formation entre outils de bureautique, échanges manuels, plateformes de paiement et documents isolés. La solution propose une application web et mobile structurée autour d'une API sécurisée, d'une base MongoDB et de services externes sélectionnés : Stripe pour le paiement, Gemini pour des fonctionnalités d'assistance intelligente, Firebase Analytics pour une mesure optionnelle du produit et Firebase Cloud Messaging pour les notifications mobiles.
 
 L'architecture retenue est un monolithe modulaire : les domaines métier sont séparés dans le code, tout en restant déployés dans une seule API. Une attention particulière est portée à l'autorisation serveur, à la traçabilité des paiements, à la protection des fichiers, à la limitation des appels IA et au consentement analytique.
 
-**Mots-clés :** plateforme de formation, application web, monolithe modulaire, MongoDB, paiement en ligne, intelligence artificielle générative, Firebase Analytics, sécurité applicative.
+**Mots-clés :** plateforme de formation, application web et mobile, monolithe modulaire, MongoDB, paiement en ligne, intelligence artificielle générative, Firebase Analytics, Firebase Cloud Messaging, sécurité applicative.
 
 ## Abstract
 
 High Skills Academy is a web platform for professional training management. It centralizes course publication, enrollment, payment, content access, in-person sessions, learning tracking, assessment, certification, and management indicators.
 
-The project addresses the fragmentation of training-centre operations across spreadsheets, manual communication, payment tools, and isolated documents. The proposed solution relies on a secured web API, MongoDB, and selected external services: Stripe for payment, Gemini for intelligent assistance, and Firebase Analytics for optional product measurement.
+The project addresses the fragmentation of training-centre operations across spreadsheets, manual communication, payment tools, and isolated documents. The proposed solution relies on secured web and mobile clients, a protected API, MongoDB, and selected external services: Stripe for payment, Gemini for intelligent assistance, Firebase Analytics for optional product measurement, and Firebase Cloud Messaging for mobile notifications.
 
 The system follows a modular-monolith architecture: business domains are separated in code while remaining deployed in a single API. Server-side authorization, payment traceability, file protection, AI request control, and analytics consent are key design concerns.
 
-**Keywords:** training platform, web application, modular monolith, MongoDB, online payment, generative AI, Firebase Analytics, application security.
+**Keywords:** training platform, web and mobile application, modular monolith, MongoDB, online payment, generative AI, Firebase Analytics, Firebase Cloud Messaging, application security.
 
 ---
 
@@ -106,7 +106,8 @@ Une formation suit les états `DRAFT`, `PUBLISHED` et `ARCHIVED`. Seules les for
 | Paiement et documents | Stripe Checkout de test, webhook vérifié, inscriptions, factures et certificats PDF protégés |
 | Gestion | Coûts, satisfaction, revenus, résultat et rentabilité dans les tableaux de bord |
 | Intelligence artificielle | Tuteur de formation, concierge public, génération de questions brouillon |
-| Mesure | Firebase Analytics optionnel pour les pages et recommandations |
+| Application mobile | Client Expo/React Native Android, navigation par rôle, accès au contenu et notifications push |
+| Mesure | Firebase Analytics optionnel pour les pages, écrans et recommandations |
 
 ## 3. Conception architecturale
 
@@ -122,6 +123,9 @@ Ce choix est adapté au périmètre du projet : il évite la complexité de coor
 flowchart LR
   Browser[Client React + Vite\nlocalhost:5173] -->|JSON, Bearer + cookie de rafraîchissement| API[API Express\nlocalhost:3000/api]
   Browser -->|événements optionnels après consentement| Analytics[Firebase Analytics / Google Analytics]
+  Mobile[Client Expo React Native Android] -->|JSON, Bearer token| API
+  Mobile -->|événements optionnels après consentement| Analytics
+  API -->|FCM si activé| FCM[Firebase Cloud Messaging]
   API --> DB[(MongoDB 8\nplateforme_formations)]
   API --> Storage[(Volume de fichiers protégés)]
   API --> Mail[Mailpit SMTP local]
@@ -130,20 +134,22 @@ flowchart LR
   Init[mongodb-init] -->|initialise rs0| DB
 ```
 
-Le client présente les parcours utilisateur et appelle l'API via `/api`. L'API est le point de contrôle central : elle valide les données, applique l'autorisation, accède à MongoDB et contacte les fournisseurs externes. Les clés privées de Stripe et Gemini ne quittent jamais le serveur.
+Le client web et le client mobile présentent les parcours utilisateur et appellent l'API via `/api`. L'API est le point de contrôle central : elle valide les données, applique l'autorisation, accède à MongoDB et contacte les fournisseurs externes. Les clés privées de Stripe et Gemini, ainsi que les identifiants de compte de service Firebase utilisés par FCM, ne quittent jamais le serveur. Le client mobile utilise une session adaptée à son environnement natif, tandis que le backend conserve les mêmes règles d'autorisation métier.
 
 ### 3.3 Technologies
 
 | Couche | Technologies retenues |
 | --- | --- |
 | Interface | React 19, TypeScript, Vite, React Router, React Hook Form, Zod |
+| Application mobile | Expo 57, React Native 0.86, React Navigation, Secure Store |
 | Backend | Node.js, Express 5, TypeScript, Mongoose, Zod |
 | Persistance | MongoDB 8, replica set mono-nœud `rs0` |
 | Documentation API | OpenAPI et Swagger UI |
 | Documents et e-mail | PDFKit, Nodemailer, Mailpit local |
 | Paiement | Stripe Checkout et webhook signé |
 | IA | SDK Google Gen AI / Gemini |
-| Analyse d'usage | Firebase Analytics |
+| Analyse d'usage | Firebase Analytics web et natif, soumis au consentement |
+| Notifications mobiles | Firebase Cloud Messaging, Firebase Admin SDK et Expo Notifications |
 
 ## 4. Modélisation des données et règles métier
 
@@ -271,6 +277,20 @@ Le choix est enregistré dans le stockage local sous la clé `analytics-consent`
 
 L'attribution est conservée dans le stockage de session et supprimée après la conversion. Le réglage `VITE_FIREBASE_ANALYTICS_DEBUG=true` ajoute `debug_mode` pour l'observation dans Firebase Analytics DebugView. Les utilisateurs qui refusent le consentement, les navigateurs incompatibles et les bloqueurs empêchent naturellement la collecte.
 
+### 7.2 Mesure dans l'application mobile
+
+Le client mobile Android utilise `@react-native-firebase/analytics` et reprend le même principe de minimisation que le client web. Le paramètre de compilation `EXPO_PUBLIC_FIREBASE_ANALYTICS_ENABLED` constitue un premier garde-fou technique; il est désactivé par défaut. Lorsque le module est activé, une boîte de dialogue demande le consentement de l'utilisateur. La décision est conservée dans `expo-secure-store` sous la clé `analytics-consent` et configure la collecte native Firebase.
+
+Les écrans affichés par React Navigation produisent des événements `screen_view`. Les événements `recommendation_impression`, `recommendation_click` et `recommendation_enrollment` reprennent les mêmes noms et paramètres que sur le web. L'attribution d'une inscription à une recommandation est conservée localement pendant au plus sept jours, puis supprimée après conversion ou expiration. Aucun nom, e-mail, élément de paiement ou autre donnée directement identifiante n'est transmis par ces événements. En l'absence de consentement, la fonction de suivi retourne sans initialiser ni appeler le SDK Analytics.
+
+### 7.3 Notifications mobiles avec FCM
+
+Les notifications reposent sur une séparation entre le client mobile, l'API métier et Firebase Cloud Messaging. Après authentification et accord explicite de l'utilisateur, l'application obtient un jeton FCM, puis l'enregistre auprès de `POST /api/notifications/devices`. Le backend associe le jeton à l'utilisateur authentifié dans la collection `notification_devices`. Le rafraîchissement du jeton est pris en compte par le même mécanisme.
+
+L'envoi est réservé à l'Administrateur via `POST /api/notifications/send`. Le service backend utilise le SDK Firebase Admin et les identifiants de compte de service fournis par les identifiants d'application par défaut. Les erreurs indiquant qu'un jeton est invalide ou n'est plus enregistré entraînent sa suppression. La désactivation de FCM (`FCM_ENABLED=false`) ne bloque ni l'authentification ni le reste de l'application.
+
+Sur Android, `expo-notifications` présente les messages reçus au premier plan et utilise le canal `hsa-default`. Une notification ouverte depuis l'arrière-plan ou depuis un état fermé est convertie en destination interne contrôlée : catalogue, détail d'une formation, détail d'une session, achats ou certificats. Une destination inconnue est ignorée. Lors de la déconnexion, l'application supprime le jeton distant avec `DELETE /api/notifications/devices` avant de fermer la session.
+
 ## 8. Déploiement et environnement de développement
 
 ### 8.1 Services locaux
@@ -295,8 +315,17 @@ mongodb://localhost:27017/plateforme_formations?replicaSet=rs0&directConnection=
 | `.env` | Surcharges Docker Compose pour Stripe et Gemini |
 | `Web/backend/.env` | API, MongoDB, JWT, SMTP, Stripe, fichiers, Gemini et identité du centre |
 | `Web/frontend/.env` | URL API, informations publiques de contact et Firebase Analytics |
+| `Mobile/.env` | URL API mobile, paramètres publics et configuration Analytics/native Firebase |
 
 Les paramètres critiques côté serveur incluent `MONGODB_URI`, `JWT_ACCESS_SECRET`, `CORS_ORIGINS`, les paramètres SMTP, les secrets Stripe, `UPLOAD_DIR`, `AI_API_KEY`, `AI_MODEL`, `AI_BASE_URL` et `AI_MAX_CONTEXT_CHARS`. Les valeurs préfixées par `VITE_` sont visibles du navigateur; elles ne doivent donc jamais contenir de secret serveur.
+
+### 8.3 Installation et configuration du client mobile
+
+Le client mobile est situé dans `Mobile/` et est construit avec Expo 57 et React Native 0.86. Après l'installation des dépendances à la racine du dépôt, la configuration locale est créée à partir de `Mobile/.env.example`. `EXPO_PUBLIC_API_BASE_URL` doit désigner une adresse accessible depuis l'émulateur ou le terminal physique : `http://10.0.2.2:3000/api` pour l'émulateur Android, ou l'adresse IP du poste sur le réseau local pour un appareil réel. Le schéma `EXPO_PUBLIC_APP_SCHEME` est utilisé par les liens profonds.
+
+Les modules natifs Firebase nécessitent une application Android enregistrée avec l'identifiant `com.highskillsacademy.formations` et son fichier local `google-services.json`. Une application iOS correspondante utilise `GoogleService-Info.plist`. Ces fichiers de configuration d'application sont distincts du compte de service Firebase du backend et ne doivent pas être confondus avec lui. Le client se lance avec `npm run dev:mobile` et le projet Android natif avec `npm run android --workspace @plateforme-formations/mobile`.
+
+Pour activer la mesure native, `EXPO_PUBLIC_FIREBASE_ANALYTICS_ENABLED=true` est défini dans l'environnement mobile. Pour activer les notifications, le backend reçoit `FCM_ENABLED=true` et utilise `GOOGLE_APPLICATION_CREDENTIALS` ou les identifiants d'application par défaut. Sur Android 13 et supérieur, la permission `POST_NOTIFICATIONS` est demandée au moment où l'utilisateur choisit d'activer les notifications; sur les versions antérieures, l'accès aux notifications est déterminé par le système. La configuration FCM reste facultative pour exécuter le client et accéder aux fonctionnalités qui ne dépendent pas des notifications.
 
 ## 9. Vérification et qualité logicielle
 
@@ -309,7 +338,8 @@ Les vérifications les plus significatives couvrent notamment :
 - les webhooks et le flux de paiement;
 - la progression, les présences, les évaluations, les certificats et les tableaux de bord;
 - la configuration, le replica set et les scripts d'initialisation;
-- les garde-fous du tuteur, du concierge public et des événements Firebase.
+- les garde-fous du tuteur, du concierge public et des événements Firebase;
+- la configuration mobile, les sessions natives, le consentement Analytics et les flux de notifications.
 
 Pour le mémoire final, cette section devra être complétée par des résultats mesurés : nombre de tests exécutés, taux de réussite, exemples de scénarios, captures d'écran de l'API et tests manuels des parcours critiques.
 
@@ -322,15 +352,16 @@ Les fonctions actuelles privilégient un périmètre clair et contrôlé. Les li
 - mécanisme de limitation de requêtes partagé et persistant pour un déploiement à plusieurs instances;
 - enrichissement de la recherche et de la recommandation, tout en conservant les contraintes de confidentialité;
 - amélioration de l'observabilité, métriques applicatives et journalisation de sécurité;
+- prise en charge complète d'une chaîne de distribution mobile, avec signature de production, notifications iOS et gestion centralisée des paramètres Firebase;
 - étude utilisateur et évaluation de l'utilisabilité des interfaces et de l'assistance IA.
 
 Ces pistes ne remettent pas en cause les règles actuelles : l'autorisation doit demeurer côté serveur, l'accès doit rester lié à l'inscription, et les assistants IA doivent rester limités aux sources qu'ils sont autorisés à utiliser.
 
 ## 11. Conclusion générale
 
-High Skills Academy met en œuvre un cycle de formation complet, depuis la publication d'une offre jusqu'à la délivrance d'un certificat. Le projet associe un client React, une API Express modulaire, MongoDB, Stripe, Mailpit, Gemini et Firebase Analytics dans une architecture cohérente pour son périmètre.
+High Skills Academy met en œuvre un cycle de formation complet, depuis la publication d'une offre jusqu'à la délivrance d'un certificat. Le projet associe des clients React web et Expo/React Native, une API Express modulaire, MongoDB, Stripe, Mailpit, Gemini, Firebase Analytics et Firebase Cloud Messaging dans une architecture cohérente pour son périmètre.
 
-Les développements récents apportent deux contributions importantes au projet : une assistance IA séparée selon le contexte — tuteur fondé sur les leçons pour l'Apprenant et concierge fondé sur les informations publiques pour le visiteur — et une mesure analytique optionnelle, limitée aux événements produits et soumise au consentement.
+Les développements récents apportent trois contributions importantes au projet : une assistance IA séparée selon le contexte — tuteur fondé sur les leçons pour l'Apprenant et concierge fondé sur les informations publiques pour le visiteur —, une application mobile native partageant les règles métier de l'API, et une mesure analytique optionnelle complétée par des notifications push FCM, toutes deux limitées par des mécanismes de consentement ou d'activation explicite.
 
 La valeur académique de la solution réside autant dans les fonctionnalités délivrées que dans les choix de conception : contrôle backend des droits, protection des flux financiers, modularisation du domaine, contraintes explicites sur l'IA et prise en compte de la confidentialité dès l'implémentation.
 

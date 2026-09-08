@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useNavigate } from 'react-router';
 
 import { ApiError, apiDownload, apiRequest } from '../api/client.js';
 import type { AuthSession, User } from './types.js';
@@ -20,6 +21,7 @@ function refreshWebSession(): Promise<AuthSession> {
 }
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
+  const navigate = useNavigate();
   const [status, setStatus] = useState<AuthStatus>('loading');
   const [user, setUser] = useState<User | null>(null);
   const accessToken = useRef<string | null>(null);
@@ -128,6 +130,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           });
         } finally {
           becomeGuest();
+          navigate('/', { replace: true });
         }
       },
       async changePassword(currentPassword, newPassword) {
@@ -153,7 +156,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       request,
       download,
     }),
-    [acceptSession, becomeGuest, download, request, status, user],
+    [acceptSession, becomeGuest, download, navigate, request, status, user],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

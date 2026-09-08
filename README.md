@@ -18,7 +18,8 @@ High Skills Academy is a French-language training platform with a public catalog
 | Learning          | Paid enrollment, lesson progress, sessions, attendance, evaluations, automatic grading, certificates, immutable satisfaction feedback |
 | Reporting         | Stripe test-mode checkout and webhook fulfillment, invoices, trainer/training costs, recommendations, dashboards                      |
 | AI                | Course tutor, public website concierge, and trainer-controlled Gemini draft-question generation                                       |
-| Measurement       | Optional consent-based Firebase Analytics for page views and recommendations                                                          |
+| Mobile            | Expo/React Native Android client with role-aware navigation, protected content, push notifications, and mobile-specific API sessions  |
+| Measurement       | Optional consent-based Firebase Analytics for web and mobile page views and recommendations                                           |
 
 ## Architecture
 
@@ -28,6 +29,9 @@ This is a **modular monolith**, not a microservices system. The React client and
 flowchart LR
   Browser[React + Vite\nlocalhost:5173] -->|JSON, Bearer token + refresh cookie| API[Express API\nlocalhost:3000/api]
   Browser -->|optional consented events| Firebase[Firebase Analytics / Google Analytics]
+  Mobile[Expo React Native Android\nHigh Skills Academy] -->|JSON, Bearer token| API
+  Mobile -->|optional consented events| Firebase
+  API -->|FCM when enabled| FirebaseMessaging[Firebase Cloud Messaging]
   API --> Mongo[(MongoDB 8\nplateforme_formations)]
   API --> Files[(Persistent upload volume)]
   API --> Mailpit[Mailpit SMTP]
@@ -38,15 +42,17 @@ flowchart LR
 
 The browser calls `/api`; the API authorizes requests, owns access control and external-service credentials, and reads or writes MongoDB. Gemini and Stripe secret keys never reach the browser.
 
-| Layer          | Implementation                                                 |
-| -------------- | -------------------------------------------------------------- |
-| Web client     | React 19, TypeScript, Vite, React Router, React Hook Form, Zod |
-| API            | Node.js, Express 5, TypeScript, Mongoose, Zod                  |
-| Database       | MongoDB 8, single-node replica set `rs0`                       |
-| Local services | Docker Compose and Mailpit                                     |
-| Payments       | Stripe Checkout and signed webhooks                            |
-| AI             | Google Gen AI SDK / Gemini                                     |
-| Analytics      | Firebase Analytics SDK                                         |
+| Layer          | Implementation                                                   |
+| -------------- | ---------------------------------------------------------------- |
+| Web client     | React 19, TypeScript, Vite, React Router, React Hook Form, Zod   |
+| API            | Node.js, Express 5, TypeScript, Mongoose, Zod                    |
+| Database       | MongoDB 8, single-node replica set `rs0`                         |
+| Local services | Docker Compose and Mailpit                                       |
+| Payments       | Stripe Checkout and signed webhooks                              |
+| AI             | Google Gen AI SDK / Gemini                                       |
+| Mobile client  | Expo 57, React Native 0.86, React Navigation, Secure Store       |
+| Analytics      | Firebase Analytics SDK for web and native clients                |
+| Push           | Firebase Cloud Messaging, Firebase Admin SDK, Expo Notifications |
 
 ## Getting started on a new PC
 
@@ -57,8 +63,9 @@ The browser calls `/api`; the API authorizes requests, owns access control and e
 | [Git](https://git-scm.com/downloads)                              | Clone the repository                                             |
 | Node.js **24+** and npm **11+**                                   | Install and run the project; it pins `npm@11.17.0`               |
 | [Docker Desktop](https://www.docker.com/products/docker-desktop/) | Run the API, MongoDB, database bootstrap, and local mail service |
+| [Stripe CLI](https://docs.stripe.com/stripe-cli)                   | Forward Stripe test-mode webhooks to the local API               |
 
-Optional: [MongoDB Compass](https://www.mongodb.com/products/tools/compass) to inspect data; a Firebase project for analytics; Stripe test credentials for real checkout; and a Google AI Studio API key for Gemini functionality.
+Optional: [MongoDB Compass](https://www.mongodb.com/products/tools/compass) to inspect data; a Firebase project and Android app for Analytics/FCM; Stripe test credentials for real checkout; and a Google AI Studio API key for Gemini functionality.
 
 ### 1. Clone and install
 
@@ -80,7 +87,46 @@ Copy-Item Web/frontend/.env.example Web/frontend/.env
 
 Edit them using the [environment reference](#environment-variables). Placeholder Stripe and Gemini values allow services to start, but cannot complete real payment or AI requests.
 
-### 3. Start API and local services
+### 3. Install and start Stripe CLI
+
+The Stripe Node SDK used by the backend is installed by `npm ci`. The Stripe CLI is a separate command-line program for forwarding webhooks. On Windows, choose **one** installation method:
+
+```powershell
+# Recommended: install with npm, as described in Stripe's installation guide.
+npm install --global @stripe/cli
+
+# Alternative: install and update the Windows package with winget.
+# winget install --id Stripe.StripeCLI --exact
+```
+
+Both commands install the same Stripe CLI. The npm method keeps it with your Node/npm global tools; the winget method uses the Windows package manager. Do not run both.
+
+If PowerShell still reports that `stripe` is not recognized after the npm installation, add npm's global executable folder to your user PATH, then open a new terminal:
+
+```powershell
+$npmGlobalBin = npm prefix --global
+$userPath = [Environment]::GetEnvironmentVariable('Path', 'User')
+if (($userPath -split ';') -notcontains $npmGlobalBin) {
+  [Environment]::SetEnvironmentVariable(
+    'Path',
+    ($userPath.TrimEnd(';') + ';' + $npmGlobalBin),
+    'User'
+  )
+}
+$env:Path += ";$npmGlobalBin"
+stripe --version
+```
+
+Open a new terminal, authenticate the CLI, and start webhook forwarding from the repository root:
+
+```powershell
+stripe login
+stripe listen --forward-to http://127.0.0.1:3000/api/payments/webhook/stripe
+```
+
+Keep this terminal running. Copy the `whsec_...` signing secret printed by `stripe listen` into `STRIPE_WEBHOOK_SECRET` in the root `.env` file. Also set `STRIPE_SECRET_KEY` to your Stripe test-mode secret key.
+
+### 4. Start API and local services
 
 ```powershell
 npm run docker:up
@@ -88,7 +134,7 @@ npm run docker:up
 
 This builds the backend when necessary and waits for MongoDB and API health checks. MongoDB replica-set setup and backend indexes happen automatically.
 
-### 4. Create the initial administrator
+### 5. Create the initial administrator
 
 After Docker is healthy, use the administrator credentials configured in `Web/backend/.env`:
 
@@ -98,7 +144,7 @@ npm run seed:admin
 
 This is idempotent: it only creates the configured administrator when no administrator exists.
 
-### 5. Start the web client
+### 6. Start the web client
 
 In a second terminal at the repository root:
 
@@ -108,7 +154,7 @@ npm run dev:frontend
 
 Open <http://localhost:5173>. The default API is <http://localhost:3000/api>.
 
-### 6. Verify
+### 7. Verify
 
 | Check         | Address or command                 | Expected result                                                   |
 | ------------- | ---------------------------------- | ----------------------------------------------------------------- |
@@ -120,15 +166,46 @@ Open <http://localhost:5173>. The default API is <http://localhost:3000/api>.
 
 The repository also provides `npm run dev:backend`. It requires `Web/backend/.env` to point to reachable MongoDB and SMTP services. The Compose path above is the supported local arrangement for normal development.
 
+### 8. Run the mobile client
+
+The mobile workspace is an Expo development-build project targeting Android. Install the workspace dependencies from the repository root, then create the mobile environment file:
+
+```powershell
+Copy-Item Mobile/.env.example Mobile/.env
+```
+
+Set `EXPO_PUBLIC_API_BASE_URL` to an address reachable from the device. The default `http://10.0.2.2:3000/api` is for the Android emulator; a physical device must use the development computer's LAN address, for example `http://192.168.1.20:3000/api`. The API must be reachable through the selected network address.
+
+Start the Expo development server or build the native Android project:
+
+```powershell
+npm run dev:mobile
+npm run android --workspace @plateforme-formations/mobile
+```
+
+The native Firebase integrations require a registered Android Firebase app whose application ID is `com.highskillsacademy.formations`. Set `GOOGLE_SERVICES_JSON` in `Mobile/.env` to the local `google-services.json` path. For iOS builds, provide `GOOGLE_SERVICE_INFO_PLIST` and use the matching iOS Firebase app. These release-environment inputs are not server service-account credentials.
+
+Mobile Analytics is disabled by default. Set `EXPO_PUBLIC_FIREBASE_ANALYTICS_ENABLED=true` only after the native Firebase app is configured. The app displays a consent dialog and stores the decision in Android Secure Store; no Analytics event is sent before explicit acceptance.
+
+FCM setup additionally requires the backend service account to be available through Application Default Credentials (or the path in `GOOGLE_APPLICATION_CREDENTIALS`) and the following backend settings:
+
+```dotenv
+FCM_ENABLED=true
+GOOGLE_APPLICATION_CREDENTIALS=/absolute/path/to/firebase-service-account.json
+```
+
+The backend must never expose this service-account file to the web or mobile bundle. Android 13 and later require the user to grant `POST_NOTIFICATIONS`; the mobile application asks explicitly on those versions and registers the FCM token only when notification access is available. For a physical device, notification delivery requires Google Play services and a Firebase-registered installation.
+
 ## Environment variables
 
 Never commit copied `.env` files. Do not put server secrets in `VITE_` variables: Vite exposes them to the browser bundle. Restart Vite after frontend changes; rerun `npm run docker:up` after root Docker configuration changes.
 
-| File                | Read by                                                     | Role                                                                    |
-| ------------------- | ----------------------------------------------------------- | ----------------------------------------------------------------------- |
-| `.env`              | Docker Compose; loaded first for a directly started backend | Stripe and Gemini Compose overrides                                     |
-| `Web/backend/.env`  | Backend scripts and direct backend startup                  | Server, database, auth, SMTP, payment, uploads, Gemini, centre identity |
-| `Web/frontend/.env` | Vite client                                                 | Public API/contact display and Firebase Analytics                       |
+| File                | Read by                                                     | Role                                                                        |
+| ------------------- | ----------------------------------------------------------- | --------------------------------------------------------------------------- |
+| `.env`              | Docker Compose; loaded first for a directly started backend | Stripe and Gemini Compose overrides                                         |
+| `Web/backend/.env`  | Backend scripts and direct backend startup                  | Server, database, auth, SMTP, payment, uploads, Gemini, centre identity     |
+| `Web/frontend/.env` | Vite client                                                 | Public API/contact display and Firebase Analytics                           |
+| `Mobile/.env`       | Expo/React Native build                                     | Mobile API, public centre values, Firebase Analytics, native Firebase files |
 
 ### Root `.env` — Docker Compose
 
@@ -188,6 +265,20 @@ All have safe Compose defaults; real credentials are needed to use their integra
 | `VITE_FIREBASE_API_KEY`                                                              | Analytics        | Firebase web app API key                                  | When Analytics is enabled                   |
 | `VITE_FIREBASE_AUTH_DOMAIN`                                                          | Analytics config | Firebase auth-domain configuration value                  | Optional for current Analytics-only use     |
 | `VITE_FIREBASE_PROJECT_ID`, `VITE_FIREBASE_APP_ID`, `VITE_FIREBASE_MEASUREMENT_ID`   | Analytics        | Firebase project, web-app, and GA measurement identifiers | When Analytics is enabled                   |
+
+### `Mobile/.env` — public mobile configuration
+
+| Variable                                                                                                         | Purpose                                              | Required?                                                   |
+| ---------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------- | ----------------------------------------------------------- |
+| `EXPO_PUBLIC_API_BASE_URL`                                                                                       | API base URL reachable from the emulator or device   | No; Android emulator defaults to `http://10.0.2.2:3000/api` |
+| `EXPO_PUBLIC_CENTER_NAME`                                                                                        | Public centre name                                   | No; has a default                                           |
+| `EXPO_PUBLIC_CENTER_ADDRESS`, `EXPO_PUBLIC_CENTER_EMAIL`, `EXPO_PUBLIC_CENTER_PHONE`, `EXPO_PUBLIC_CENTER_HOURS` | Public contact display                               | No; fallbacks exist                                         |
+| `EXPO_PUBLIC_APP_SCHEME`                                                                                         | Deep-link scheme                                     | No; `plateforme-formations`                                 |
+| `EXPO_PUBLIC_FIREBASE_ANALYTICS_ENABLED`                                                                         | Enables native Analytics before consent is evaluated | No; `false`                                                 |
+| `GOOGLE_SERVICES_JSON`                                                                                           | Local Android Firebase configuration file            | Required for native Firebase Android builds                 |
+| `GOOGLE_SERVICE_INFO_PLIST`                                                                                      | Local iOS Firebase configuration file                | Required for native Firebase iOS builds                     |
+
+`EXPO_PUBLIC_*` values are bundled into the application and are not secrets. Firebase service-account credentials belong only to the backend; they must not be placed in `Mobile/.env`.
 
 ## Docker and local services
 
@@ -260,6 +351,16 @@ Configuration lives in `Web/frontend/src/core/analytics/firebase.ts`. Analytics 
 
 Attribution is held in session storage and removed after conversion. Development mode logs initialization and queued events to the browser console. Set `VITE_FIREBASE_ANALYTICS_DEBUG=true` while validating in **Firebase Console → Analytics → DebugView**; it adds `debug_mode`. Consent refusal, blockers, or unsupported browsers can prevent events from sending.
 
+### Mobile Analytics
+
+The mobile client uses `@react-native-firebase/analytics` and follows the same consent principle as the web client. `EXPO_PUBLIC_FIREBASE_ANALYTICS_ENABLED` is a build-time feature switch; the user decision is stored in `expo-secure-store` under `analytics-consent`. `screen_view` events are emitted from React Navigation, and recommendation impressions, clicks, and attributed enrollments use the same event names and parameters as the web implementation. No name, email, payment data, or event is transmitted before explicit acceptance.
+
+### Firebase Cloud Messaging
+
+FCM is an authenticated device-registration service shared by the web backend and the Android client. The mobile client obtains an FCM registration token with `@react-native-firebase/messaging`, registers it with `POST /api/notifications/devices`, and refreshes it when Firebase rotates the token. The backend stores tokens in the `notification_devices` collection, associates them with the authenticated user, and exposes the administrator-only `POST /api/notifications/send` operation. Invalid or unregistered tokens are removed after delivery failures.
+
+On Android, `expo-notifications` displays foreground messages and creates the `hsa-default` notification channel. Notification responses and messages that open the app are translated into controlled destinations such as `Catalogue`, `TrainingDetail`, `SessionDetail`, `Purchases`, and `Certificates`; unknown destinations are ignored. Logout calls `DELETE /api/notifications/devices` before terminating the mobile session. FCM is disabled by default and remains optional for authentication and normal application use.
+
 ## AI features
 
 Gemini calls originate only in the backend through `AI_API_KEY`. The API asks for structured JSON and validates responses before returning them.
@@ -308,19 +409,23 @@ Trainers can create draft objective questions through `POST /api/evaluations/:id
 
 Run from the repository root.
 
-| Task                         | Command                          |
-| ---------------------------- | -------------------------------- |
-| Install locked dependencies  | `npm ci`                         |
-| Start Docker services/API    | `npm run docker:up`              |
-| Stop services                | `npm run docker:down`            |
-| Follow logs                  | `npm run docker:logs`            |
-| Show service status          | `docker compose ps`              |
-| Restart API container        | `docker compose restart backend` |
-| Start web server             | `npm run dev:frontend`           |
-| Start backend watcher        | `npm run dev:backend`            |
-| Create initial administrator | `npm run seed:admin`             |
-| Build web and backend        | `npm run build`                  |
-| Render Compose configuration | `npm run docker:config`          |
+| Task                         | Command                                                       |
+| ---------------------------- | ------------------------------------------------------------- |
+| Install locked dependencies  | `npm ci`                                                      |
+| Start Docker services/API    | `npm run docker:up`                                           |
+| Stop services                | `npm run docker:down`                                         |
+| Follow logs                  | `npm run docker:logs`                                         |
+| Show service status          | `docker compose ps`                                           |
+| Restart API container        | `docker compose restart backend`                              |
+| Start web server             | `npm run dev:frontend`                                        |
+| Start backend watcher        | `npm run dev:backend`                                         |
+| Start Expo mobile server     | `npm run dev:mobile`                                          |
+| Build/run Android client     | `npm run android --workspace @plateforme-formations/mobile`   |
+| Test mobile workspace        | `npm run test --workspace @plateforme-formations/mobile`      |
+| Typecheck mobile workspace   | `npm run typecheck --workspace @plateforme-formations/mobile` |
+| Create initial administrator | `npm run seed:admin`                                          |
+| Build web and backend        | `npm run build`                                               |
+| Render Compose configuration | `npm run docker:config`                                       |
 
 The repository also has a development demonstration-data seed that deliberately clears and recreates the local database. It is not part of normal setup; review its safeguards before use.
 
@@ -349,6 +454,15 @@ The repository also has a development demonstration-data seed that deliberately 
 │       │   └── shared/                # Reusable UI and styles
 │       ├── .env.example
 │       └── vite.config.ts
+├── Mobile/
+│   ├── src/
+│   │   ├── app/                   # Navigation, linking, and notification routing
+│   │   ├── core/                  # API, authentication, Analytics, FCM, storage
+│   │   ├── features/              # Mobile workspaces and feature screens
+│   │   └── shared/                # Reusable components, theme, and utilities
+│   ├── android/                   # Generated/native Android project
+│   ├── .env.example               # Mobile public configuration template
+│   └── app.config.js              # Conditional native Firebase file configuration
 ├── HSA_LOGO.png
 └── package.json                        # Workspace scripts and engines
 ```
