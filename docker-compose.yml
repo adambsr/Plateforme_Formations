@@ -54,32 +54,8 @@ services:
       mongodb-init:
         condition: service_completed_successfully
     environment:
-      NODE_ENV: development
-      PORT: 3000
       MONGODB_URI: mongodb://mongodb:27017/plateforme_formations?replicaSet=rs0&directConnection=true
-      WEB_APP_URL: http://localhost:5173
-      MOBILE_APP_SCHEME: ${MOBILE_APP_SCHEME:-plateforme-formations}
-      CORS_ORIGINS: http://localhost:5173
-      TRUST_PROXY_HOPS: 0
-      TZ: UTC
-      LOG_LEVEL: info
-      JWT_ACCESS_SECRET: compose-only-secret-that-is-at-least-32-characters
-      JWT_ACCESS_TTL_MINUTES: 15
-      REFRESH_TOKEN_TTL_DAYS: 7
-      PASSWORD_RESET_TTL_MINUTES: 30
-      STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:-sk_test_compose_placeholder}
-      STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET:-whsec_compose_placeholder}
-      STRIPE_SUCCESS_URL: ${STRIPE_SUCCESS_URL:-http://localhost:5173/payments/success}
-      STRIPE_CANCEL_URL: ${STRIPE_CANCEL_URL:-http://localhost:5173/payments/cancel}
       UPLOAD_DIR: /app/uploads
-      MAX_UPLOAD_SIZE_MB: 20
-      AI_API_KEY: ${AI_API_KEY:-compose-placeholder}
-      AI_MODEL: ${AI_MODEL:-gemini-3.7-flash}
-      AI_BASE_URL: ${AI_BASE_URL:-}
-      AI_MAX_CONTEXT_CHARS: ${AI_MAX_CONTEXT_CHARS:-100000}
-      CENTER_NAME: High Skills Academy
-      CENTER_ADDRESS: Route Manzel Chaker km 2.5 en face Magasin Général (MG), Sfax, Tunisia
-      CENTER_EMAIL: contact.hsa.tn@gmail.com
       CENTER_LOGO_PATH: /app/Web/backend/assets/hsa-logo-blue.png
     ports:
       - '127.0.0.1:3000:3000'

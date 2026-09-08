@@ -1,3 +1,5 @@
+import 'dotenv/config';
+
 import { pathToFileURL } from 'node:url';
 import mongoose, { Types } from 'mongoose';
 import { AttendanceModel } from '../modules/attendance/models/attendance.model.js';

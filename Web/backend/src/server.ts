@@ -1,13 +1,9 @@
 import dotenv from 'dotenv';
 import { fileURLToPath } from 'node:url';
 
-// Workspace scripts run from Web/backend. Repository-level overrides are
-// loaded first, then Web/backend/.env fills the remaining local values.
+// Backend configuration has a single local source of truth.
 dotenv.config({
-  path: [
-    fileURLToPath(new URL('../../../.env', import.meta.url)),
-    fileURLToPath(new URL('../.env', import.meta.url)),
-  ],
+  path: fileURLToPath(new URL('../.env', import.meta.url)),
   quiet: true,
 });
 

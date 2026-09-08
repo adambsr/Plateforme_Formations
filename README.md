@@ -86,7 +86,9 @@ Copy-Item Web/backend/.env.example Web/backend/.env
 Copy-Item Web/frontend/.env.example Web/frontend/.env
 ```
 
-Edit them using the [environment reference](#environment-variables). Placeholder Stripe and Gemini values allow services to start, but cannot complete real payment or AI requests.
+Edit them using the [environment reference](#environment-variables). Backend
+secret placeholders allow services to start, but cannot complete real payment,
+AI, SMTP, or administrator-seed operations.
 
 ### 3. Install and start Stripe CLI
 
@@ -125,7 +127,9 @@ stripe login
 stripe listen --forward-to http://127.0.0.1:3000/api/payments/webhook/stripe
 ```
 
-Keep this terminal running. Copy the `whsec_...` signing secret printed by `stripe listen` into `STRIPE_WEBHOOK_SECRET` in the root `.env` file. Also set `STRIPE_SECRET_KEY` to your Stripe test-mode secret key.
+Keep this terminal running. Copy the `whsec_...` signing secret printed by
+`stripe listen` into `STRIPE_WEBHOOK_SECRET` in `Web/backend/.env`. Set
+`STRIPE_SECRET_KEY` there to your Stripe test-mode secret key as well.
 
 ### 4. Start API and local services
 
@@ -196,35 +200,37 @@ FCM_ENABLED=true
 GOOGLE_APPLICATION_CREDENTIALS=/absolute/path/to/firebase-service-account.json
 ```
 
+For the repository's local credential mount, apply the ignored FCM overlay when
+creating the backend container:
+
+```powershell
+docker compose -f docker-compose.yml -f docker-compose.fcm.yml up --build --detach --wait
+```
+
 The backend must never expose this service-account file to the web or mobile bundle. Android 13 and later require the user to grant `POST_NOTIFICATIONS`; the mobile application asks explicitly on those versions and registers the FCM token only when notification access is available. For a physical device, notification delivery requires Google Play services and a Firebase-registered installation.
 
 ## Environment variables
 
-Never commit copied `.env` files. Do not put server secrets in `VITE_` variables: Vite exposes them to the browser bundle. Restart Vite after frontend changes; rerun `npm run docker:up` after root Docker configuration changes.
+Never commit copied `.env` files. Do not put server secrets in `VITE_` or
+`EXPO_PUBLIC_` variables: they are bundled into browser or mobile clients.
+Restart the affected development process after changing its environment file;
+recreate the backend container after changing `Web/backend/.env`.
 
 Gmail transactional email setup is documented in
 [`Docs/EMAIL_SETUP.md`](Docs/EMAIL_SETUP.md).
 
-| File                | Read by                                                     | Role                                                                        |
-| ------------------- | ----------------------------------------------------------- | --------------------------------------------------------------------------- |
-| `.env`              | Docker Compose; loaded first for a directly started backend | Stripe and Gemini Compose overrides                                         |
-| `Web/backend/.env`  | Docker backend, backend scripts, and direct backend startup | Server, database, auth, SMTP, payment, uploads, Gemini, centre identity     |
-| `Web/frontend/.env` | Vite client                                                 | Public API/contact display and Firebase Analytics                           |
-| `Mobile/.env`       | Expo/React Native build                                     | Mobile API, public centre values, Firebase Analytics, native Firebase files |
+| File                | Read by                                                 | Role                                                                         |
+| ------------------- | ------------------------------------------------------- | ---------------------------------------------------------------------------- |
+| `.env`              | Docker Compose                                          | Project-level orchestration overrides only; none are currently required      |
+| `Web/backend/.env`  | Docker backend, backend scripts, direct backend startup | Server, database, auth, SMTP, payment, uploads, Gemini, FCM, centre identity |
+| `Web/frontend/.env` | Vite client                                             | Public API/contact display and Firebase Analytics                            |
+| `Mobile/.env`       | Expo/React Native build                                 | Mobile API, public centre values, Firebase Analytics, native Firebase files  |
 
 ### Root `.env` — Docker Compose
 
-All have safe Compose defaults; real credentials are needed to use their integrations.
-
-| Variable                | Used by        | Purpose                             | Required?                          |
-| ----------------------- | -------------- | ----------------------------------- | ---------------------------------- |
-| `STRIPE_SECRET_KEY`     | Docker backend | Stripe test secret key              | For real checkout                  |
-| `STRIPE_WEBHOOK_SECRET` | Docker backend | Webhook signature secret            | For verified webhook delivery      |
-| `STRIPE_SUCCESS_URL`    | Docker backend | Checkout success return URL         | Defaults locally                   |
-| `STRIPE_CANCEL_URL`     | Docker backend | Checkout cancel return URL          | Defaults locally                   |
-| `AI_API_KEY`            | Docker backend | Server-side Gemini API key          | For Gemini functionality           |
-| `AI_MODEL`              | Docker backend | Gemini fallback/evaluation model    | No; defaults to `gemini-3.7-flash` |
-| `AI_MAX_CONTEXT_CHARS`  | Docker backend | Evaluation-generation context limit | No; defaults to `100000`           |
+The root environment is reserved for values used by Compose itself. The current
+Compose model has no project-level interpolation variables. Backend settings,
+including Stripe and Gemini credentials, belong only in `Web/backend/.env`.
 
 ### `Web/backend/.env` — API
 
@@ -267,7 +273,6 @@ All have safe Compose defaults; real credentials are needed to use their integra
 | Variable                                                                             | Used by          | Purpose                                                   | Required?                                   |
 | ------------------------------------------------------------------------------------ | ---------------- | --------------------------------------------------------- | ------------------------------------------- |
 | `VITE_API_BASE_URL`                                                                  | Web client       | API base URL                                              | No; defaults to `http://localhost:3000/api` |
-| `VITE_CENTER_NAME`                                                                   | Web client       | Reserved; currently not read by the client                | No                                          |
 | `VITE_CENTER_ADDRESS`, `VITE_CENTER_EMAIL`, `VITE_CENTER_PHONE`, `VITE_CENTER_HOURS` | Contact page     | Public contact display                                    | No; the page has fallbacks                  |
 | `VITE_FIREBASE_ANALYTICS_ENABLED`                                                    | Analytics        | Enables Analytics only when exactly `true`                | No; disabled by default                     |
 | `VITE_FIREBASE_ANALYTICS_DEBUG`                                                      | Analytics        | Adds `debug_mode` for DebugView                           | No; validation only                         |
@@ -406,12 +411,12 @@ Trainers can create draft objective questions through `POST /api/evaluations/:id
 
 ## External services
 
-| Service                     | Use                                          | Configuration                                                                         |
-| --------------------------- | -------------------------------------------- | ------------------------------------------------------------------------------------- |
-| Google Gemini               | Tutor, concierge, trainer question drafts    | Backend/root `AI_API_KEY`, `AI_MODEL`, optional `AI_BASE_URL`, `AI_MAX_CONTEXT_CHARS` |
-| Stripe                      | Test Checkout and signed webhook fulfillment | Backend/root test key, webhook secret, return URLs                                    |
-| Firebase / Google Analytics | Optional consent-based measurement           | `VITE_FIREBASE_*` in `Web/frontend/.env`                                              |
-| Gmail                       | Transactional email delivery                 | Backend-only settings from `Web/backend/.env`                                         |
+| Service                     | Use                                          | Configuration                                                                    |
+| --------------------------- | -------------------------------------------- | -------------------------------------------------------------------------------- |
+| Google Gemini               | Tutor, concierge, trainer question drafts    | Backend `AI_API_KEY`, `AI_MODEL`, optional `AI_BASE_URL`, `AI_MAX_CONTEXT_CHARS` |
+| Stripe                      | Test Checkout and signed webhook fulfillment | Backend test key, webhook secret, return URLs                                    |
+| Firebase / Google Analytics | Optional consent-based measurement           | `VITE_FIREBASE_*` in `Web/frontend/.env`                                         |
+| Gmail                       | Transactional email delivery                 | Backend-only settings from `Web/backend/.env`                                    |
 
 ## Useful commands
 
