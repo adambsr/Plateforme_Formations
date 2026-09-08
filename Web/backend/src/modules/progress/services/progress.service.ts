@@ -1,5 +1,8 @@
 import mongoose, { type QueryFilter } from 'mongoose';
+import type { Logger } from 'pino';
 
+import { deliverBestEffort } from '../../../infrastructure/mail/email-delivery.js';
+import type { TransactionalEmailService } from '../../../infrastructure/mail/email-service.js';
 import type { AuthenticatedPrincipal } from '../../../shared/auth/principal.js';
 import { isDuplicateKeyError } from '../../../shared/database/mongo-errors.js';
 import { AppError } from '../../../shared/errors/app-error.js';
@@ -11,6 +14,7 @@ import {
   type Enrollment,
 } from '../../enrollments/models/enrollment.model.js';
 import { TrainingModel } from '../../trainings/models/training.model.js';
+import { UserModel } from '../../users/models/user.model.js';
 import type {
   ProgressListInput,
   UpdateLessonProgressInput,
@@ -36,9 +40,17 @@ function assertLearner(principal: AuthenticatedPrincipal): void {
 
 export class ProgressService {
   readonly #completion: CompletionService;
+  readonly #mail: TransactionalEmailService;
+  readonly #logger: Logger;
 
-  constructor(completion = new CompletionService()) {
+  constructor(
+    completion: CompletionService,
+    mail: TransactionalEmailService,
+    logger: Logger,
+  ) {
     this.#completion = completion;
+    this.#mail = mail;
+    this.#logger = logger;
   }
 
   async list(principal: AuthenticatedPrincipal, input: ProgressListInput) {
@@ -119,6 +131,9 @@ export class ProgressService {
         'Lesson progress is immutable after Certificate issuance.',
       );
     }
+    const wasComplete = input.completed
+      ? (await this.#completion.selfPaced(enrollment._id)).isComplete
+      : false;
     const existing = await LessonProgressModel.findOne({
       enrollmentId: enrollment._id,
       lessonId: lesson._id,
@@ -151,7 +166,22 @@ export class ProgressService {
       existing.completedAt = input.completed ? new Date() : null;
       await existing.save();
     }
-    return await this.#completion.selfPaced(enrollment._id);
+    const completion = await this.#completion.selfPaced(enrollment._id);
+    if (input.completed && !wasComplete && completion.isComplete) {
+      await deliverBestEffort(this.#logger, 'training-completed', async () => {
+        const learner = await UserModel.findById(enrollment.learnerId).exec();
+        if (learner !== null) {
+          await this.#mail.sendTrainingCompleted({
+            email: learner.email,
+            ...(learner.profile.firstName === undefined
+              ? {}
+              : { firstName: learner.profile.firstName }),
+            trainingTitle: training.title,
+          });
+        }
+      });
+    }
+    return completion;
   }
 
   #lessonNotFound(): AppError {

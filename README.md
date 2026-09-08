@@ -34,7 +34,8 @@ flowchart LR
   API -->|FCM when enabled| FirebaseMessaging[Firebase Cloud Messaging]
   API --> Mongo[(MongoDB 8\nplateforme_formations)]
   API --> Files[(Persistent upload volume)]
-  API --> Mailpit[Mailpit SMTP]
+  API --> EmailService[Transactional email service]
+  EmailService -->|authenticated SMTP| Gmail[Gmail]
   API --> Stripe[Stripe test mode]
   API --> Gemini[Google Gemini]
   Init[mongodb-init] -->|initiates rs0| Mongo
@@ -47,7 +48,7 @@ The browser calls `/api`; the API authorizes requests, owns access control and e
 | Web client     | React 19, TypeScript, Vite, React Router, React Hook Form, Zod   |
 | API            | Node.js, Express 5, TypeScript, Mongoose, Zod                    |
 | Database       | MongoDB 8, single-node replica set `rs0`                         |
-| Local services | Docker Compose and Mailpit                                       |
+| Local services | Docker Compose                                                   |
 | Payments       | Stripe Checkout and signed webhooks                              |
 | AI             | Google Gen AI SDK / Gemini                                       |
 | Mobile client  | Expo 57, React Native 0.86, React Navigation, Secure Store       |
@@ -62,8 +63,8 @@ The browser calls `/api`; the API authorizes requests, owns access control and e
 | ----------------------------------------------------------------- | ---------------------------------------------------------------- |
 | [Git](https://git-scm.com/downloads)                              | Clone the repository                                             |
 | Node.js **24+** and npm **11+**                                   | Install and run the project; it pins `npm@11.17.0`               |
-| [Docker Desktop](https://www.docker.com/products/docker-desktop/) | Run the API, MongoDB, database bootstrap, and local mail service |
-| [Stripe CLI](https://docs.stripe.com/stripe-cli)                   | Forward Stripe test-mode webhooks to the local API               |
+| [Docker Desktop](https://www.docker.com/products/docker-desktop/) | Run the API, MongoDB, and database bootstrap                    |
+| [Stripe CLI](https://docs.stripe.com/stripe-cli)                  | Forward Stripe test-mode webhooks to the local API               |
 
 Optional: [MongoDB Compass](https://www.mongodb.com/products/tools/compass) to inspect data; a Firebase project and Android app for Analytics/FCM; Stripe test credentials for real checkout; and a Google AI Studio API key for Gemini functionality.
 
@@ -161,10 +162,11 @@ Open <http://localhost:5173>. The default API is <http://localhost:3000/api>.
 | API health    | <http://localhost:3000/api/health> | `status: "ok"`, database `up`                                     |
 | API reference | <http://localhost:3000/api/docs>   | Swagger UI                                                        |
 | Web app       | <http://localhost:5173>            | Public High Skills Academy site                                   |
-| Local mail    | <http://localhost:8025>            | Mailpit inbox                                                     |
-| Containers    | `docker compose ps`                | `backend`, `mongodb`, `mailpit` running; `mongodb-init` completed |
+| Containers    | `docker compose ps`                | `backend` and `mongodb` running; `mongodb-init` completed         |
 
-The repository also provides `npm run dev:backend`. It requires `Web/backend/.env` to point to reachable MongoDB and SMTP services. The Compose path above is the supported local arrangement for normal development.
+The repository also provides `npm run dev:backend`. The normal Compose backend
+loads `Web/backend/.env` directly, while Compose overrides only container-specific
+values such as the internal MongoDB address and upload path.
 
 ### 8. Run the mobile client
 
@@ -200,10 +202,13 @@ The backend must never expose this service-account file to the web or mobile bun
 
 Never commit copied `.env` files. Do not put server secrets in `VITE_` variables: Vite exposes them to the browser bundle. Restart Vite after frontend changes; rerun `npm run docker:up` after root Docker configuration changes.
 
+Gmail transactional email setup is documented in
+[`Docs/EMAIL_SETUP.md`](Docs/EMAIL_SETUP.md).
+
 | File                | Read by                                                     | Role                                                                        |
 | ------------------- | ----------------------------------------------------------- | --------------------------------------------------------------------------- |
 | `.env`              | Docker Compose; loaded first for a directly started backend | Stripe and Gemini Compose overrides                                         |
-| `Web/backend/.env`  | Backend scripts and direct backend startup                  | Server, database, auth, SMTP, payment, uploads, Gemini, centre identity     |
+| `Web/backend/.env`  | Docker backend, backend scripts, and direct backend startup | Server, database, auth, SMTP, payment, uploads, Gemini, centre identity     |
 | `Web/frontend/.env` | Vite client                                                 | Public API/contact display and Firebase Analytics                           |
 | `Mobile/.env`       | Expo/React Native build                                     | Mobile API, public centre values, Firebase Analytics, native Firebase files |
 
@@ -223,35 +228,39 @@ All have safe Compose defaults; real credentials are needed to use their integra
 
 ### `Web/backend/.env` — API
 
-| Variable                                                     | Used by             | Purpose                                                     | Required?                                           |
-| ------------------------------------------------------------ | ------------------- | ----------------------------------------------------------- | --------------------------------------------------- |
-| `NODE_ENV`                                                   | API                 | `development`, `test`, or `production`                      | Yes                                                 |
-| `PORT`                                                       | API                 | HTTP listener port                                          | No; `3000` default                                  |
-| `MONGODB_URI`                                                | API / seed commands | MongoDB connection string                                   | Yes                                                 |
-| `WEB_APP_URL`                                                | API                 | Web origin for application links                            | Yes                                                 |
-| `CORS_ORIGINS`                                               | API                 | Comma-separated allowed browser origins                     | Yes                                                 |
-| `TZ`                                                         | API                 | Must be `UTC`                                               | No; `UTC` default                                   |
-| `LOG_LEVEL`                                                  | API                 | Pino log level                                              | No; `info` default                                  |
-| `JWT_ACCESS_SECRET`                                          | API                 | Access-token signing secret (32+ characters)                | Yes                                                 |
-| `JWT_ACCESS_TTL_MINUTES`                                     | API                 | Access-token lifetime                                       | No; `15` default                                    |
-| `REFRESH_TOKEN_TTL_DAYS`                                     | API                 | Refresh-session lifetime                                    | No; `7` default                                     |
-| `PASSWORD_RESET_TTL_MINUTES`                                 | API                 | Reset-token lifetime                                        | No; `30` default                                    |
-| `INITIAL_ADMIN_EMAIL`                                        | `seed:admin`        | Initial administrator email                                 | Only for the seed                                   |
-| `INITIAL_ADMIN_PASSWORD`                                     | `seed:admin`        | Initial administrator password (12+ characters)             | Only for the seed                                   |
-| `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`                      | API                 | SMTP endpoint and implicit-TLS setting                      | Yes                                                 |
-| `SMTP_USER`, `SMTP_PASSWORD`                                 | API                 | SMTP credentials                                            | Optional pair; set both or neither                  |
-| `SMTP_FROM`                                                  | API                 | Sender identity for reset/contact mail                      | Yes                                                 |
-| `STRIPE_SECRET_KEY`                                          | API                 | Stripe test key (`sk_test_…`)                               | Yes; real key for payments                          |
-| `STRIPE_WEBHOOK_SECRET`                                      | API                 | Webhook secret (`whsec_…`)                                  | Yes; real secret for verification                   |
-| `STRIPE_SUCCESS_URL`, `STRIPE_CANCEL_URL`                    | API                 | Checkout return URLs                                        | Yes                                                 |
-| `UPLOAD_DIR`                                                 | API                 | Protected uploads and generated documents directory         | Yes                                                 |
-| `MAX_UPLOAD_SIZE_MB`                                         | API                 | Upload-size limit                                           | No; `20` default                                    |
-| `AI_API_KEY`                                                 | API                 | Gemini API key                                              | Configuration requires a value; real key for Gemini |
-| `AI_MODEL`                                                   | API                 | Gemini evaluation/configured fallback model                 | Yes                                                 |
-| `AI_BASE_URL`                                                | API                 | Optional compatible Gemini base URL                         | No                                                  |
-| `AI_MAX_CONTEXT_CHARS`                                       | API                 | Evaluation context limit (1,000–1,000,000)                  | No; `100000` default                                |
-| `CENTER_NAME`, `CENTER_ADDRESS`, `CENTER_EMAIL`              | API                 | Centre identity used in application documents/contact       | Yes                                                 |
-| `CENTER_PHONE`, `CENTER_REGISTRATION_ID`, `CENTER_LOGO_PATH` | API                 | Optional centre phone, registration ID, local document logo | No                                                  |
+| Variable                                                     | Used by             | Purpose                                                      | Required?                                           |
+| ------------------------------------------------------------ | ------------------- | ------------------------------------------------------------ | --------------------------------------------------- |
+| `NODE_ENV`                                                   | API                 | `development`, `test`, or `production`                       | Yes                                                 |
+| `PORT`                                                       | API                 | HTTP listener port                                           | No; `3000` default                                  |
+| `MONGODB_URI`                                                | API / seed commands | MongoDB connection string                                    | Yes                                                 |
+| `WEB_APP_URL`                                                | API                 | Web origin for application links                             | Yes                                                 |
+| `CORS_ORIGINS`                                               | API                 | Comma-separated allowed browser origins                      | Yes                                                 |
+| `TRUST_PROXY_HOPS`                                           | API                 | Trusted reverse-proxy hops used to resolve client IPs        | No; `0` default                                     |
+| `TZ`                                                         | API                 | Must be `UTC`                                                | No; `UTC` default                                   |
+| `LOG_LEVEL`                                                  | API                 | Pino log level                                               | No; `info` default                                  |
+| `JWT_ACCESS_SECRET`                                          | API                 | Access-token signing secret (32+ characters)                 | Yes                                                 |
+| `JWT_ACCESS_TTL_MINUTES`                                     | API                 | Access-token lifetime                                        | No; `15` default                                    |
+| `REFRESH_TOKEN_TTL_DAYS`                                     | API                 | Refresh-session lifetime                                     | No; `7` default                                     |
+| `PASSWORD_RESET_TTL_MINUTES`                                 | API                 | Reset-token lifetime                                         | No; `30` default                                    |
+| `INITIAL_ADMIN_EMAIL`                                        | `seed:admin`        | Initial administrator email                                  | Only for the seed                                   |
+| `INITIAL_ADMIN_PASSWORD`                                     | `seed:admin`        | Initial administrator password (12+ characters)              | Only for the seed                                   |
+| `EMAIL_PROVIDER`, `EMAIL_DELIVERY_ENABLED`                   | API                 | Select authenticated SMTP or disable delivery                | Yes                                                 |
+| `EMAIL_FROM`, `EMAIL_CONTACT_TO`, `EMAIL_SUPPORT_ADDRESS`    | API                 | Transactional sender and monitored site addresses            | Yes                                                 |
+| `EMAIL_TEST_RECIPIENT`                                       | API                 | Safely redirect every outgoing message during provider tests | No                                                  |
+| `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`, `SMTP_REQUIRE_TLS`  | API                 | SMTP endpoint and TLS behavior                               | Yes                                                 |
+| `SMTP_USER`, `SMTP_PASSWORD`                                 | API                 | Backend-only Gmail SMTP credentials                          | When SMTP delivery is enabled                       |
+| `SMTP_FROM`                                                  | API                 | Legacy fallback for `EMAIL_FROM`                             | No                                                  |
+| `STRIPE_SECRET_KEY`                                          | API                 | Stripe test key (`sk_test_…`)                                | Yes; real key for payments                          |
+| `STRIPE_WEBHOOK_SECRET`                                      | API                 | Webhook secret (`whsec_…`)                                   | Yes; real secret for verification                   |
+| `STRIPE_SUCCESS_URL`, `STRIPE_CANCEL_URL`                    | API                 | Checkout return URLs                                         | Yes                                                 |
+| `UPLOAD_DIR`                                                 | API                 | Protected uploads and generated documents directory          | Yes                                                 |
+| `MAX_UPLOAD_SIZE_MB`                                         | API                 | Upload-size limit                                            | No; `20` default                                    |
+| `AI_API_KEY`                                                 | API                 | Gemini API key                                               | Configuration requires a value; real key for Gemini |
+| `AI_MODEL`                                                   | API                 | Gemini evaluation/configured fallback model                  | Yes                                                 |
+| `AI_BASE_URL`                                                | API                 | Optional compatible Gemini base URL                          | No                                                  |
+| `AI_MAX_CONTEXT_CHARS`                                       | API                 | Evaluation context limit (1,000–1,000,000)                   | No; `100000` default                                |
+| `CENTER_NAME`, `CENTER_ADDRESS`, `CENTER_EMAIL`              | API                 | Centre identity used in application documents/contact        | Yes                                                 |
+| `CENTER_PHONE`, `CENTER_REGISTRATION_ID`, `CENTER_LOGO_PATH` | API                 | Optional centre phone, registration ID, local document logo  | No                                                  |
 
 ### `Web/frontend/.env` — browser-safe values
 
@@ -289,7 +298,6 @@ The client is not containerized in the current development setup. `docker-compos
 | `backend`      | API                | Builds/serves the API, waits for database initialization, owns protected uploads, has a health check | <http://localhost:3000/api> (loopback) |
 | `mongodb`      | Database           | MongoDB 8 with `rs0`, health check, and persistent database volume                                   | `127.0.0.1:27017` (loopback)           |
 | `mongodb-init` | Database bootstrap | Safely initiates `rs0` with `mongodb:27017`, then waits for a writable primary                       | No host port; completes and exits      |
-| `mailpit`      | Local mail capture | Receives backend SMTP and exposes a browser inbox                                                    | <http://localhost:8025> (loopback)     |
 
 `mongodb-init` is required because the application relies on a transaction-capable replica set. On later starts it verifies the existing configuration instead of recreating it.
 
@@ -403,7 +411,7 @@ Trainers can create draft objective questions through `POST /api/evaluations/:id
 | Google Gemini               | Tutor, concierge, trainer question drafts    | Backend/root `AI_API_KEY`, `AI_MODEL`, optional `AI_BASE_URL`, `AI_MAX_CONTEXT_CHARS` |
 | Stripe                      | Test Checkout and signed webhook fulfillment | Backend/root test key, webhook secret, return URLs                                    |
 | Firebase / Google Analytics | Optional consent-based measurement           | `VITE_FIREBASE_*` in `Web/frontend/.env`                                              |
-| Mailpit                     | Local password-reset/contact email capture   | Supplied by Compose; Docker backend uses its internal SMTP endpoint                   |
+| Gmail                       | Transactional email delivery                 | Backend-only settings from `Web/backend/.env`                                         |
 
 ## Useful commands
 
@@ -433,7 +441,7 @@ The repository also has a development demonstration-data seed that deliberately 
 
 ```text
 .
-├── docker-compose.yml                 # Local API, MongoDB, bootstrap, Mailpit
+├── docker-compose.yml                 # Local API, MongoDB, bootstrap
 ├── .env.example                       # Docker Stripe/Gemini template
 ├── Web/
 │   ├── backend/

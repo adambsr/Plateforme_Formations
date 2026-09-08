@@ -101,7 +101,7 @@ export function PublicLayout() {
           <h2>Nous contacter</h2>
           <nav aria-label="Contact et informations légales">
             <Link to="/contact">Contact</Link>
-            <a href="mailto:highskills.ac@gmail.com">highskills.ac@gmail.com</a>
+            <a href="mailto:contact.hsa.tn@gmail.com">contact.hsa.tn@gmail.com</a>
             <Link to="/about">Mentions légales</Link>
           </nav>
         </div>

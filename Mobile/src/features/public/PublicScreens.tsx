@@ -30,7 +30,7 @@ const centerAddress =
   process.env.EXPO_PUBLIC_CENTER_ADDRESS ??
   'Route Manzel Chaker km 2.5 en face Magasin Général (MG), Sfax, Tunisia';
 const centerEmail =
-  process.env.EXPO_PUBLIC_CENTER_EMAIL ?? 'highskills.ac@gmail.com';
+  process.env.EXPO_PUBLIC_CENTER_EMAIL ?? 'contact.hsa.tn@gmail.com';
 const centerPhone = process.env.EXPO_PUBLIC_CENTER_PHONE ?? '+216 70 000 000';
 const centerHours =
   process.env.EXPO_PUBLIC_CENTER_HOURS ?? 'Lundi–vendredi, 8 h 30–17 h 30';

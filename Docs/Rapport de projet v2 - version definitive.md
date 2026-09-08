@@ -128,7 +128,7 @@ flowchart LR
   API -->|FCM si activé| FCM[Firebase Cloud Messaging]
   API --> DB[(MongoDB 8\nplateforme_formations)]
   API --> Storage[(Volume de fichiers protégés)]
-  API --> Mail[Mailpit SMTP local]
+  API --> Mail[Gmail SMTP]
   API --> Stripe[Stripe Checkout + webhook]
   API --> Gemini[Google Gemini]
   Init[mongodb-init] -->|initialise rs0| DB
@@ -145,7 +145,7 @@ Le client web et le client mobile présentent les parcours utilisateur et appell
 | Backend | Node.js, Express 5, TypeScript, Mongoose, Zod |
 | Persistance | MongoDB 8, replica set mono-nœud `rs0` |
 | Documentation API | OpenAPI et Swagger UI |
-| Documents et e-mail | PDFKit, Nodemailer, Mailpit local |
+| Documents et e-mail | PDFKit, Nodemailer, Gmail SMTP |
 | Paiement | Stripe Checkout et webhook signé |
 | IA | SDK Google Gen AI / Gemini |
 | Analyse d'usage | Firebase Analytics web et natif, soumis au consentement |
@@ -300,7 +300,6 @@ Sur Android, `expo-notifications` présente les messages reçus au premier plan 
 | `backend` | API Express, health check et volume de fichiers protégés; exposition locale sur le port 3000 |
 | `mongodb` | MongoDB 8 avec données persistantes; exposition locale sur le port 27017 |
 | `mongodb-init` | Initialisation et contrôle du replica set `rs0`, requis par les flux transactionnels |
-| `mailpit` | Capture locale des e-mails de contact et de réinitialisation, interface sur le port 8025 |
 
 Deux volumes persistent les données : `mongodb_data` pour la base et `backend_uploads` pour les fichiers protégés. MongoDB Compass peut se connecter à la base locale `plateforme_formations` via :
 
@@ -359,7 +358,7 @@ Ces pistes ne remettent pas en cause les règles actuelles : l'autorisation doit
 
 ## 11. Conclusion générale
 
-High Skills Academy met en œuvre un cycle de formation complet, depuis la publication d'une offre jusqu'à la délivrance d'un certificat. Le projet associe des clients React web et Expo/React Native, une API Express modulaire, MongoDB, Stripe, Mailpit, Gemini, Firebase Analytics et Firebase Cloud Messaging dans une architecture cohérente pour son périmètre.
+High Skills Academy met en œuvre un cycle de formation complet, depuis la publication d'une offre jusqu'à la délivrance d'un certificat. Le projet associe des clients React web et Expo/React Native, une API Express modulaire, MongoDB, Stripe, Gmail SMTP, Gemini, Firebase Analytics et Firebase Cloud Messaging dans une architecture cohérente pour son périmètre.
 
 Les développements récents apportent trois contributions importantes au projet : une assistance IA séparée selon le contexte — tuteur fondé sur les leçons pour l'Apprenant et concierge fondé sur les informations publiques pour le visiteur —, une application mobile native partageant les règles métier de l'API, et une mesure analytique optionnelle complétée par des notifications push FCM, toutes deux limitées par des mécanismes de consentement ou d'activation explicite.
 
@@ -752,9 +751,9 @@ node "Poste de développement" {
     node "backend" { artifact "API Express :3000" as API }
     node "mongodb" { database "MongoDB :27017" as Mongo }
     node "mongodb-init" as Init
-    node "mailpit" { artifact "Interface :8025" as Mailpit }
   }
 }
+cloud "Gmail SMTP" as Gmail
 cloud "Stripe" as Stripe
 cloud "Google Gemini" as Gemini
 cloud "Firebase Analytics" as Firebase
@@ -763,7 +762,7 @@ Browser --> Vite : HTTP
 Vite --> API : /api
 API --> Mongo
 Init --> Mongo
-API --> Mailpit : SMTP interne
+API --> Gmail : SMTP authentifié
 API --> Stripe : HTTPS
 API --> Gemini : HTTPS
 Browser --> Firebase : après consentement

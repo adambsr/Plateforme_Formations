@@ -6,6 +6,19 @@ const optionalText = z.preprocess(
   z.string().trim().min(1).optional(),
 );
 
+const optionalSenderAddress = z.preprocess(
+  (value) =>
+    typeof value === 'string' && value.trim() === '' ? undefined : value,
+  z
+    .string()
+    .trim()
+    .refine((value) => {
+      const displayAddress = /^[^<>\r\n]+<([^<>\r\n]+)>$/.exec(value);
+      return z.email().safeParse(displayAddress?.[1]?.trim() ?? value).success;
+    }, 'must be a valid email address or a name followed by <email@example.com>')
+    .optional(),
+);
+
 const positiveInteger = z.coerce.number().int().positive();
 
 const environmentSchema = z
@@ -23,6 +36,7 @@ const environmentSchema = z
       .string()
       .transform((value) => value.split(',').map((origin) => origin.trim()))
       .pipe(z.array(z.url()).min(1)),
+    TRUST_PROXY_HOPS: z.coerce.number().int().min(0).max(10).default(0),
     TZ: z.literal('UTC').default('UTC'),
     LOG_LEVEL: z
       .enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace', 'silent'])
@@ -33,6 +47,16 @@ const environmentSchema = z
     REFRESH_TOKEN_TTL_DAYS: positiveInteger.default(7),
     PASSWORD_RESET_TTL_MINUTES: positiveInteger.default(30),
 
+    EMAIL_PROVIDER: z.enum(['mailpit', 'smtp']).default('mailpit'),
+    EMAIL_DELIVERY_ENABLED: z
+      .enum(['true', 'false'])
+      .transform((value) => value === 'true')
+      .default(true),
+    EMAIL_FROM: optionalSenderAddress,
+    EMAIL_CONTACT_TO: optionalText.pipe(z.email().optional()),
+    EMAIL_SUPPORT_ADDRESS: optionalText.pipe(z.email().optional()),
+    EMAIL_TEST_RECIPIENT: optionalText.pipe(z.email().optional()),
+
     SMTP_HOST: z.string().trim().min(1),
     SMTP_PORT: z.coerce.number().int().min(1).max(65_535),
     SMTP_SECURE: z
@@ -40,7 +64,11 @@ const environmentSchema = z
       .transform((value) => value === 'true'),
     SMTP_USER: optionalText,
     SMTP_PASSWORD: optionalText,
-    SMTP_FROM: z.string().trim().min(1),
+    SMTP_FROM: optionalSenderAddress,
+    SMTP_REQUIRE_TLS: z
+      .enum(['true', 'false'])
+      .transform((value) => value === 'true')
+      .default(false),
 
     STRIPE_SECRET_KEY: z.string().startsWith('sk_test_'),
     STRIPE_WEBHOOK_SECRET: z.string().startsWith('whsec_'),
@@ -85,6 +113,52 @@ const environmentSchema = z
           'SMTP_USER and SMTP_PASSWORD must either both be set or both be empty',
       });
     }
+    if (
+      environment.EMAIL_FROM === undefined &&
+      environment.SMTP_FROM === undefined
+    ) {
+      context.addIssue({
+        code: 'custom',
+        path: ['EMAIL_FROM'],
+        message: 'EMAIL_FROM (or legacy SMTP_FROM) is required',
+      });
+    }
+    if (
+      environment.NODE_ENV === 'production' &&
+      environment.EMAIL_DELIVERY_ENABLED &&
+      environment.EMAIL_PROVIDER !== 'smtp'
+    ) {
+      context.addIssue({
+        code: 'custom',
+        path: ['EMAIL_PROVIDER'],
+        message: 'Production email delivery requires EMAIL_PROVIDER=smtp',
+      });
+    }
+    if (
+      environment.EMAIL_PROVIDER === 'smtp' &&
+      environment.EMAIL_DELIVERY_ENABLED &&
+      (!hasSmtpUser || !hasSmtpPassword)
+    ) {
+      context.addIssue({
+        code: 'custom',
+        path: ['SMTP_USER'],
+        message: 'Authenticated SMTP requires SMTP_USER and SMTP_PASSWORD',
+      });
+    }
+    if (
+      environment.NODE_ENV === 'production' &&
+      environment.EMAIL_DELIVERY_ENABLED &&
+      environment.EMAIL_PROVIDER === 'smtp' &&
+      !environment.SMTP_SECURE &&
+      !environment.SMTP_REQUIRE_TLS
+    ) {
+      context.addIssue({
+        code: 'custom',
+        path: ['SMTP_REQUIRE_TLS'],
+        message:
+          'Production SMTP must use implicit TLS or require a STARTTLS upgrade',
+      });
+    }
   });
 
 const initialAdminSchema = z.object({
@@ -106,6 +180,7 @@ export interface AppConfig {
     webAppUrl: string;
     mobileAppScheme: string;
     corsOrigins: string[];
+    trustProxyHops: number;
     timezone: 'UTC';
     logLevel:
       'fatal' | 'error' | 'warn' | 'info' | 'debug' | 'trace' | 'silent';
@@ -123,7 +198,15 @@ export interface AppConfig {
     secure: boolean;
     user: string | undefined;
     password: string | undefined;
+    requireTls: boolean;
+  };
+  email: {
+    provider: 'mailpit' | 'smtp';
+    deliveryEnabled: boolean;
     from: string;
+    contactTo: string;
+    supportAddress: string;
+    testRecipient: string | undefined;
   };
   stripe: {
     secretKey: string;
@@ -204,6 +287,7 @@ export function loadAppConfig(
       webAppUrl: value.WEB_APP_URL,
       mobileAppScheme: value.MOBILE_APP_SCHEME,
       corsOrigins: value.CORS_ORIGINS,
+      trustProxyHops: value.TRUST_PROXY_HOPS,
       timezone: value.TZ,
       logLevel: value.LOG_LEVEL,
     },
@@ -220,7 +304,15 @@ export function loadAppConfig(
       secure: value.SMTP_SECURE,
       user: value.SMTP_USER,
       password: value.SMTP_PASSWORD,
-      from: value.SMTP_FROM,
+      requireTls: value.SMTP_REQUIRE_TLS,
+    },
+    email: {
+      provider: value.EMAIL_PROVIDER,
+      deliveryEnabled: value.EMAIL_DELIVERY_ENABLED,
+      from: value.EMAIL_FROM ?? (value.SMTP_FROM as string),
+      contactTo: value.EMAIL_CONTACT_TO ?? value.CENTER_EMAIL,
+      supportAddress: value.EMAIL_SUPPORT_ADDRESS ?? value.CENTER_EMAIL,
+      testRecipient: value.EMAIL_TEST_RECIPIENT,
     },
     stripe: {
       secretKey: value.STRIPE_SECRET_KEY,

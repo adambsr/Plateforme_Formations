@@ -22,6 +22,45 @@ describe('loadAppConfig', () => {
     expect(config.uploads.maxSizeMb).toBe(20);
   });
 
+  it('prefers EMAIL_FROM and allows SMTP_FROM to be omitted or empty', () => {
+    const omittedLegacyEnvironment = validEnvironment();
+    delete omittedLegacyEnvironment.SMTP_FROM;
+    expect(loadAppConfig(omittedLegacyEnvironment).email.from).toBe(
+      'no-reply@example.com',
+    );
+
+    const emptyLegacyEnvironment = validEnvironment();
+    emptyLegacyEnvironment.SMTP_FROM = '';
+    expect(loadAppConfig(emptyLegacyEnvironment).email.from).toBe(
+      'no-reply@example.com',
+    );
+  });
+
+  it('uses SMTP_FROM only as a legacy fallback', () => {
+    const environment = validEnvironment();
+    delete environment.EMAIL_FROM;
+    environment.SMTP_FROM = 'Legacy Sender <legacy@example.com>';
+
+    expect(loadAppConfig(environment).email.from).toBe(
+      'Legacy Sender <legacy@example.com>',
+    );
+  });
+
+  it('rejects a missing or invalid sender with a clear error', () => {
+    const missingSenderEnvironment = validEnvironment();
+    delete missingSenderEnvironment.EMAIL_FROM;
+    delete missingSenderEnvironment.SMTP_FROM;
+    expect(() => loadAppConfig(missingSenderEnvironment)).toThrow(
+      /EMAIL_FROM \(or legacy SMTP_FROM\) is required/,
+    );
+
+    const invalidSenderEnvironment = validEnvironment();
+    invalidSenderEnvironment.EMAIL_FROM = 'not-an-email-address';
+    expect(() => loadAppConfig(invalidSenderEnvironment)).toThrow(
+      /EMAIL_FROM: must be a valid email address/,
+    );
+  });
+
   it('uses only the documented defaults', () => {
     const environment = validEnvironment();
     delete environment.PORT;

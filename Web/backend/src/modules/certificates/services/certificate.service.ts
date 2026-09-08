@@ -1,9 +1,12 @@
 import { randomBytes } from 'node:crypto';
 
 import type { HydratedDocument, QueryFilter } from 'mongoose';
+import type { Logger } from 'pino';
 
 import type { AppConfig } from '../../../config/environment.js';
 import { ProtectedDocumentStorage } from '../../../infrastructure/files/protected-document-storage.js';
+import { deliverBestEffort } from '../../../infrastructure/mail/email-delivery.js';
+import type { TransactionalEmailService } from '../../../infrastructure/mail/email-service.js';
 import { renderCertificatePdf } from '../../../infrastructure/pdf/certificate-pdf.js';
 import type { AuthenticatedPrincipal } from '../../../shared/auth/principal.js';
 import { isDuplicateKeyError } from '../../../shared/database/mongo-errors.js';
@@ -43,15 +46,21 @@ export class CertificateService {
   readonly #eligibility: EligibilityService;
   readonly #storage: ProtectedDocumentStorage;
   readonly #issuer: AppConfig['center'];
+  readonly #mail: TransactionalEmailService;
+  readonly #logger: Logger;
 
   constructor(
     eligibility: EligibilityService,
     storage: ProtectedDocumentStorage,
     issuer: AppConfig['center'],
+    mail: TransactionalEmailService,
+    logger: Logger,
   ) {
     this.#eligibility = eligibility;
     this.#storage = storage;
     this.#issuer = issuer;
+    this.#mail = mail;
+    this.#logger = logger;
   }
 
   async list(principal: AuthenticatedPrincipal, input: CertificateListInput) {
@@ -91,6 +100,7 @@ export class CertificateService {
     let certificate = await CertificateModel.findOne({
       enrollmentId: enrollment._id,
     }).exec();
+    let created = false;
     if (certificate === null) {
       const eligibility = await this.#eligibility.evaluate(input.enrollmentId);
       if (
@@ -189,6 +199,7 @@ export class CertificateService {
             ...value,
             number: attempt === 0 ? value.number : number(issuedAt),
           });
+          created = true;
         } catch (error) {
           if (!isDuplicateKeyError(error)) throw error;
           certificate = await CertificateModel.findOne({
@@ -202,6 +213,18 @@ export class CertificateService {
       throw new Error('Certificate idempotence could not be resolved.');
     }
     certificate = await this.#ensurePdf(certificate);
+    if (created) {
+      await deliverBestEffort(this.#logger, 'certificate-awarded', () =>
+        this.#mail.sendCertificateAwarded({
+          email: certificate.learner.email,
+          ...(certificate.learner.firstName === ''
+            ? {}
+            : { firstName: certificate.learner.firstName }),
+          trainingTitle: certificate.training.title,
+          certificateNumber: certificate.number,
+        }),
+      );
+    }
     return this.#view(certificate);
   }
 

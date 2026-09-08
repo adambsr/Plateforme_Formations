@@ -4,7 +4,10 @@ import mongoose, {
   type QueryFilter,
   type Types,
 } from 'mongoose';
+import type { Logger } from 'pino';
 
+import { deliverBestEffort } from '../../../infrastructure/mail/email-delivery.js';
+import type { TransactionalEmailService } from '../../../infrastructure/mail/email-service.js';
 import type { AuthenticatedPrincipal } from '../../../shared/auth/principal.js';
 import { isDuplicateKeyError } from '../../../shared/database/mongo-errors.js';
 import { AppError } from '../../../shared/errors/app-error.js';
@@ -97,6 +100,14 @@ function uniqueObjectIds(values: readonly string[]): Types.ObjectId[] {
 }
 
 export class SessionService {
+  readonly #mail: TransactionalEmailService;
+  readonly #logger: Logger;
+
+  constructor(mail: TransactionalEmailService, logger: Logger) {
+    this.#mail = mail;
+    this.#logger = logger;
+  }
+
   async listAssignableTrainers(principal: AuthenticatedPrincipal) {
     passwordReady(principal);
     if (principal.role === 'LEARNER') {
@@ -264,6 +275,7 @@ export class SessionService {
         additionalInformation: input.additionalInformation,
         status: 'PLANNED',
       });
+      await this.#notifySession('scheduled', session);
       return (await this.#views([session]))[0] as TrainingSessionView;
     } catch (error) {
       this.#duplicateSessionError(error);
@@ -325,6 +337,7 @@ export class SessionService {
     } catch (error) {
       this.#duplicateSessionError(error);
     }
+    await this.#notifySession('changed', session);
     return (await this.#views([session]))[0] as TrainingSessionView;
   }
 
@@ -354,6 +367,7 @@ export class SessionService {
     }
     session.assignedTrainerIds = assignedTrainerIds;
     await session.save();
+    await this.#notifySession('changed', session);
     return (await this.#views([session]))[0] as TrainingSessionView;
   }
 
@@ -393,6 +407,7 @@ export class SessionService {
       ...(input.room === undefined ? {} : { room: input.room }),
       ...(roomKey === undefined ? {} : { normalizedLocationRoom: roomKey }),
     });
+    await this.#notifySession('scheduled', session);
     return await this.#scheduleView(schedule);
   }
 
@@ -438,6 +453,7 @@ export class SessionService {
     );
     schedule.set('normalizedLocationRoom', roomKey);
     await schedule.save();
+    await this.#notifySession('changed', session);
     return await this.#scheduleView(schedule);
   }
 
@@ -460,6 +476,10 @@ export class SessionService {
       );
     }
     await SessionScheduleModel.deleteOne({ _id: schedule._id });
+    await this.#notifySession(
+      'changed',
+      await this.#session(String(schedule.sessionId)),
+    );
   }
 
   async startSession(
@@ -520,6 +540,7 @@ export class SessionService {
         return session;
       },
     );
+    await this.#notifySession('completed', completed);
     return (await this.#views([completed]))[0] as TrainingSessionView;
   }
 
@@ -548,6 +569,7 @@ export class SessionService {
     }
     session.status = 'CANCELLED';
     await session.save();
+    await this.#notifySession('cancelled', session);
     return (await this.#views([session]))[0] as TrainingSessionView;
   }
 
@@ -851,6 +873,38 @@ export class SessionService {
       .session(databaseSession ?? null)
       .exec();
     return attendanceCount === enrollmentIds.length * scheduleIds.length;
+  }
+
+  async #notifySession(
+    kind: 'scheduled' | 'changed' | 'cancelled' | 'completed',
+    session: HydratedDocument<TrainingSession>,
+  ): Promise<void> {
+    await deliverBestEffort(this.#logger, `session-${kind}`, async () => {
+      const [training, schedules, learnerIds] = await Promise.all([
+        TrainingModel.findById(session.trainingId).exec(),
+        SessionScheduleModel.find({ sessionId: session._id })
+          .sort({ startAt: 1, _id: 1 })
+          .exec(),
+        EnrollmentModel.find({ sessionId: session._id }).distinct('learnerId'),
+      ]);
+      if (training === null) return;
+      const users = await UserModel.find({
+        _id: { $in: [...session.assignedTrainerIds, ...learnerIds] },
+        isActive: true,
+      }).exec();
+      const firstSchedule = schedules[0];
+      await this.#mail.sendSessionNotification({
+        recipients: users.map(({ email }) => email),
+        kind,
+        sessionId: String(session._id),
+        trainingTitle: training.title,
+        sessionTitle: session.title,
+        ...(firstSchedule === undefined
+          ? {}
+          : { startsAt: firstSchedule.startAt.toISOString() }),
+        location: session.location,
+      });
+    });
   }
 
   async #hasLearnerEnrollment(

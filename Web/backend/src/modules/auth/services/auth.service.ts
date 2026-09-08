@@ -1,6 +1,8 @@
 import mongoose from 'mongoose';
 
 import type { AppConfig } from '../../../config/environment.js';
+import { deliverBestEffort } from '../../../infrastructure/mail/email-delivery.js';
+import type { TransactionalEmailService } from '../../../infrastructure/mail/email-service.js';
 import type { PasswordResetMailService } from '../../../infrastructure/mail/password-reset-mail.js';
 import { isDuplicateKeyError } from '../../../shared/database/mongo-errors.js';
 import { AppError } from '../../../shared/errors/app-error.js';
@@ -19,6 +21,7 @@ import type {
 import { PasswordResetTokenModel } from '../models/password-reset-token.model.js';
 import { RefreshSessionModel } from '../models/refresh-session.model.js';
 import { TokenService } from './token.service.js';
+import type { Logger } from 'pino';
 
 export interface AuthSessionResult {
   accessToken: string;
@@ -50,15 +53,21 @@ export class AuthService {
   readonly #config: AppConfig;
   readonly #tokens: TokenService;
   readonly #mail: PasswordResetMailService;
+  readonly #transactionalMail: TransactionalEmailService;
+  readonly #logger: Logger;
 
   constructor(
     config: AppConfig,
     tokens: TokenService,
     mail: PasswordResetMailService,
+    transactionalMail: TransactionalEmailService,
+    logger: Logger,
   ) {
     this.#config = config;
     this.#tokens = tokens;
     this.#mail = mail;
+    this.#transactionalMail = transactionalMail;
+    this.#logger = logger;
   }
 
   async registerLearner(
@@ -86,6 +95,14 @@ export class AuthService {
       }
       throw error;
     }
+    await deliverBestEffort(this.#logger, 'welcome', () =>
+      this.#transactionalMail.sendWelcome({
+        email: user.email,
+        ...(user.profile.firstName === undefined
+          ? {}
+          : { firstName: user.profile.firstName }),
+      }),
+    );
     return this.#createSession(user);
   }
 
@@ -300,6 +317,17 @@ export class AuthService {
         { session },
       );
     });
+    await deliverBestEffort(this.#logger, 'password-changed', async () => {
+      const user = await UserModel.findById(resetToken.userId).exec();
+      if (user !== null) {
+        await this.#transactionalMail.sendPasswordChanged({
+          email: user.email,
+          ...(user.profile.firstName === undefined
+            ? {}
+            : { firstName: user.profile.firstName }),
+        });
+      }
+    });
   }
 
   async changePassword(
@@ -346,6 +374,14 @@ export class AuthService {
     user.passwordHash = passwordHash;
     user.passwordChangedAt = now;
     user.mustChangePassword = false;
+    await deliverBestEffort(this.#logger, 'password-changed', () =>
+      this.#transactionalMail.sendPasswordChanged({
+        email: user.email,
+        ...(user.profile.firstName === undefined
+          ? {}
+          : { firstName: user.profile.firstName }),
+      }),
+    );
     return this.#createSession(user);
   }
 

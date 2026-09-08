@@ -1,5 +1,8 @@
 import mongoose from 'mongoose';
+import type { Logger } from 'pino';
 
+import { deliverBestEffort } from '../../../infrastructure/mail/email-delivery.js';
+import type { TransactionalEmailService } from '../../../infrastructure/mail/email-service.js';
 import { hashPassword } from '../../../shared/auth/password.js';
 import { isDuplicateKeyError } from '../../../shared/database/mongo-errors.js';
 import { AppError } from '../../../shared/errors/app-error.js';
@@ -20,6 +23,14 @@ export interface PaginatedUsers {
 }
 
 export class UserService {
+  readonly #mail: TransactionalEmailService;
+  readonly #logger: Logger;
+
+  constructor(mail: TransactionalEmailService, logger: Logger) {
+    this.#mail = mail;
+    this.#logger = logger;
+  }
+
   async createTrainer(input: CreateTrainerInput): Promise<PublicUser> {
     const passwordHash = await hashPassword(input.temporaryPassword);
     try {
@@ -32,6 +43,15 @@ export class UserService {
         profile: { firstName: input.firstName, lastName: input.lastName },
         passwordChangedAt: new Date(),
       });
+      await deliverBestEffort(this.#logger, 'trainer-welcome', () =>
+        this.#mail.sendWelcome({
+          email: user.email,
+          ...(user.profile.firstName === undefined
+            ? {}
+            : { firstName: user.profile.firstName }),
+          temporaryPassword: true,
+        }),
+      );
       return toPublicUser(user);
     } catch (error) {
       if (isDuplicateKeyError(error)) {

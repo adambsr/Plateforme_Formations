@@ -18,7 +18,7 @@ export function validEnvironment(): NodeJS.ProcessEnv {
     SMTP_SECURE: 'false',
     SMTP_USER: '',
     SMTP_PASSWORD: '',
-    SMTP_FROM: 'no-reply@example.com',
+    EMAIL_FROM: 'no-reply@example.com',
     STRIPE_SECRET_KEY: 'sk_test_placeholder',
     STRIPE_WEBHOOK_SECRET: 'whsec_placeholder',
     STRIPE_SUCCESS_URL: 'http://localhost:5173/payments/success',

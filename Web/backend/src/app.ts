@@ -10,12 +10,13 @@ import {
 } from './infrastructure/http/error-middleware.js';
 import { requestLogging } from './infrastructure/http/request-logging.js';
 import { openApiDocument } from './infrastructure/openapi/document.js';
-import { createPasswordResetMailService } from './infrastructure/mail/password-reset-mail.js';
 import type { PasswordResetMailService } from './infrastructure/mail/password-reset-mail.js';
 import {
-  createContactMailService,
-  type ContactMailService,
-} from './infrastructure/mail/contact-mail.js';
+  createTransactionalEmailService,
+  noopTransactionalEmailService,
+  type TransactionalEmailService,
+} from './infrastructure/mail/email-service.js';
+import type { ContactMailService } from './infrastructure/mail/contact-mail.js';
 import { createAuthRouter } from './modules/auth/routes/auth.routes.js';
 import { AuthService } from './modules/auth/services/auth.service.js';
 import { TokenService } from './modules/auth/services/token.service.js';
@@ -91,6 +92,7 @@ export interface AppDependencies {
   databaseReady: () => boolean;
   passwordResetMailService?: PasswordResetMailService;
   contactMailService?: ContactMailService;
+  transactionalEmailService?: TransactionalEmailService;
   stripeCheckoutGateway?: StripeCheckoutGateway;
   questionGenerationGateway?: QuestionGenerationGateway;
   tutorGenerationGateway?: TutorGenerationGateway;
@@ -103,6 +105,7 @@ export function createApp({
   databaseReady,
   passwordResetMailService,
   contactMailService,
+  transactionalEmailService,
   stripeCheckoutGateway,
   questionGenerationGateway,
   tutorGenerationGateway,
@@ -110,8 +113,19 @@ export function createApp({
 }: AppDependencies): Express {
   const app = express();
 
+  if (config.application.trustProxyHops > 0) {
+    app.set('trust proxy', config.application.trustProxyHops);
+  }
+
   const tokenService = new TokenService(config.authentication);
-  const userService = new UserService();
+  const defaultEmailService =
+    transactionalEmailService ?? createTransactionalEmailService(config);
+  const lifecycleEmailService =
+    transactionalEmailService === undefined &&
+    config.application.nodeEnv === 'test'
+      ? noopTransactionalEmailService
+      : defaultEmailService;
+  const userService = new UserService(lifecycleEmailService, logger);
   const fileStorage = new LocalFileStorage(
     config.uploads.directory,
     config.uploads.maxSizeMb,
@@ -119,7 +133,7 @@ export function createApp({
   const trainingService = new TrainingService(undefined, fileStorage);
   const enrollmentAccess = new EnrollmentAccessService();
   const contentService = new ContentService(fileStorage, enrollmentAccess);
-  const sessionService = new SessionService();
+  const sessionService = new SessionService(lifecycleEmailService, logger);
   const paymentService = new PaymentService(
     stripeCheckoutGateway ??
       new StripeSdkCheckoutGateway(config.stripe, {
@@ -127,6 +141,8 @@ export function createApp({
         logger,
       }),
     config.center,
+    lifecycleEmailService,
+    logger,
     config.application.mobileAppScheme,
   );
   const invoiceService = new InvoiceService(
@@ -135,7 +151,11 @@ export function createApp({
   const completionService = new CompletionService();
   const eligibilityService = new EligibilityService(completionService);
   const enrollmentService = new EnrollmentService(eligibilityService);
-  const progressService = new ProgressService(completionService);
+  const progressService = new ProgressService(
+    completionService,
+    lifecycleEmailService,
+    logger,
+  );
   const attendanceService = new AttendanceService();
   const evaluationService = new EvaluationService();
   const aiEvaluationService = new AiEvaluationService(
@@ -157,6 +177,8 @@ export function createApp({
     eligibilityService,
     new ProtectedDocumentStorage(config.uploads.directory),
     config.center,
+    lifecycleEmailService,
+    logger,
   );
   const feedbackService = new FeedbackService(eligibilityService);
   const costService = new CostService();
@@ -164,10 +186,12 @@ export function createApp({
   const authService = new AuthService(
     config,
     tokenService,
-    passwordResetMailService ?? createPasswordResetMailService(config),
+    passwordResetMailService ?? defaultEmailService,
+    lifecycleEmailService,
+    logger,
   );
   const contactService = new ContactService(
-    contactMailService ?? createContactMailService(config),
+    contactMailService ?? defaultEmailService,
   );
   const notificationService = new NotificationService(config.notifications);
 

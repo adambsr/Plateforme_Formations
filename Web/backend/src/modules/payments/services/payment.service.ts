@@ -3,8 +3,11 @@ import mongoose, {
   type QueryFilter,
   type Types,
 } from 'mongoose';
+import type { Logger } from 'pino';
 
 import type { AppConfig } from '../../../config/environment.js';
+import { deliverBestEffort } from '../../../infrastructure/mail/email-delivery.js';
+import type { TransactionalEmailService } from '../../../infrastructure/mail/email-service.js';
 import type {
   StripeCheckoutEvent,
   StripeCheckoutGateway,
@@ -41,14 +44,20 @@ export class PaymentService {
   readonly #gateway: StripeCheckoutGateway;
   readonly #issuer: AppConfig['center'];
   readonly #mobileAppScheme: string;
+  readonly #mail: TransactionalEmailService;
+  readonly #logger: Logger;
 
   constructor(
     gateway: StripeCheckoutGateway,
     issuer: AppConfig['center'],
+    mail: TransactionalEmailService,
+    logger: Logger,
     mobileAppScheme = 'plateforme-formations',
   ) {
     this.#gateway = gateway;
     this.#issuer = issuer;
+    this.#mail = mail;
+    this.#logger = logger;
     this.#mobileAppScheme = mobileAppScheme;
   }
 
@@ -321,141 +330,160 @@ export class PaymentService {
   async #fulfill(
     event: Extract<StripeCheckoutEvent, { kind: 'SUCCEEDED' }>,
   ): Promise<void> {
-    await mongoose.connection.transaction(async (databaseSession) => {
-      const payment = await PaymentModel.findById(event.paymentId)
-        .session(databaseSession)
-        .exec();
-      if (payment === null) {
-        throw new AppError(
-          404,
-          'PAYMENT_NOT_FOUND',
-          'The Payment does not exist.',
-        );
-      }
-      if (payment.status === 'PAID') return;
-      if (payment.status !== 'PENDING') {
-        throw new AppError(
-          409,
-          'PAYMENT_NOT_PENDING',
-          'Only a pending Payment can be fulfilled.',
-        );
-      }
-      const equivalent = await EnrollmentModel.exists(
-        payment.sessionId === undefined
-          ? {
-              learnerId: payment.learnerId,
-              trainingId: payment.trainingId,
-              sessionId: null,
-            }
-          : { learnerId: payment.learnerId, sessionId: payment.sessionId },
-      ).session(databaseSession);
-      if (equivalent !== null) throw this.#duplicateEnrollment();
-
-      if (payment.sessionId !== undefined) {
-        const updated = await TrainingSessionModel.findOneAndUpdate(
-          {
-            _id: payment.sessionId,
-            status: { $ne: 'CANCELLED' },
-            $expr: { $lt: ['$enrolledCount', '$capacity'] },
-          },
-          { $inc: { enrolledCount: 1 } },
-          { returnDocument: 'after', session: databaseSession },
-        ).exec();
-        if (updated === null) {
+    const confirmation = await mongoose.connection.transaction(
+      async (databaseSession) => {
+        const payment = await PaymentModel.findById(event.paymentId)
+          .session(databaseSession)
+          .exec();
+        if (payment === null) {
           throw new AppError(
-            409,
-            'SESSION_CAPACITY_REACHED',
-            'The Session reached capacity before payment fulfillment.',
+            404,
+            'PAYMENT_NOT_FOUND',
+            'The Payment does not exist.',
           );
         }
-      }
+        if (payment.status === 'PAID') return undefined;
+        if (payment.status !== 'PENDING') {
+          throw new AppError(
+            409,
+            'PAYMENT_NOT_PENDING',
+            'Only a pending Payment can be fulfilled.',
+          );
+        }
+        const equivalent = await EnrollmentModel.exists(
+          payment.sessionId === undefined
+            ? {
+                learnerId: payment.learnerId,
+                trainingId: payment.trainingId,
+                sessionId: null,
+              }
+            : { learnerId: payment.learnerId, sessionId: payment.sessionId },
+        ).session(databaseSession);
+        if (equivalent !== null) throw this.#duplicateEnrollment();
 
-      const learner = await UserModel.findById(payment.learnerId)
-        .session(databaseSession)
-        .exec();
-      if (learner === null)
-        throw new Error('Payment Learner reference is inconsistent.');
-      const [enrollment] = await EnrollmentModel.create(
-        [
-          {
-            learnerId: payment.learnerId,
-            trainingId: payment.trainingId,
-            ...(payment.sessionId === undefined
-              ? { sessionId: null }
-              : { sessionId: payment.sessionId }),
-            paymentId: payment._id,
-          },
-        ],
-        { session: databaseSession },
-      );
-      if (enrollment === undefined)
-        throw new Error('Enrollment was not created.');
-      const issuedAt = new Date();
-      const description =
-        payment.sessionTitle === undefined
-          ? payment.trainingTitle
-          : `${payment.trainingTitle} — ${payment.sessionTitle}`;
-      const [invoice] = await InvoiceModel.create(
-        [
-          {
-            paymentId: payment._id,
-            enrollmentId: enrollment._id,
-            learnerId: payment.learnerId,
-            trainingId: payment.trainingId,
-            ...(payment.sessionId === undefined
-              ? {}
-              : { sessionId: payment.sessionId }),
-            number: this.#invoiceNumber(payment._id, issuedAt),
-            issuedAt,
-            learner: {
-              email: learner.email,
-              firstName: learner.profile.firstName ?? '',
-              lastName: learner.profile.lastName ?? '',
+        if (payment.sessionId !== undefined) {
+          const updated = await TrainingSessionModel.findOneAndUpdate(
+            {
+              _id: payment.sessionId,
+              status: { $ne: 'CANCELLED' },
+              $expr: { $lt: ['$enrolledCount', '$capacity'] },
             },
-            issuer: {
-              name: this.#issuer.name,
-              address: this.#issuer.address,
-              email: this.#issuer.email,
-              ...(this.#issuer.phone === undefined
-                ? {}
-                : { phone: this.#issuer.phone }),
-              ...(this.#issuer.registrationId === undefined
-                ? {}
-                : { registrationId: this.#issuer.registrationId }),
-              ...(this.#issuer.logoPath === undefined
-                ? {}
-                : { logoPath: this.#issuer.logoPath }),
+            { $inc: { enrolledCount: 1 } },
+            { returnDocument: 'after', session: databaseSession },
+          ).exec();
+          if (updated === null) {
+            throw new AppError(
+              409,
+              'SESSION_CAPACITY_REACHED',
+              'The Session reached capacity before payment fulfillment.',
+            );
+          }
+        }
+
+        const learner = await UserModel.findById(payment.learnerId)
+          .session(databaseSession)
+          .exec();
+        if (learner === null)
+          throw new Error('Payment Learner reference is inconsistent.');
+        const [enrollment] = await EnrollmentModel.create(
+          [
+            {
+              learnerId: payment.learnerId,
+              trainingId: payment.trainingId,
+              ...(payment.sessionId === undefined
+                ? { sessionId: null }
+                : { sessionId: payment.sessionId }),
+              paymentId: payment._id,
             },
-            purchaseDescription: description,
-            subtotalMinor: payment.amountMinor,
-            totalMinor: payment.amountMinor,
-            currency: payment.currency,
-          },
-        ],
-        { session: databaseSession },
+          ],
+          { session: databaseSession },
+        );
+        if (enrollment === undefined)
+          throw new Error('Enrollment was not created.');
+        const issuedAt = new Date();
+        const description =
+          payment.sessionTitle === undefined
+            ? payment.trainingTitle
+            : `${payment.trainingTitle} — ${payment.sessionTitle}`;
+        const [invoice] = await InvoiceModel.create(
+          [
+            {
+              paymentId: payment._id,
+              enrollmentId: enrollment._id,
+              learnerId: payment.learnerId,
+              trainingId: payment.trainingId,
+              ...(payment.sessionId === undefined
+                ? {}
+                : { sessionId: payment.sessionId }),
+              number: this.#invoiceNumber(payment._id, issuedAt),
+              issuedAt,
+              learner: {
+                email: learner.email,
+                firstName: learner.profile.firstName ?? '',
+                lastName: learner.profile.lastName ?? '',
+              },
+              issuer: {
+                name: this.#issuer.name,
+                address: this.#issuer.address,
+                email: this.#issuer.email,
+                ...(this.#issuer.phone === undefined
+                  ? {}
+                  : { phone: this.#issuer.phone }),
+                ...(this.#issuer.registrationId === undefined
+                  ? {}
+                  : { registrationId: this.#issuer.registrationId }),
+                ...(this.#issuer.logoPath === undefined
+                  ? {}
+                  : { logoPath: this.#issuer.logoPath }),
+              },
+              purchaseDescription: description,
+              subtotalMinor: payment.amountMinor,
+              totalMinor: payment.amountMinor,
+              currency: payment.currency,
+            },
+          ],
+          { session: databaseSession },
+        );
+        if (invoice === undefined) throw new Error('Invoice was not created.');
+        await InvoiceItemModel.create(
+          [
+            {
+              invoiceId: invoice._id,
+              description,
+              quantity: 1,
+              unitAmountMinor: payment.amountMinor,
+              totalMinor: payment.amountMinor,
+              currency: payment.currency,
+            },
+          ],
+          { session: databaseSession },
+        );
+        payment.status = 'PAID';
+        payment.paidAt = issuedAt;
+        payment.lastStripeEventId = event.eventId;
+        if (event.paymentIntentId !== undefined) {
+          payment.stripePaymentIntentId = event.paymentIntentId;
+        }
+        await payment.save({ session: databaseSession });
+        return {
+          email: learner.email,
+          ...(learner.profile.firstName === undefined
+            ? {}
+            : { firstName: learner.profile.firstName }),
+          trainingTitle: payment.trainingTitle,
+          ...(payment.sessionTitle === undefined
+            ? {}
+            : { sessionTitle: payment.sessionTitle }),
+          amountMinor: payment.amountMinor,
+          currency: payment.currency,
+        };
+      },
+    );
+    if (confirmation !== undefined) {
+      await deliverBestEffort(this.#logger, 'enrollment-confirmation', () =>
+        this.#mail.sendEnrollmentConfirmation(confirmation),
       );
-      if (invoice === undefined) throw new Error('Invoice was not created.');
-      await InvoiceItemModel.create(
-        [
-          {
-            invoiceId: invoice._id,
-            description,
-            quantity: 1,
-            unitAmountMinor: payment.amountMinor,
-            totalMinor: payment.amountMinor,
-            currency: payment.currency,
-          },
-        ],
-        { session: databaseSession },
-      );
-      payment.status = 'PAID';
-      payment.paidAt = issuedAt;
-      payment.lastStripeEventId = event.eventId;
-      if (event.paymentIntentId !== undefined) {
-        payment.stripePaymentIntentId = event.paymentIntentId;
-      }
-      await payment.save({ session: databaseSession });
-    });
+    }
   }
 
   async #view(payment: HydratedDocument<Payment>) {

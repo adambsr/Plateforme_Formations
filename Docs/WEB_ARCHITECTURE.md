@@ -25,7 +25,7 @@ API Express 5 — monolithe modulaire
   ├─ routes + DTO Zod + middlewares
   ├─ services métier
   ├─ modèles Mongoose / transactions
-  └─ adaptateurs : Stripe, Gemini, SMTP, Firebase Admin, PDF, fichiers
+  └─ adaptateurs : Stripe, Gemini, service email/SMTP, Firebase Admin, PDF, fichiers
              │
              ├─ MongoDB 8 (`rs0`)
              └─ volume local d'uploads/documents
@@ -67,7 +67,9 @@ Web/
     └── vite.config.ts                # React, alias/déduplication et Vitest/jsdom
 ```
 
-À la racine, `package.json` définit les workspaces et commandes communes, `docker-compose.yml` fournit MongoDB, l'initialiseur, Mailpit et le backend, et `.github/workflows/ci.yml` exécute les contrôles et tests d'intégration.
+À la racine, `package.json` définit les workspaces et commandes communes,
+`docker-compose.yml` fournit MongoDB, l'initialiseur et le backend, et
+`.github/workflows/ci.yml` exécute les contrôles et tests d'intégration.
 
 ## Technologies et outils
 
@@ -77,7 +79,7 @@ Web/
 | Backend            | Node.js 24, Express 5, TypeScript ESM/NodeNext, Zod, Mongoose 9                         |
 | Données            | MongoDB 8, replica set mono-nœud local `rs0`                                            |
 | Authentification   | JWT HS256 avec `jose`, jetons opaques SHA-256, mots de passe `scrypt`                   |
-| Externes           | Stripe Checkout, Google Gen AI/Gemini, Nodemailer/SMTP, Firebase Admin/FCM              |
+| Externes           | Stripe Checkout, Google Gen AI/Gemini, service email Nodemailer/SMTP, Firebase Admin/FCM |
 | Documents/fichiers | Multer mémoire, `file-type`, `pdf-parse`, `fflate`, PDFKit                              |
 | Observabilité/API  | Pino, `pino-http`, OpenAPI 3.0.3, Swagger UI                                            |
 | Qualité            | Vitest, Testing Library, Supertest, Oxlint, Prettier, GitHub Actions                    |
@@ -104,9 +106,9 @@ Tous les chemins ci-dessous sont relatifs à `Web/backend/src/modules`.
 | `tutor`                     | sélection de leçons et réponse Gemini fondée avec citations vérifiées                                                                                                                                |
 | `public-concierge`          | contexte limité aux pages publiques et formations publiées, réponses/liens contrôlés                                                                                                                 |
 | `notifications`             | enregistrement des appareils Android et envoi FCM réservé à l'Administrateur                                                                                                                         |
-| `contact`                   | validation et envoi d'un message via SMTP                                                                                                                                                            |
+| `contact`                   | validation, protection anti-abus et envoi vers une adresse fixe via le service email                                                                                                                 |
 
-Les adaptateurs importants se trouvent dans `src/infrastructure` : `StripeSdkCheckoutGateway`, `LocalFileStorage`, `ProtectedDocumentStorage`, générateurs PDF, services SMTP, connexion/index MongoDB, middleware d'erreurs et document OpenAPI.
+Les adaptateurs importants se trouvent dans `src/infrastructure` : `StripeSdkCheckoutGateway`, `LocalFileStorage`, `ProtectedDocumentStorage`, générateurs PDF, service email transactionnel avec fournisseur SMTP configurable, connexion/index MongoDB, middleware d'erreurs et document OpenAPI.
 
 ## Frontend : pages, composants et hooks
 
@@ -185,7 +187,7 @@ Les index uniques protègent notamment l'e-mail et l'unique Administrateur, l'or
 | Emplacement             | Variables principales                                                                                                                                                                                                                                                        |
 | ----------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Racine `.env` / Compose | `MOBILE_APP_SCHEME`, `STRIPE_*`, `AI_*`                                                                                                                                                                                                                                      |
-| `Web/backend/.env`      | `NODE_ENV`, `PORT`, `MONGODB_URI`, `WEB_APP_URL`, `MOBILE_APP_SCHEME`, `CORS_ORIGINS`, `TZ=UTC`, `LOG_LEVEL`, `JWT_*`, TTL, `INITIAL_ADMIN_*`, `SMTP_*`, `STRIPE_*`, `UPLOAD_DIR`, `MAX_UPLOAD_SIZE_MB`, `AI_*`, `FCM_ENABLED`, `GOOGLE_APPLICATION_CREDENTIALS`, `CENTER_*` |
+| `Web/backend/.env`      | `NODE_ENV`, `PORT`, `MONGODB_URI`, `WEB_APP_URL`, `MOBILE_APP_SCHEME`, `CORS_ORIGINS`, `TRUST_PROXY_HOPS`, `TZ=UTC`, `LOG_LEVEL`, `JWT_*`, TTL, `INITIAL_ADMIN_*`, `EMAIL_*`, `SMTP_*`, `STRIPE_*`, `UPLOAD_DIR`, `MAX_UPLOAD_SIZE_MB`, `AI_*`, `FCM_ENABLED`, `GOOGLE_APPLICATION_CREDENTIALS`, `CENTER_*` |
 | `Web/frontend/.env`     | `VITE_API_BASE_URL`, informations publiques `VITE_CENTER_*`, interrupteurs/configuration `VITE_FIREBASE_*`                                                                                                                                                                   |
 
 `loadAppConfig()` valide et normalise l'environnement avec Zod avant le démarrage. Toutes les variables `VITE_*` sont publiques dans le bundle et ne doivent contenir aucun secret.
@@ -235,7 +237,9 @@ L'attribution d'une recommandation reste dans `sessionStorage` jusqu'à sept jou
 
 - Frontend : `src/main.tsx` monte `BrowserRouter → AuthProvider → App`. Développement : `npm run dev:frontend`. Build : `tsc -b && vite build`; résultat statique dans `Web/frontend/dist`.
 - Backend : `src/server.ts` charge d'abord `.env` racine puis `Web/backend/.env`, connecte MongoDB, initialise les index et écoute le port. Développement : `npm run dev:backend`; build/start : `tsc` puis `node dist/server.js`.
-- Local : `npm run docker:up` construit uniquement le backend et démarre MongoDB `rs0`, son initialiseur et Mailpit. Le frontend n'a pas de service Docker.
+- Local : `npm run docker:up` construit le backend et démarre MongoDB `rs0` et
+  son initialiseur. Compose fournit `Web/backend/.env` au backend, qui envoie les
+  e-mails par Gmail SMTP. Le frontend n'a pas de service Docker.
 - CI : format, lint, typecheck, tests, builds Web/backend, validation Compose, health check et tests d'intégration. Il n'existe pas de manifeste de déploiement production ni de configuration d'hébergement du frontend.
 - Paiement : le schéma d'environnement exige actuellement une clé `STRIPE_SECRET_KEY` commençant par `sk_test_`; le passage au mode live nécessite donc une évolution de configuration et une validation métier, pas un simple changement de secret.
 
