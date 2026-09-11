@@ -110,6 +110,7 @@ describe('Phase 13 Mobile feature flows', () => {
       registration.getByLabelText('Confirmer le mot de passe'),
       'Password123!',
     );
+    await fireEvent.press(registration.getByRole('checkbox'));
     await fireEvent.press(registration.getByText('Créer mon compte'));
 
     await waitFor(() =>

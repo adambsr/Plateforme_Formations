@@ -10,8 +10,7 @@ const analyticsEnabled =
   import.meta.env.VITE_FIREBASE_ANALYTICS_ENABLED === 'true';
 const analyticsConsentKey = 'analytics-consent';
 const analyticsDevelopmentLogging = import.meta.env.DEV;
-const analyticsDebug =
-  import.meta.env.VITE_FIREBASE_ANALYTICS_DEBUG === 'true';
+const analyticsDebug = import.meta.env.VITE_FIREBASE_ANALYTICS_DEBUG === 'true';
 
 const firebaseConfig: FirebaseOptions = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
@@ -50,7 +49,9 @@ export function getAnalyticsConsent(): AnalyticsConsent {
   return consent === 'granted' || consent === 'denied' ? consent : undefined;
 }
 
-export function setAnalyticsConsent(consent: Exclude<AnalyticsConsent, undefined>): void {
+export function setAnalyticsConsent(
+  consent: Exclude<AnalyticsConsent, undefined>,
+): void {
   if (typeof window === 'undefined') return;
   window.localStorage.setItem(analyticsConsentKey, consent);
   // Allows the current route to be recorded immediately after consent.
@@ -58,10 +59,7 @@ export function setAnalyticsConsent(consent: Exclude<AnalyticsConsent, undefined
 }
 
 export function getFirebaseAnalytics(): Promise<Analytics | undefined> {
-  if (
-    !canUseFirebaseAnalytics() ||
-    getAnalyticsConsent() !== 'granted'
-  ) {
+  if (!canUseFirebaseAnalytics() || getAnalyticsConsent() !== 'granted') {
     return Promise.resolve(undefined);
   }
 
@@ -97,7 +95,7 @@ export function trackPageView(path: string): void {
   void getFirebaseAnalytics().then((analytics) => {
     if (analytics === undefined) return;
     logAnalyticsEvent(analytics, 'page_view', {
-      page_location: window.location.href,
+      page_location: `${window.location.origin}${path}`,
       page_path: path,
       page_title: document.title,
     });

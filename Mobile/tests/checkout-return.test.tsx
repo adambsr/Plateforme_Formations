@@ -61,9 +61,7 @@ describe('Stripe Mobile return', () => {
     expect(await screen.findByText('Payé')).toBeTruthy();
     expect(request).toHaveBeenCalledWith('/payments/507f1f77bcf86cd799439011');
     expect(
-      screen.getByText(
-        /Le retour du navigateur ne confirme jamais le paiement/,
-      ),
+      screen.getByText(/confirmation sécurisée du prestataire/),
     ).toBeTruthy();
   });
 });

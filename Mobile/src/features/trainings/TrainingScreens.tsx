@@ -231,10 +231,7 @@ function CatalogueView({
   }
 
   return (
-    <SafeAreaView
-      edges={['bottom']}
-      style={styles.safeArea}
-    >
+    <SafeAreaView edges={['bottom']} style={styles.safeArea}>
       <ScrollView
         ref={scrollRef}
         contentContainerStyle={styles.catalogueContent}
@@ -439,6 +436,7 @@ function TrainingDetailView({
           <StatePanel loading message="Chargement de la formation…" />
         ) : error !== '' || training === null ? (
           <StatePanel
+            title="Formation indisponible"
             message={error || 'Formation introuvable.'}
             retry={() => void load()}
           />

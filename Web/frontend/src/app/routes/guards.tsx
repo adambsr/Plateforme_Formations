@@ -3,6 +3,7 @@ import { Navigate, Outlet, useLocation } from 'react-router';
 import { useAuth } from '../../core/auth/AuthContext.js';
 import type { UserRole } from '../../core/auth/types.js';
 import { roleHomePath } from './destinations.js';
+import { ForbiddenPage } from '../../features/system/SystemPages.js';
 
 export function PublicOnly() {
   const { status, user } = useAuth();
@@ -26,7 +27,13 @@ export function RequireAuthentication() {
   if (status === 'loading')
     return <div className="screen-message">Chargement de la session…</div>;
   if (user === null)
-    return <Navigate to="/login" state={{ from: location.pathname }} replace />;
+    return (
+      <Navigate
+        to="/status/authentication-required"
+        state={{ from: `${location.pathname}${location.search}` }}
+        replace
+      />
+    );
   if (user.mustChangePassword && location.pathname !== '/change-password') {
     return <Navigate to="/change-password" replace />;
   }
@@ -38,6 +45,6 @@ export function RequireRole({ roles }: { roles: readonly UserRole[] }) {
   return user !== null && roles.includes(user.role) ? (
     <Outlet />
   ) : (
-    <Navigate to={user === null ? '/login' : roleHomePath(user.role)} replace />
+    <ForbiddenPage />
   );
 }

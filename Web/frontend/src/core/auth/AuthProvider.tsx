@@ -45,13 +45,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       .then((session) => {
         if (active) acceptSession(session);
       })
-      .catch(() => {
-        if (active) becomeGuest();
+      .catch((error: unknown) => {
+        if (!active) return;
+        becomeGuest();
+        if (error instanceof ApiError && error.code === 'ACCOUNT_UNAVAILABLE') {
+          navigate('/status/account-unavailable', { replace: true });
+        } else if (
+          error instanceof ApiError &&
+          (error.code === 'REFRESH_TOKEN_EXPIRED' ||
+            error.code === 'REFRESH_TOKEN_REUSED')
+        ) {
+          navigate('/status/session-expired', { replace: true });
+        }
       });
     return () => {
       active = false;
     };
-  }, [acceptSession, becomeGuest]);
+  }, [acceptSession, becomeGuest, navigate]);
 
   const request = useCallback(
     async <T,>(path: string, options: RequestInit = {}): Promise<T> => {
@@ -69,11 +79,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           return await apiRequest<T>(path, options, session.accessToken);
         } catch (refreshError) {
           becomeGuest();
+          navigate(
+            refreshError instanceof ApiError &&
+              refreshError.code === 'ACCOUNT_UNAVAILABLE'
+              ? '/status/account-unavailable'
+              : '/status/session-expired',
+            { replace: true },
+          );
           throw refreshError;
         }
       }
     },
-    [acceptSession, becomeGuest],
+    [acceptSession, becomeGuest, navigate],
   );
 
   const download = useCallback(
@@ -88,11 +105,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           return await apiDownload(path, {}, session.accessToken);
         } catch (refreshError) {
           becomeGuest();
+          navigate(
+            refreshError instanceof ApiError &&
+              refreshError.code === 'ACCOUNT_UNAVAILABLE'
+              ? '/status/account-unavailable'
+              : '/status/session-expired',
+            { replace: true },
+          );
           throw refreshError;
         }
       }
     },
-    [acceptSession, becomeGuest],
+    [acceptSession, becomeGuest, navigate],
   );
 
   const value = useMemo<AuthContextValue>(

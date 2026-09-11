@@ -77,6 +77,22 @@ describe('Phase 1 Web routes', () => {
       await screen.findByRole('heading', { name: /compte Apprenant/i }),
     ).toBeVisible();
     expect(screen.queryByRole('combobox')).not.toBeInTheDocument();
+    expect(screen.getByRole('checkbox')).toBeRequired();
+  });
+
+  it('renders legal information and a real 404 instead of redirecting home', async () => {
+    const legal = renderAt('/privacy');
+    expect(
+      await screen.findByRole('heading', {
+        name: 'Politique de confidentialité',
+      }),
+    ).toBeVisible();
+    legal.unmount();
+
+    renderAt('/adresse-inconnue');
+    expect(
+      await screen.findByRole('heading', { name: 'Page introuvable' }),
+    ).toBeVisible();
   });
 });
 
@@ -159,7 +175,7 @@ describe('Phase 2 management routes', () => {
     renderAppAt('/app/trainings');
 
     expect(
-      await screen.findByRole('heading', { name: 'Bonjour Lina' }),
+      await screen.findByRole('heading', { name: 'Accès non autorisé' }),
     ).toBeVisible();
     expect(
       screen.queryByRole('link', { name: /formations/i }),

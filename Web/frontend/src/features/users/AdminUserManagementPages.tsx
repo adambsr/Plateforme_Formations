@@ -94,13 +94,19 @@ export function AdminUserListPage() {
                     {trainer.isActive && (
                       <button
                         className="danger-button compact-button"
-                        onClick={() =>
+                        onClick={() => {
+                          if (
+                            !window.confirm(
+                              `Désactiver le compte de ${trainer.profile.firstName ?? trainer.email} ? Cette personne sera déconnectée.`,
+                            )
+                          )
+                            return;
                           void request(`/trainers/${trainer.id}/disable`, {
                             method: 'POST',
                           })
                             .then(load)
-                            .catch((caught) => setError(message(caught)))
-                        }
+                            .catch((caught) => setError(message(caught)));
+                        }}
                       >
                         <UserRoundX
                           aria-hidden="true"

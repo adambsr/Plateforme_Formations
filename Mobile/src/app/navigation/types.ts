@@ -1,3 +1,15 @@
+export type LegalKind =
+  'privacy' | 'terms' | 'cookies' | 'refunds' | 'deletion';
+export type StatusKind =
+  | 'not-found'
+  | 'authentication-required'
+  | 'forbidden'
+  | 'server-error'
+  | 'unavailable'
+  | 'session-expired'
+  | 'account-unavailable'
+  | 'resource-unavailable';
+
 export type GuestStackParamList = {
   Home: undefined;
   Catalogue: undefined;
@@ -9,6 +21,9 @@ export type GuestStackParamList = {
   Register: undefined;
   ForgotPassword: undefined;
   ResetPassword: { token?: string };
+  Legal: { kind: LegalKind };
+  Status: { kind: StatusKind };
+  NotFound: undefined;
 };
 
 export type AppStackParamList = {
@@ -37,6 +52,9 @@ export type AppStackParamList = {
   Profile: undefined;
   Settings: undefined;
   ChangePassword: undefined;
+  Legal: { kind: LegalKind };
+  Status: { kind: StatusKind };
+  NotFound: undefined;
 };
 
 export type PasswordStackParamList = {

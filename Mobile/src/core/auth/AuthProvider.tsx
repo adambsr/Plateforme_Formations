@@ -6,6 +6,7 @@ import { appConfig } from '../config/environment';
 import { secureRefreshTokenStore } from '../storage/refresh-token-store';
 import {
   AuthContext,
+  type AuthNotice,
   type AuthContextValue,
   type AuthStatus,
 } from './AuthContext';
@@ -16,12 +17,14 @@ import { unregisterPushDevice } from '../notifications/firebase-messaging';
 export function AuthProvider({ children }: React.PropsWithChildren) {
   const [status, setStatus] = useState<AuthStatus>('loading');
   const [user, setUser] = useState<User | null>(null);
+  const [authNotice, setAuthNotice] = useState<AuthNotice>(null);
   const accessToken = useRef<string | null>(null);
   const refreshInFlight = useRef<Promise<MobileAuthSession> | null>(null);
 
   const applySession = useCallback((session: MobileAuthSession) => {
     accessToken.current = session.accessToken;
     setUser(session.user);
+    setAuthNotice(null);
     setStatus('authenticated');
     return session.user;
   }, []);
@@ -34,13 +37,14 @@ export function AuthProvider({ children }: React.PropsWithChildren) {
     [applySession],
   );
 
-  const becomeGuest = useCallback(async () => {
+  const becomeGuest = useCallback(async (notice: AuthNotice = null) => {
     accessToken.current = null;
     setUser(null);
     try {
       await secureRefreshTokenStore.clear();
     } finally {
       setStatus('guest');
+      setAuthNotice(notice);
     }
   }, []);
 
@@ -62,9 +66,28 @@ export function AuthProvider({ children }: React.PropsWithChildren) {
 
   useEffect(() => {
     let active = true;
-    void refreshSession().catch(async () => {
-      if (active) await becomeGuest();
-    });
+    void secureRefreshTokenStore
+      .get()
+      .then(async (storedToken) => {
+        if (!active) return;
+        if (storedToken === null) {
+          await becomeGuest();
+          return;
+        }
+        try {
+          await refreshSession();
+        } catch (error) {
+          if (!active) return;
+          await becomeGuest(
+            error instanceof ApiError && error.code === 'ACCOUNT_UNAVAILABLE'
+              ? 'account-unavailable'
+              : 'session-expired',
+          );
+        }
+      })
+      .catch(async () => {
+        if (active) await becomeGuest();
+      });
     return () => {
       active = false;
     };
@@ -84,7 +107,12 @@ export function AuthProvider({ children }: React.PropsWithChildren) {
           const session = await refreshSession();
           return await apiClient.request<T>(path, options, session.accessToken);
         } catch (refreshError) {
-          await becomeGuest();
+          await becomeGuest(
+            refreshError instanceof ApiError &&
+              refreshError.code === 'ACCOUNT_UNAVAILABLE'
+              ? 'account-unavailable'
+              : 'session-expired',
+          );
           throw refreshError;
         }
       }
@@ -132,7 +160,11 @@ export function AuthProvider({ children }: React.PropsWithChildren) {
   const value = useMemo<AuthContextValue>(
     () => ({
       status,
+      authNotice,
       user,
+      dismissAuthNotice() {
+        setAuthNotice(null);
+      },
       async login(email, password) {
         return acceptSession(
           await apiClient.request<MobileAuthSession>('/auth/login', {
@@ -199,7 +231,7 @@ export function AuthProvider({ children }: React.PropsWithChildren) {
       request,
       download,
     }),
-    [acceptSession, becomeGuest, download, request, status, user],
+    [acceptSession, authNotice, becomeGuest, download, request, status, user],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

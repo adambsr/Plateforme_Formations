@@ -25,9 +25,18 @@ export class ApiError extends Error {
 function localizedApiMessage(
   status: number,
   code: string,
-  message: string,
+  _message: string,
 ): string {
   const known: Record<string, string> = {
+    ACCOUNT_UNAVAILABLE: 'Ce compte est désactivé ou n’est plus disponible.',
+    CURRENT_PASSWORD_INCORRECT: 'Le mot de passe actuel est incorrect.',
+    EMAIL_ALREADY_EXISTS: 'Un compte utilise déjà cet email.',
+    INVALID_CREDENTIALS: 'L’email ou le mot de passe est incorrect.',
+    INVALID_PASSWORD_RESET_TOKEN:
+      'Le lien de réinitialisation est invalide ou expiré.',
+    INVALID_REFRESH_TOKEN: 'Votre session a expiré. Reconnectez-vous.',
+    REFRESH_TOKEN_EXPIRED: 'Votre session a expiré. Reconnectez-vous.',
+    REFRESH_TOKEN_REUSED: 'Votre session a été révoquée. Reconnectez-vous.',
     VALIDATION_FAILED: 'Certaines données saisies sont invalides.',
     AUTHENTICATION_REQUIRED: 'Connectez-vous pour continuer.',
     PASSWORD_CHANGE_REQUIRED:
@@ -49,11 +58,8 @@ function localizedApiMessage(
       'Cette évaluation est déjà complétée. Une évaluation réussie ne peut pas être recommencée.',
   };
   if (known[code] !== undefined) return known[code];
-  const appearsEnglish =
-    /\b(the|this|that|only|cannot|must|required|invalid|failed|does not|training|trainer|learner|session|payment|evaluation|category)\b/i.test(
-      message,
-    );
-  if (!appearsEnglish) return message;
+  if (status === 0)
+    return 'Connexion impossible. Vérifiez votre accès réseau puis réessayez.';
   if (status === 400 || status === 422)
     return 'Les données de la requête sont invalides.';
   if (status === 401) return 'Connectez-vous pour continuer.';
@@ -64,7 +70,7 @@ function localizedApiMessage(
     return 'Cette action est incompatible avec l’état actuel de l’élément.';
   if (status >= 500)
     return 'Le service est momentanément indisponible. Veuillez réessayer.';
-  return message;
+  return 'La requête n’a pas pu aboutir. Veuillez réessayer.';
 }
 
 const API_BASE_URL =
@@ -90,14 +96,28 @@ export async function apiRequest<T>(
   if (accessToken !== undefined)
     headers.set('authorization', `Bearer ${accessToken}`);
 
-  const response = await fetch(`${API_BASE_URL}${path}`, {
-    ...options,
-    headers,
-    credentials: 'include',
-  });
+  let response: Response;
+  try {
+    response = await fetch(`${API_BASE_URL}${path}`, {
+      ...options,
+      headers,
+      credentials: 'include',
+    });
+  } catch {
+    throw new ApiError(0, 'NETWORK_ERROR', 'Network request failed.');
+  }
   if (response.status === 204) return undefined as T;
-
-  const body: unknown = await response.json();
+  let body: unknown;
+  try {
+    const text = await response.text();
+    body = text.length === 0 ? undefined : JSON.parse(text);
+  } catch {
+    throw new ApiError(
+      response.status,
+      'INVALID_API_RESPONSE',
+      'The server returned an invalid response.',
+    );
+  }
   if (!response.ok) {
     const payload = body as {
       error?: { code?: string; message?: string; fieldErrors?: FieldError[] };
@@ -127,9 +147,18 @@ export async function apiDownload(
     credentials: 'include',
   });
   if (!response.ok) {
-    const body = (await response.json()) as {
+    let body: {
       error?: { code?: string; message?: string; fieldErrors?: FieldError[] };
     };
+    try {
+      body = (await response.json()) as typeof body;
+    } catch {
+      throw new ApiError(
+        response.status,
+        'INVALID_API_RESPONSE',
+        'The server returned an invalid response.',
+      );
+    }
     throw new ApiError(
       response.status,
       body.error?.code ?? 'DOWNLOAD_FAILED',

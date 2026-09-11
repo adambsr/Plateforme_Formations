@@ -57,6 +57,7 @@ describe('Phase 12 authentication UI', () => {
     fireEvent.change(screen.getByLabelText('Confirmer le mot de passe'), {
       target: { value: 'Password123!' },
     });
+    fireEvent.click(screen.getByRole('checkbox'));
 
     fireEvent.click(screen.getByRole('button', { name: 'Créer mon compte' }));
 

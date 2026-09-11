@@ -265,6 +265,7 @@ export function ContentScreen({
           <StatePanel loading message="Chargement du contenu…" />
         ) : content === null ? (
           <StatePanel
+            title="Ressource indisponible"
             message={error || 'Contenu indisponible.'}
             retry={() => void load()}
           />
@@ -304,7 +305,8 @@ export function ContentScreen({
                 }}
               />
             )}
-            {content.access === 'MANAGE' ? null : content.modules.length === 0 ? (
+            {content.access === 'MANAGE' ? null : content.modules.length ===
+              0 ? (
               <StatePanel message="Aucun contenu disponible." />
             ) : (
               content.modules.map((module) => (

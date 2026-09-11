@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
+import { Link } from 'react-router';
 
 import { ApiError } from '../../core/api/client.js';
 import { useAuth } from '../../core/auth/AuthContext.js';
@@ -156,6 +157,21 @@ export function ProfilePage() {
           </button>
         </form>
       </div>
+      <article className="content-card account-trust-card">
+        <div>
+          <h2>Confidentialité et compte</h2>
+          <p className="muted">
+            Consultez les règles d’utilisation et la procédure actuelle pour
+            demander la suppression de votre compte et de vos données.
+          </p>
+        </div>
+        <nav aria-label="Confidentialité et compte">
+          <Link to="/privacy">Politique de confidentialité</Link>
+          <Link to="/terms">Conditions générales</Link>
+          <Link to="/data-deletion">Suppression du compte</Link>
+          <Link to="/contact">Contacter le support</Link>
+        </nav>
+      </article>
     </section>
   );
 }

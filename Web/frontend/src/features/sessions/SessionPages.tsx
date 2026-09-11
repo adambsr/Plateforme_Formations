@@ -289,13 +289,14 @@ function ManagedSession({
             session.status !== 'CANCELLED' && (
               <button
                 className="danger-button"
-                onClick={() =>
+                onClick={() => {
+                  if (!window.confirm('Annuler cette session ?')) return;
                   void mutate(
                     `/sessions/${session.id}/cancel`,
                     { method: 'POST' },
                     'Session annulée.',
-                  )
-                }
+                  );
+                }}
               >
                 Annuler
               </button>
@@ -303,13 +304,15 @@ function ManagedSession({
           {canManage && (
             <button
               className="danger-button"
-              onClick={() =>
+              onClick={() => {
+                if (!window.confirm('Supprimer définitivement cette session ?'))
+                  return;
                 void mutate(
                   `/sessions/${session.id}`,
                   { method: 'DELETE' },
                   'Session supprimée.',
-                )
-              }
+                );
+              }}
             >
               Supprimer
             </button>
@@ -336,13 +339,15 @@ function ManagedSession({
               {canManage && session.status === 'PLANNED' && (
                 <button
                   className="danger-button"
-                  onClick={() =>
+                  onClick={() => {
+                    if (!window.confirm('Supprimer cette date du planning ?'))
+                      return;
                     void mutate(
                       `/schedules/${schedule.id}`,
                       { method: 'DELETE' },
                       'Date supprimée.',
-                    )
-                  }
+                    );
+                  }}
                 >
                   Supprimer
                 </button>

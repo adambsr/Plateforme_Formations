@@ -25,7 +25,10 @@ import {
   WalletCards,
   X,
 } from 'lucide-react-native';
-import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import {
+  SafeAreaView,
+  useSafeAreaInsets,
+} from 'react-native-safe-area-context';
 
 import type { AppStackParamList } from '../../app/navigation/types';
 import { navigationRef } from '../../app/navigation/navigation-ref';
@@ -33,6 +36,7 @@ import { useDrawer } from '../../app/navigation/drawer-context';
 import { ApiError } from '../../core/api/client';
 import { useAuth } from '../../core/auth/AuthContext';
 import { NotificationPreferences } from '../../core/notifications/NotificationPreferences';
+import { AnalyticsPreferences } from '../../core/analytics/AnalyticsPreferences';
 import { Brand } from '../../shared/components/Brand';
 import { Button } from '../../shared/components/Button';
 import { TextField } from '../../shared/components/TextField';
@@ -105,7 +109,11 @@ export function AuthenticatedDrawer() {
   const drawerX = useState(() => new Animated.Value(-320))[0];
   useEffect(() => {
     if (isOpen) {
-      Animated.timing(drawerX, { toValue: 0, duration: 180, useNativeDriver: true }).start();
+      Animated.timing(drawerX, {
+        toValue: 0,
+        duration: 180,
+        useNativeDriver: true,
+      }).start();
     }
   }, [drawerX, isOpen]);
   if (user === null || !isOpen) return null;
@@ -115,57 +123,143 @@ export function AuthenticatedDrawer() {
     { label: 'Catalogue', Icon: BookOpen, route: 'Catalogue' as const },
     ...(user.role === 'LEARNER'
       ? [
-          { label: 'Ma progression', Icon: ChartNoAxesCombined, route: 'Progress' as const },
-          { label: 'Mes achats', Icon: WalletCards, route: 'Purchases' as const },
+          {
+            label: 'Ma progression',
+            Icon: ChartNoAxesCombined,
+            route: 'Progress' as const,
+          },
+          {
+            label: 'Mes achats',
+            Icon: WalletCards,
+            route: 'Purchases' as const,
+          },
         ]
-      : [{ label: 'Formations', Icon: BookOpen, route: 'ManagedTrainings' as const }]),
-    { label: user.role === 'LEARNER' ? 'Mon planning' : 'Sessions', Icon: CalendarDays, route: 'Sessions' as const },
-    { label: user.role === 'LEARNER' ? 'Mes présences' : 'Présences', Icon: ClipboardCheck, route: 'Attendance' as const },
-    { label: 'Évaluations', Icon: ClipboardCheck, route: 'Evaluations' as const },
+      : [
+          {
+            label: 'Formations',
+            Icon: BookOpen,
+            route: 'ManagedTrainings' as const,
+          },
+        ]),
+    {
+      label: user.role === 'LEARNER' ? 'Mon planning' : 'Sessions',
+      Icon: CalendarDays,
+      route: 'Sessions' as const,
+    },
+    {
+      label: user.role === 'LEARNER' ? 'Mes présences' : 'Présences',
+      Icon: ClipboardCheck,
+      route: 'Attendance' as const,
+    },
+    {
+      label: 'Évaluations',
+      Icon: ClipboardCheck,
+      route: 'Evaluations' as const,
+    },
     { label: 'Certificats', Icon: BadgeCheck, route: 'Certificates' as const },
     ...(user.role === 'ADMIN'
       ? [
-          { label: 'Indicateurs', Icon: ChartNoAxesCombined, route: 'AdminDashboard' as const },
-          { label: 'Utilisateurs', Icon: UsersRound, route: 'AdminUsers' as const },
+          {
+            label: 'Indicateurs',
+            Icon: ChartNoAxesCombined,
+            route: 'AdminDashboard' as const,
+          },
+          {
+            label: 'Utilisateurs',
+            Icon: UsersRound,
+            route: 'AdminUsers' as const,
+          },
           { label: 'Coûts', Icon: WalletCards, route: 'AdminCosts' as const },
-          { label: 'Catégories', Icon: Settings, route: 'AdminCategories' as const },
+          {
+            label: 'Catégories',
+            Icon: Settings,
+            route: 'AdminCategories' as const,
+          },
         ]
       : []),
     { label: 'Mon profil', Icon: UserRound, route: 'Profile' as const },
     { label: 'Paramètres', Icon: Settings, route: 'Settings' as const },
   ];
   function close(after?: () => void) {
-    Animated.timing(drawerX, { toValue: -320, duration: 180, useNativeDriver: true }).start(() => {
+    Animated.timing(drawerX, {
+      toValue: -320,
+      duration: 180,
+      useNativeDriver: true,
+    }).start(() => {
       closeDrawer();
       after?.();
     });
   }
   return (
     <>
-      <Pressable accessibilityLabel="Fermer la navigation" style={styles.backdrop} onPress={() => close()} />
+      <Pressable
+        accessibilityLabel="Fermer la navigation"
+        style={styles.backdrop}
+        onPress={() => close()}
+      />
       <Animated.View
         style={[
           styles.drawer,
-          { top: insets.top, paddingTop: spacing.md, paddingBottom: insets.bottom + spacing.md },
+          {
+            top: insets.top,
+            paddingTop: spacing.md,
+            paddingBottom: insets.bottom + spacing.md,
+          },
           { transform: [{ translateX: drawerX }] },
         ]}
       >
         <View style={styles.drawerHeader}>
           <Brand compact />
-          <Pressable accessibilityLabel="Fermer la navigation" hitSlop={8} onPress={() => close()} style={styles.iconButton}>
+          <Pressable
+            accessibilityLabel="Fermer la navigation"
+            hitSlop={8}
+            onPress={() => close()}
+            style={styles.iconButton}
+          >
             <X color={colors.ink} size={24} />
           </Pressable>
         </View>
         <Text style={styles.drawerLabel}>NAVIGATION</Text>
-        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.drawerList}>
+        <ScrollView
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={styles.drawerList}
+        >
           {items.map(({ label, Icon, route }) => (
-            <Pressable key={label} accessibilityRole="button" accessibilityState={{ selected: currentRoute === route }} onPress={() => close(() => navigationRef.navigate(route as never))} style={({ pressed }) => [styles.drawerItem, currentRoute === route && styles.drawerItemActive, pressed && styles.drawerItemPressed]}>
-              <Icon color={currentRoute === route ? colors.primaryDark : colors.muted} size={22} />
-              <Text style={[styles.drawerText, currentRoute === route && styles.drawerTextActive]}>{label}</Text>
+            <Pressable
+              key={label}
+              accessibilityRole="button"
+              accessibilityState={{ selected: currentRoute === route }}
+              onPress={() =>
+                close(() => navigationRef.navigate(route as never))
+              }
+              style={({ pressed }) => [
+                styles.drawerItem,
+                currentRoute === route && styles.drawerItemActive,
+                pressed && styles.drawerItemPressed,
+              ]}
+            >
+              <Icon
+                color={
+                  currentRoute === route ? colors.primaryDark : colors.muted
+                }
+                size={22}
+              />
+              <Text
+                style={[
+                  styles.drawerText,
+                  currentRoute === route && styles.drawerTextActive,
+                ]}
+              >
+                {label}
+              </Text>
             </Pressable>
           ))}
         </ScrollView>
-        <Pressable accessibilityRole="button" onPress={() => void logout()} style={styles.drawerItem}>
+        <Pressable
+          accessibilityRole="button"
+          onPress={() => void logout()}
+          style={styles.drawerItem}
+        >
           <LogOut color={colors.danger} size={22} />
           <Text style={styles.drawerLogout}>Se déconnecter</Text>
         </Pressable>
@@ -278,6 +372,10 @@ export function SettingsScreen({
           <NotificationPreferences />
         </View>
         <View style={styles.card}>
+          <Text style={styles.cardTitle}>Statistiques facultatives</Text>
+          <AnalyticsPreferences />
+        </View>
+        <View style={styles.card}>
           <Text style={styles.cardTitle}>Compte et sécurité</Text>
           <Button
             label="Gérer mon profil"
@@ -299,6 +397,31 @@ export function SettingsScreen({
             label="Voir l’accueil public"
             variant="link"
             onPress={() => navigation.navigate('Home')}
+          />
+          <Button
+            label="Confidentialité"
+            variant="link"
+            onPress={() => navigation.navigate('Legal', { kind: 'privacy' })}
+          />
+          <Button
+            label="Conditions générales"
+            variant="link"
+            onPress={() => navigation.navigate('Legal', { kind: 'terms' })}
+          />
+          <Button
+            label="Cookies et traceurs"
+            variant="link"
+            onPress={() => navigation.navigate('Legal', { kind: 'cookies' })}
+          />
+          <Button
+            label="Remboursements"
+            variant="link"
+            onPress={() => navigation.navigate('Legal', { kind: 'refunds' })}
+          />
+          <Button
+            label="Demander la suppression du compte"
+            variant="link"
+            onPress={() => navigation.navigate('Legal', { kind: 'deletion' })}
           />
         </View>
       </ScrollView>

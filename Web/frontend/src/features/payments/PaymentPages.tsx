@@ -34,7 +34,7 @@ function date(value: string): string {
 
 function statusLabel(status: Payment['status']): string {
   return {
-    PENDING: 'En attente du webhook',
+    PENDING: 'Traitement en cours',
     PAID: 'Payé',
     FAILED: 'Échoué',
     CANCELLED: 'Annulé',
@@ -86,12 +86,20 @@ export function CheckoutReturnPage({
   return (
     <main className="checkout-return-page">
       <article className="content-card checkout-return-card">
-        <span className="eyebrow">Stripe test</span>
-        <h1>{cancelled ? 'Checkout quitté' : 'Confirmation en cours'}</h1>
+        <span className="eyebrow">Paiement sécurisé</span>
+        <h1>
+          {cancelled
+            ? 'Paiement annulé'
+            : payment?.status === 'FAILED'
+              ? 'Paiement échoué'
+              : payment?.status === 'PAID'
+                ? 'Paiement confirmé'
+                : 'Paiement en cours de traitement'}
+        </h1>
         <p className="muted">
           {cancelled
-            ? 'Le retour du navigateur ne modifie pas le paiement. Seul le webhook Stripe confirme son état.'
-            : 'Le retour Stripe ne donne aucun accès à lui seul. Nous vérifions le paiement confirmé par le webhook.'}
+            ? 'Aucun nouvel accès n’est accordé à partir de ce retour. Consultez vos achats pour vérifier l’état enregistré.'
+            : 'Nous vérifions la confirmation sécurisée du prestataire avant d’accorder l’accès.'}
         </p>
         {paymentId === null ? (
           <p className="form-error" role="alert">
@@ -117,8 +125,11 @@ export function CheckoutReturnPage({
                 Le webhook n’a pas encore confirmé le paiement.
               </p>
             )}
-            {payment.failure !== undefined && (
-              <p className="form-error">{payment.failure.message}</p>
+            {payment.status === 'FAILED' && (
+              <p className="form-error">
+                Le paiement n’a pas abouti. Vous pouvez réessayer depuis la
+                formation ou contacter le support si un débit apparaît.
+              </p>
             )}
             {payment.enrollmentId !== undefined && (
               <Link
@@ -131,6 +142,9 @@ export function CheckoutReturnPage({
           </div>
         )}
         <Link to="/app/payments">Voir mes paiements et factures</Link>
+        <Link to="/refund-policy">
+          Politique de remboursement et d’annulation
+        </Link>
       </article>
     </main>
   );
@@ -148,11 +162,10 @@ export function PaymentCenterPage() {
     setLoading(true);
     setError('');
     try {
-      const [paymentResult, invoiceResult] =
-        await Promise.all([
-          request<Page<Payment>>(`/payments?page=${paymentPage}&pageSize=10`),
-          request<Page<Invoice>>('/invoices?page=1&pageSize=100'),
-        ]);
+      const [paymentResult, invoiceResult] = await Promise.all([
+        request<Page<Payment>>(`/payments?page=${paymentPage}&pageSize=10`),
+        request<Page<Invoice>>('/invoices?page=1&pageSize=100'),
+      ]);
       setPayments(paymentResult);
       setInvoices(invoiceResult);
     } catch (caught) {
@@ -376,40 +389,100 @@ function PaymentLedger({
       <div className="section-heading">
         <div>
           <span className="eyebrow">Stripe test · EUR</span>
-          <h1>{user.role === 'ADMIN' ? 'Paiements et factures' : 'Mes achats'}</h1>
+          <h1>
+            {user.role === 'ADMIN' ? 'Paiements et factures' : 'Mes achats'}
+          </h1>
         </div>
         <button className="secondary-button" onClick={() => void refresh()}>
           <RefreshCw aria-hidden="true" size={16} /> Actualiser
         </button>
       </div>
-      {error !== '' && <p className="form-error" role="alert">{error}</p>}
-      {loading ? <p className="muted">Chargement des données confirmées…</p> : (
+      {error !== '' && (
+        <p className="form-error" role="alert">
+          {error}
+        </p>
+      )}
+      {loading ? (
+        <p className="muted">Chargement des données confirmées…</p>
+      ) : (
         <section className="content-card payment-ledger">
           <div className="ledger-heading">
-            <div><h2>Historique des paiements</h2><p className="muted">Les factures sont disponibles dès leur émission.</p></div>
+            <div>
+              <h2>Historique des paiements</h2>
+              <p className="muted">
+                Les factures sont disponibles dès leur émission.
+              </p>
+            </div>
             <span className="count-badge">{payments?.total ?? 0}</span>
           </div>
-          {payments?.items.length === 0 ? <p className="muted">Aucun paiement.</p> : (
-            <div className={`responsive-table payment-table${isAdmin ? ' payment-table-admin' : ''}`} role="table">
+          {payments?.items.length === 0 ? (
+            <p className="muted">Aucun paiement.</p>
+          ) : (
+            <div
+              className={`responsive-table payment-table${isAdmin ? ' payment-table-admin' : ''}`}
+              role="table"
+            >
               <div className="table-row table-head" role="row">
                 {isAdmin && <span role="columnheader">Utilisateur</span>}
-                <span role="columnheader">Formation</span><span role="columnheader">Statut</span><span role="columnheader">Facture</span>
+                <span role="columnheader">Formation</span>
+                <span role="columnheader">Statut</span>
+                <span role="columnheader">Facture</span>
               </div>
               {payments?.items.map((payment) => {
                 const invoice = invoicesByPayment.get(payment.id);
-                const name = invoice === undefined
-                  ? (user.profile.firstName ?? user.email)
-                  : [invoice.learner.firstName, invoice.learner.lastName].filter(Boolean).join(' ') || invoice.learner.email;
-                return <div className="table-row" role="row" key={payment.id}>
-                  {isAdmin && <span role="cell"><strong>{name}</strong><small>{invoice?.learner.email ?? user.email}</small></span>}
-                  <span role="cell"><strong>{payment.training.title}</strong><small>{date(payment.createdAt)} · {money(payment.amountMinor)}</small></span>
-                  <span role="cell" className={`status-pill status-${payment.status.toLowerCase()}`}>{statusLabel(payment.status)}</span>
-                  <span role="cell">{invoice ? <button className="secondary-button compact-button" onClick={() => void downloadInvoice(invoice)}><Download aria-hidden="true" size={16} /> Télécharger</button> : <span className="muted">Non disponible</span>}</span>
-                </div>;
+                const name =
+                  invoice === undefined
+                    ? (user.profile.firstName ?? user.email)
+                    : [invoice.learner.firstName, invoice.learner.lastName]
+                        .filter(Boolean)
+                        .join(' ') || invoice.learner.email;
+                return (
+                  <div className="table-row" role="row" key={payment.id}>
+                    {isAdmin && (
+                      <span role="cell">
+                        <strong>{name}</strong>
+                        <small>{invoice?.learner.email ?? user.email}</small>
+                      </span>
+                    )}
+                    <span role="cell">
+                      <strong>{payment.training.title}</strong>
+                      <small>
+                        {date(payment.createdAt)} · {money(payment.amountMinor)}
+                      </small>
+                    </span>
+                    <span
+                      role="cell"
+                      className={`status-pill status-${payment.status.toLowerCase()}`}
+                    >
+                      {statusLabel(payment.status)}
+                    </span>
+                    <span role="cell">
+                      {invoice ? (
+                        <button
+                          className="secondary-button compact-button"
+                          onClick={() => void downloadInvoice(invoice)}
+                        >
+                          <Download aria-hidden="true" size={16} /> Télécharger
+                        </button>
+                      ) : (
+                        <span className="muted">Non disponible</span>
+                      )}
+                    </span>
+                  </div>
+                );
               })}
             </div>
           )}
-          {payments && <Pagination page={page} pageSize={payments.pageSize} total={payments.total} onPageChange={setPage} disabled={loading} label="Pages des paiements" />}
+          {payments && (
+            <Pagination
+              page={page}
+              pageSize={payments.pageSize}
+              total={payments.total}
+              onPageChange={setPage}
+              disabled={loading}
+              label="Pages des paiements"
+            />
+          )}
         </section>
       )}
     </section>

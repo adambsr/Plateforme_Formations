@@ -1,6 +1,6 @@
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useState } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import type {
   AppStackParamList,
@@ -60,6 +60,10 @@ export function LoginScreen({
     try {
       await login(email, password);
     } catch (caught) {
+      if (caught instanceof ApiError && caught.code === 'ACCOUNT_UNAVAILABLE') {
+        navigation.navigate('Status', { kind: 'account-unavailable' });
+        return;
+      }
       setError(messageFor(caught));
     } finally {
       setLoading(false);
@@ -127,6 +131,7 @@ export function RegisterScreen({
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [accepted, setAccepted] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -139,6 +144,10 @@ export function RegisterScreen({
       confirmPassword,
     });
     if (validation !== null) return setError(validation);
+    if (!accepted)
+      return setError(
+        'Vous devez accepter les Conditions générales pour créer le compte.',
+      );
     setError('');
     setLoading(true);
     try {
@@ -191,6 +200,37 @@ export function RegisterScreen({
         secureTextEntry
         value={confirmPassword}
       />
+      <Text style={styles.dataNotice}>
+        Votre nom et votre email servent à créer le compte, fournir les
+        formations et envoyer les messages opérationnels. Aucun abonnement
+        marketing n’est créé.
+      </Text>
+      <Pressable
+        accessibilityRole="checkbox"
+        accessibilityState={{ checked: accepted }}
+        onPress={() => setAccepted((value) => !value)}
+        style={styles.consentRow}
+      >
+        <View style={[styles.checkbox, accepted && styles.checkboxChecked]}>
+          {accepted && <Text style={styles.checkmark}>✓</Text>}
+        </View>
+        <Text style={styles.consentText}>
+          J’accepte les Conditions générales et reconnais avoir lu la Politique
+          de confidentialité.
+        </Text>
+      </Pressable>
+      <View style={styles.legalLinks}>
+        <Button
+          label="Lire les Conditions"
+          variant="link"
+          onPress={() => navigation.navigate('Legal', { kind: 'terms' })}
+        />
+        <Button
+          label="Lire la confidentialité"
+          variant="link"
+          onPress={() => navigation.navigate('Legal', { kind: 'privacy' })}
+        />
+      </View>
       {error !== '' && <AlertMessage message={error} />}
       <Button
         label="Créer mon compte"
@@ -471,6 +511,29 @@ export function ChangePasswordScreen() {
 
 const styles = StyleSheet.create({
   actions: { gap: spacing.sm },
+  dataNotice: { color: colors.muted, fontSize: 13, lineHeight: 19 },
+  consentRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: spacing.md,
+  },
+  checkbox: {
+    width: 22,
+    height: 22,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: colors.line,
+    borderRadius: 5,
+    backgroundColor: colors.surface,
+  },
+  checkboxChecked: {
+    borderColor: colors.primary,
+    backgroundColor: colors.primary,
+  },
+  checkmark: { color: colors.surface, fontSize: 15, fontWeight: '900' },
+  consentText: { flex: 1, color: colors.ink, fontSize: 14, lineHeight: 20 },
+  legalLinks: { gap: spacing.xs },
   alert: {
     borderRadius: 9,
     padding: spacing.md,

@@ -1,6 +1,12 @@
-import { useState, type InputHTMLAttributes } from 'react';
+import { useEffect, useState, type InputHTMLAttributes } from 'react';
 import { useForm } from 'react-hook-form';
-import { Link, Navigate, useNavigate, useSearchParams } from 'react-router';
+import {
+  Link,
+  Navigate,
+  useLocation,
+  useNavigate,
+  useSearchParams,
+} from 'react-router';
 import { z } from 'zod';
 
 import { ApiError, apiRequest } from '../../core/api/client.js';
@@ -16,6 +22,7 @@ const registrationSchema = credentialsSchema
     firstName: z.string().trim().min(1).max(100),
     lastName: z.string().trim().min(1).max(100),
     confirmPassword: z.string().min(8),
+    acceptTerms: z.literal(true),
   })
   .refine((value) => value.password === value.confirmPassword, {
     path: ['confirmPassword'],
@@ -87,6 +94,7 @@ function AuthCard({
 export function LoginPage() {
   const { login } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
   const [error, setError] = useState('');
   const form = useForm<{ email: string; password: string }>();
   return (
@@ -106,15 +114,26 @@ export function LoginPage() {
           }
           try {
             const user = await login(parsed.data.email, parsed.data.password);
+            const requestedPath = (location.state as { from?: string } | null)
+              ?.from;
             navigate(
               user.mustChangePassword
                 ? '/change-password'
-                : roleHomePath(user.role),
+                : requestedPath?.startsWith('/')
+                  ? requestedPath
+                  : roleHomePath(user.role),
               {
                 replace: true,
               },
             );
           } catch (caught) {
+            if (
+              caught instanceof ApiError &&
+              caught.code === 'ACCOUNT_UNAVAILABLE'
+            ) {
+              navigate('/status/account-unavailable');
+              return;
+            }
             setError(errorMessage(caught));
           }
         })}
@@ -222,6 +241,25 @@ export function RegisterPage() {
           required
           {...form.register('confirmPassword')}
         />
+        <p className="registration-data-notice">
+          Nous utilisons votre nom et votre email pour créer votre compte,
+          fournir les formations et envoyer les messages opérationnels liés au
+          service. Aucun abonnement marketing n’est créé.
+        </p>
+        <label className="consent-control">
+          <input type="checkbox" required {...form.register('acceptTerms')} />
+          <span>
+            J’accepte les{' '}
+            <Link to="/terms" target="_blank">
+              Conditions générales
+            </Link>{' '}
+            et reconnais avoir lu la{' '}
+            <Link to="/privacy" target="_blank">
+              Politique de confidentialité
+            </Link>
+            .
+          </span>
+        </label>
         {error && (
           <p className="form-error" role="alert">
             {error}
@@ -297,10 +335,14 @@ export function ForgotPasswordPage() {
 
 export function ResetPasswordPage() {
   const [parameters] = useSearchParams();
-  const token = parameters.get('token');
+  const [token] = useState(() => parameters.get('token'));
   const [complete, setComplete] = useState(false);
   const [error, setError] = useState('');
   const form = useForm<{ newPassword: string; confirmPassword: string }>();
+  useEffect(() => {
+    if (token === null || typeof window === 'undefined') return;
+    window.history.replaceState(window.history.state, '', '/reset-password');
+  }, [token]);
   if (complete) return <Navigate to="/login" replace />;
   return (
     <AuthCard

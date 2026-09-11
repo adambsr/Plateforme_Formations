@@ -35,7 +35,7 @@ beforeEach(() => {
 });
 
 describe('Phase 5 webhook-confirmed Web state', () => {
-  it('renders empty Payment, Enrollment, and Invoice states', async () => {
+  it('renders the empty payment ledger state', async () => {
     request.mockResolvedValue({
       items: [],
       page: 1,
@@ -51,13 +51,7 @@ describe('Phase 5 webhook-confirmed Web state', () => {
     expect(
       screen.getByText(/Chargement des données confirmées/i),
     ).toBeVisible();
-    expect(
-      await screen.findByText('Aucune tentative de paiement.'),
-    ).toBeVisible();
-    expect(
-      screen.getByText('Aucune inscription confirmée par webhook.'),
-    ).toBeVisible();
-    expect(screen.getByText('Aucune facture émise.')).toBeVisible();
+    expect(await screen.findByText('Aucun paiement.')).toBeVisible();
   });
 
   it('does not trust the redirect and shows backend-confirmed paid access', async () => {
@@ -81,7 +75,7 @@ describe('Phase 5 webhook-confirmed Web state', () => {
     );
 
     expect(
-      screen.getByText(/Le retour Stripe ne donne aucun accès à lui seul/i),
+      screen.getByText(/confirmation sécurisée du prestataire/i),
     ).toBeVisible();
     expect(await screen.findByText('Payé')).toBeVisible();
     expect(

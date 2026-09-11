@@ -5,11 +5,12 @@ import { trackPageView } from './firebase.js';
 
 /** Records one Firebase Analytics page view for each client-side route. */
 export function AnalyticsPageTracker() {
-  const { hash, pathname, search } = useLocation();
+  const { pathname } = useLocation();
 
   useEffect(() => {
-    trackPageView(`${pathname}${search}${hash}`);
-  }, [hash, pathname, search]);
+    // Query strings may contain one-time reset or payment references.
+    trackPageView(pathname);
+  }, [pathname]);
 
   return null;
 }

@@ -19,22 +19,22 @@ export function AnalyticsConsentBanner() {
     setAnalyticsConsent(value);
     setConsent(value);
     if (value === 'granted') {
-      trackPageView(`${location.pathname}${location.search}${location.hash}`);
+      trackPageView(location.pathname);
     }
   }
 
   return (
-    <aside className='analytics-consent' aria-label='Choix des statistiques'>
+    <aside className="analytics-consent" aria-label="Choix des statistiques">
       <p>
         Nous utilisons des statistiques facultatives pour mesurer les
-        recommandations de formation. Elles ne contiennent ni nom, ni email,
-        ni donnée de paiement.
+        recommandations de formation. Elles ne contiennent ni nom, ni email, ni
+        donnée de paiement.
       </p>
       <div>
-        <button className='secondary-button' onClick={() => choose('denied')}>
+        <button className="secondary-button" onClick={() => choose('denied')}>
           Refuser
         </button>
-        <button className='primary-button' onClick={() => choose('granted')}>
+        <button className="primary-button" onClick={() => choose('granted')}>
           Accepter
         </button>
       </div>

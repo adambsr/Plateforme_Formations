@@ -3,10 +3,13 @@ import { createContext, useContext } from 'react';
 import type { RegisterLearnerInput, User } from './types';
 
 export type AuthStatus = 'loading' | 'guest' | 'authenticated';
+export type AuthNotice = 'session-expired' | 'account-unavailable' | null;
 
 export interface AuthContextValue {
   status: AuthStatus;
+  authNotice: AuthNotice;
   user: User | null;
+  dismissAuthNotice(): void;
   login(email: string, password: string): Promise<User>;
   register(input: RegisterLearnerInput): Promise<User>;
   logout(): Promise<void>;

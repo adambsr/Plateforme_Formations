@@ -1,4 +1,4 @@
-import { Navigate, Route, Routes } from 'react-router';
+import { Route, Routes } from 'react-router';
 
 import {
   ChangePasswordPage,
@@ -48,6 +48,14 @@ import {
   LandingPage,
 } from '../features/public/PublicPages.js';
 import {
+  CookiePolicyPage,
+  DataDeletionPage,
+  PrivacyPolicyPage,
+  RefundPolicyPage,
+  TermsPage,
+} from '../features/legal/LegalPages.js';
+import { SystemStatusPage } from '../features/system/SystemPages.js';
+import {
   LearnerDashboard,
   RoleIndexRedirect,
   TrainerDashboard,
@@ -79,7 +87,40 @@ export function App() {
           <Route path="/about" element={<AboutPage />} />
           <Route path="/faq" element={<FaqPage />} />
           <Route path="/contact" element={<ContactPage />} />
+          <Route path="/privacy" element={<PrivacyPolicyPage />} />
+          <Route path="/terms" element={<TermsPage />} />
+          <Route path="/cookies" element={<CookiePolicyPage />} />
+          <Route path="/refund-policy" element={<RefundPolicyPage />} />
+          <Route path="/data-deletion" element={<DataDeletionPage />} />
         </Route>
+        <Route
+          path="/status/authentication-required"
+          element={<SystemStatusPage kind="authentication-required" />}
+        />
+        <Route
+          path="/status/forbidden"
+          element={<SystemStatusPage kind="forbidden" />}
+        />
+        <Route
+          path="/status/server-error"
+          element={<SystemStatusPage kind="server-error" />}
+        />
+        <Route
+          path="/status/unavailable"
+          element={<SystemStatusPage kind="unavailable" />}
+        />
+        <Route
+          path="/status/session-expired"
+          element={<SystemStatusPage kind="session-expired" />}
+        />
+        <Route
+          path="/status/account-unavailable"
+          element={<SystemStatusPage kind="account-unavailable" />}
+        />
+        <Route
+          path="/status/resource-unavailable"
+          element={<SystemStatusPage kind="resource-unavailable" />}
+        />
         <Route element={<PublicOnly />}>
           <Route element={<AuthLayout />}>
             <Route path="/login" element={<LoginPage />} />
@@ -119,7 +160,10 @@ export function App() {
             <Route path="content/:trainingId" element={<ContentPage />} />
             <Route path="attendance" element={<AttendancePage />} />
             <Route path="evaluations" element={<EvaluationPage />} />
-            <Route path="evaluations/:evaluationId" element={<EvaluationPage />} />
+            <Route
+              path="evaluations/:evaluationId"
+              element={<EvaluationPage />}
+            />
             <Route element={<RequireRole roles={['TRAINER']} />}>
               <Route
                 path="evaluations/new"
@@ -155,7 +199,7 @@ export function App() {
             </Route>
           </Route>
         </Route>
-        <Route path="*" element={<Navigate to="/" replace />} />
+        <Route path="*" element={<SystemStatusPage kind="not-found" />} />
       </Routes>
     </>
   );

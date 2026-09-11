@@ -101,8 +101,14 @@ export function PublicLayout() {
           <h2>Nous contacter</h2>
           <nav aria-label="Contact et informations légales">
             <Link to="/contact">Contact</Link>
-            <a href="mailto:contact.hsa.tn@gmail.com">contact.hsa.tn@gmail.com</a>
-            <Link to="/about">Mentions légales</Link>
+            <a href="mailto:contact.hsa.tn@gmail.com">
+              contact.hsa.tn@gmail.com
+            </a>
+            <Link to="/privacy">Confidentialité</Link>
+            <Link to="/terms">Conditions</Link>
+            <Link to="/cookies">Cookies</Link>
+            <Link to="/refund-policy">Remboursements</Link>
+            <Link to="/data-deletion">Suppression des données</Link>
           </nav>
         </div>
         <p className="footer-copyright">

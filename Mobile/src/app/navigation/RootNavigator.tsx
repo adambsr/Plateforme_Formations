@@ -17,7 +17,10 @@ import {
   GuestCatalogueScreen,
   GuestTrainingDetailScreen,
 } from '../../features/trainings/TrainingScreens';
-import { ManagedTrainingsScreen, TrainingCreateScreen } from '../../features/trainings/ManagedTrainingsScreen';
+import {
+  ManagedTrainingsScreen,
+  TrainingCreateScreen,
+} from '../../features/trainings/ManagedTrainingsScreen';
 import {
   ContentScreen,
   ProgressScreen,
@@ -55,8 +58,20 @@ import {
   HomeScreen,
 } from '../../features/public/PublicScreens';
 import { NotificationPreferences } from '../../core/notifications/NotificationPreferences';
+import {
+  AppLegalScreen,
+  GuestLegalScreen,
+} from '../../features/legal/LegalScreens';
+import {
+  AppNotFoundScreen,
+  AppStatusScreen,
+  GuestNotFoundScreen,
+  GuestStatusScreen,
+  SystemStatusView,
+} from '../../features/system/SystemScreens';
 import { useDrawer } from './drawer-context';
 import { DrawerProvider } from './drawer-provider';
+import { navigationRef } from './navigation-ref';
 import { colors } from '../../shared/theme/tokens';
 import type {
   AppStackParamList,
@@ -100,10 +115,29 @@ const appScreenOptions = () => ({
   headerRight: () => <AppMenuButton />,
 });
 
+function ForbiddenAppRoute() {
+  return (
+    <SystemStatusView
+      kind="forbidden"
+      primaryLabel="Tableau de bord"
+      onPrimary={() => navigationRef.navigate('Workspace')}
+    />
+  );
+}
+
 export function RootNavigator() {
-  const { status, user } = useAuth();
+  const { authNotice, dismissAuthNotice, status, user } = useAuth();
   if (status === 'loading') {
     return <ScreenMessage message="Chargement de votre session…" />;
+  }
+  if (user === null && authNotice !== null) {
+    return (
+      <SystemStatusView
+        kind={authNotice}
+        primaryLabel="Se reconnecter"
+        onPrimary={dismissAuthNotice}
+      />
+    );
   }
   if (user === null) {
     return (
@@ -162,6 +196,21 @@ export function RootNavigator() {
             component={ResetPasswordScreen}
             options={{ title: 'R\u00e9initialiser le mot de passe' }}
           />
+          <GuestStack.Screen
+            name="Legal"
+            component={GuestLegalScreen}
+            options={{ title: 'Informations légales' }}
+          />
+          <GuestStack.Screen
+            name="Status"
+            component={GuestStatusScreen}
+            options={{ headerShown: false }}
+          />
+          <GuestStack.Screen
+            name="NotFound"
+            component={GuestNotFoundScreen}
+            options={{ headerShown: false }}
+          />
         </GuestStack.Navigator>
       </>
     );
@@ -183,131 +232,172 @@ export function RootNavigator() {
           initialRouteName="Workspace"
           screenOptions={appScreenOptions}
         >
-      <AppStack.Screen
-        name="Home"
-        component={HomeScreen as never}
-        options={{ headerShown: false }}
-      />
-      <AppStack.Screen
-        name="Workspace"
-        component={WorkspaceScreen}
-        options={{ headerShown: false }}
-      />
-      <AppStack.Screen
-        name="Catalogue"
-        component={AppCatalogueScreen}
-        options={{ title: 'Catalogue' }}
-      />
-      <AppStack.Screen
-        name="TrainingDetail"
-        component={AppTrainingDetailScreen}
-        options={{ title: 'Formation' }}
-      />
-      <AppStack.Screen
-        name="ManagedTrainings"
-        component={ManagedTrainingsScreen}
-        options={{ title: 'Formations gérées' }}
-      />
-      <AppStack.Screen
-        name="TrainingCreate"
-        component={TrainingCreateScreen}
-        options={{ title: 'Créer une formation' }}
-      />
-      <AppStack.Screen
-        name="Content"
-        component={ContentScreen}
-        options={{ title: 'Contenu' }}
-      />
-      <AppStack.Screen
-        name="Progress"
-        component={ProgressScreen}
-        options={{ title: 'Ma progression' }}
-      />
-      <AppStack.Screen
-        name="Sessions"
-        component={SessionsScreen}
-        options={{ title: 'Sessions' }}
-      />
-      <AppStack.Screen
-        name="SessionDetail"
-        component={SessionDetailScreen}
-        options={{ title: 'Détail de la session' }}
-      />
-      <AppStack.Screen
-        name="SessionManage"
-        component={SessionManagementScreen}
-        options={{ title: 'Gestion de Session' }}
-      />
-      <AppStack.Screen
-        name="Attendance"
-        component={AttendanceScreen}
-        options={{ title: 'Présences' }}
-      />
-      <AppStack.Screen
-        name="Purchases"
-        component={PurchasesScreen}
-        options={{ title: 'Achats et factures' }}
-      />
-      <AppStack.Screen
-        name="CheckoutReturn"
-        component={CheckoutReturnScreen}
-        options={{ title: 'Paiement' }}
-      />
-      <AppStack.Screen
-        name="ResetPassword"
-        component={AuthenticatedResetPasswordScreen}
-        options={{ title: 'R\u00e9initialiser le mot de passe' }}
-      />
-      <AppStack.Screen
-        name="Evaluations"
-        component={EvaluationsScreen}
-        options={{ title: 'Évaluations' }}
-      />
-      <AppStack.Screen
-        name="EvaluationCreate"
-        component={EvaluationCreateScreen}
-        options={{ title: 'Nouvelle évaluation' }}
-      />
-      <AppStack.Screen
-        name="Certificates"
-        component={CertificatesScreen}
-        options={{ title: 'Certificats' }}
-      />
-      <AppStack.Screen
-        name="AdminDashboard"
-        component={AdminDashboardScreen}
-        options={{ title: 'Tableau de bord' }}
-      />
-      <AppStack.Screen
-        name="AdminUsers"
-        component={AdminUsersScreen}
-        options={{ title: 'Utilisateurs' }}
-      />
-      <AppStack.Screen
-        name="AdminCosts"
-        component={AdminCostsScreen}
-        options={{ title: 'Coûts' }}
-      />
-      <AppStack.Screen
-        name="AdminCategories"
-        component={AdminCategoriesScreen}
-        options={{ title: 'Catégories' }}
-      />
-      <AppStack.Screen
-        name="ChangePassword"
-        component={ChangePasswordScreen}
-        options={{ title: 'Changer le mot de passe' }}
-      />
-      <AppStack.Screen
-        name="Settings"
-        component={SettingsScreen}
-        options={{ title: 'Paramètres' }}
-      />
-      <AppStack.Screen
-        name="Profile"
-        component={ProfileScreen}
-        options={{ title: 'Mon profil' }}
-      />
+          <AppStack.Screen
+            name="Home"
+            component={HomeScreen as never}
+            options={{ headerShown: false }}
+          />
+          <AppStack.Screen
+            name="Workspace"
+            component={WorkspaceScreen}
+            options={{ headerShown: false }}
+          />
+          <AppStack.Screen
+            name="Catalogue"
+            component={AppCatalogueScreen}
+            options={{ title: 'Catalogue' }}
+          />
+          <AppStack.Screen
+            name="TrainingDetail"
+            component={AppTrainingDetailScreen}
+            options={{ title: 'Formation' }}
+          />
+          <AppStack.Screen
+            name="ManagedTrainings"
+            component={
+              user.role === 'LEARNER'
+                ? ForbiddenAppRoute
+                : ManagedTrainingsScreen
+            }
+            options={{ title: 'Formations gérées' }}
+          />
+          <AppStack.Screen
+            name="TrainingCreate"
+            component={
+              user.role === 'LEARNER' ? ForbiddenAppRoute : TrainingCreateScreen
+            }
+            options={{ title: 'Créer une formation' }}
+          />
+          <AppStack.Screen
+            name="Content"
+            component={ContentScreen}
+            options={{ title: 'Contenu' }}
+          />
+          <AppStack.Screen
+            name="Progress"
+            component={
+              user.role === 'LEARNER' ? ProgressScreen : ForbiddenAppRoute
+            }
+            options={{ title: 'Ma progression' }}
+          />
+          <AppStack.Screen
+            name="Sessions"
+            component={SessionsScreen}
+            options={{ title: 'Sessions' }}
+          />
+          <AppStack.Screen
+            name="SessionDetail"
+            component={SessionDetailScreen}
+            options={{ title: 'Détail de la session' }}
+          />
+          <AppStack.Screen
+            name="SessionManage"
+            component={
+              user.role === 'LEARNER'
+                ? ForbiddenAppRoute
+                : SessionManagementScreen
+            }
+            options={{ title: 'Gestion de Session' }}
+          />
+          <AppStack.Screen
+            name="Attendance"
+            component={AttendanceScreen}
+            options={{ title: 'Présences' }}
+          />
+          <AppStack.Screen
+            name="Purchases"
+            component={
+              user.role === 'TRAINER' ? ForbiddenAppRoute : PurchasesScreen
+            }
+            options={{ title: 'Achats et factures' }}
+          />
+          <AppStack.Screen
+            name="CheckoutReturn"
+            component={CheckoutReturnScreen}
+            options={{ title: 'Paiement' }}
+          />
+          <AppStack.Screen
+            name="ResetPassword"
+            component={AuthenticatedResetPasswordScreen}
+            options={{ title: 'R\u00e9initialiser le mot de passe' }}
+          />
+          <AppStack.Screen
+            name="Evaluations"
+            component={EvaluationsScreen}
+            options={{ title: 'Évaluations' }}
+          />
+          <AppStack.Screen
+            name="EvaluationCreate"
+            component={
+              user.role === 'TRAINER'
+                ? EvaluationCreateScreen
+                : ForbiddenAppRoute
+            }
+            options={{ title: 'Nouvelle évaluation' }}
+          />
+          <AppStack.Screen
+            name="Certificates"
+            component={CertificatesScreen}
+            options={{ title: 'Certificats' }}
+          />
+          <AppStack.Screen
+            name="AdminDashboard"
+            component={
+              user.role === 'ADMIN' ? AdminDashboardScreen : ForbiddenAppRoute
+            }
+            options={{ title: 'Tableau de bord' }}
+          />
+          <AppStack.Screen
+            name="AdminUsers"
+            component={
+              user.role === 'ADMIN' ? AdminUsersScreen : ForbiddenAppRoute
+            }
+            options={{ title: 'Utilisateurs' }}
+          />
+          <AppStack.Screen
+            name="AdminCosts"
+            component={
+              user.role === 'ADMIN' ? AdminCostsScreen : ForbiddenAppRoute
+            }
+            options={{ title: 'Coûts' }}
+          />
+          <AppStack.Screen
+            name="AdminCategories"
+            component={
+              user.role === 'ADMIN' ? AdminCategoriesScreen : ForbiddenAppRoute
+            }
+            options={{ title: 'Catégories' }}
+          />
+          <AppStack.Screen
+            name="ChangePassword"
+            component={ChangePasswordScreen}
+            options={{ title: 'Changer le mot de passe' }}
+          />
+          <AppStack.Screen
+            name="Settings"
+            component={SettingsScreen}
+            options={{ title: 'Paramètres' }}
+          />
+          <AppStack.Screen
+            name="Profile"
+            component={ProfileScreen}
+            options={{ title: 'Mon profil' }}
+          />
+          <AppStack.Screen
+            name="Legal"
+            component={AppLegalScreen}
+            options={{ title: 'Informations légales' }}
+          />
+          <AppStack.Screen
+            name="Status"
+            component={AppStatusScreen}
+            options={{ headerShown: false }}
+          />
+          <AppStack.Screen
+            name="NotFound"
+            component={AppNotFoundScreen}
+            options={{ headerShown: false }}
+          />
         </AppStack.Navigator>
         <AuthenticatedDrawer />
         <NotificationPreferences autoPrompt />

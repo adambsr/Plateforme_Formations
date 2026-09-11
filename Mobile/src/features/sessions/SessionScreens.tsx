@@ -266,17 +266,19 @@ export function SessionsScreen({
                   }
                   session={session}
                 />
-                {user !== null && user.role !== 'LEARNER' && session.status !== 'COMPLETED' && (
-                  <Button
-                    label="Gérer cette Session"
-                    onPress={() =>
-                      navigation.navigate('SessionManage', {
-                        sessionId: session.id,
-                      })
-                    }
-                    variant="secondary"
-                  />
-                )}
+                {user !== null &&
+                  user.role !== 'LEARNER' &&
+                  session.status !== 'COMPLETED' && (
+                    <Button
+                      label="Gérer cette Session"
+                      onPress={() =>
+                        navigation.navigate('SessionManage', {
+                          sessionId: session.id,
+                        })
+                      }
+                      variant="secondary"
+                    />
+                  )}
                 {session.status === 'COMPLETED' && (
                   <Text style={styles.completedNotice}>
                     Session terminée : la gestion n’est plus disponible.
@@ -338,6 +340,7 @@ export function SessionDetailScreen({
           <StatePanel loading message="Chargement de la session…" />
         ) : error !== '' || session === null ? (
           <StatePanel
+            title="Session indisponible"
             message={error || 'Session introuvable.'}
             retry={() => void load()}
           />

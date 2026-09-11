@@ -65,7 +65,7 @@ describe('Phase 4 Tunisia scheduling', () => {
     );
 
     expect(await screen.findByRole('alert')).toHaveTextContent(
-      'Calendrier indisponible.',
+      'Le service est momentanément indisponible.',
     );
   });
 });

@@ -20,12 +20,7 @@ import { StatePanel } from '../../shared/components/StatePanel';
 import { colors, radii, spacing } from '../../shared/theme/tokens';
 import { formatTunisDateTime } from '../../shared/utils/format';
 import { formatEur } from '../trainings/format';
-import type {
-  Invoice,
-  Page,
-  Payment,
-  PaymentStatus,
-} from './types';
+import type { Invoice, Page, Payment, PaymentStatus } from './types';
 
 function message(error: unknown): string {
   return error instanceof ApiError
@@ -35,7 +30,7 @@ function message(error: unknown): string {
 
 function statusLabel(status: PaymentStatus): string {
   return {
-    PENDING: 'En attente du webhook',
+    PENDING: 'Traitement en cours',
     PAID: 'Payé',
     FAILED: 'Échoué',
     CANCELLED: 'Annulé',
@@ -121,13 +116,19 @@ export function CheckoutReturnScreen({
     <SafeAreaView edges={['bottom']} style={styles.safeArea}>
       <ScrollView contentContainerStyle={styles.content}>
         <View style={styles.hero}>
-          <Text style={styles.eyebrow}>STRIPE TEST · EUR</Text>
+          <Text style={styles.eyebrow}>PAIEMENT SÉCURISÉ</Text>
           <Text style={styles.title}>
-            {cancelled ? 'Checkout quitté' : 'Confirmation en cours'}
+            {cancelled
+              ? 'Paiement annulé'
+              : payment?.status === 'FAILED'
+                ? 'Paiement échoué'
+                : payment?.status === 'PAID'
+                  ? 'Paiement confirmé'
+                  : 'Paiement en cours de traitement'}
           </Text>
           <Text style={styles.muted}>
-            Le retour du navigateur ne confirme jamais le paiement. Seul le
-            webhook backend accorde l’accès.
+            Nous vérifions la confirmation sécurisée du prestataire avant
+            d’accorder l’accès.
           </Text>
         </View>
         {paymentId === undefined ? (
@@ -148,8 +149,8 @@ export function CheckoutReturnScreen({
                 Le webhook n’a pas encore confirmé le paiement.
               </Text>
             )}
-            {payment.failure !== undefined && (
-              <Notice message={payment.failure.message} />
+            {payment.status === 'FAILED' && (
+              <Notice message="Le paiement n’a pas abouti. Réessayez depuis la formation ou contactez le support si un débit apparaît." />
             )}
             {payment.enrollmentId !== undefined && (
               <Button
@@ -167,6 +168,11 @@ export function CheckoutReturnScreen({
           label="Voir mes achats"
           onPress={() => navigation.navigate('Purchases')}
           variant="secondary"
+        />
+        <Button
+          label="Remboursements et annulations"
+          onPress={() => navigation.navigate('Legal', { kind: 'refunds' })}
+          variant="link"
         />
       </ScrollView>
     </SafeAreaView>
@@ -261,7 +267,7 @@ export function PurchasesScreen() {
                       {formatEur(payment.amountMinor)}
                     </Text>
                   </View>
-                    <Text style={[styles.status, statusStyle(payment.status)]}>
+                  <Text style={[styles.status, statusStyle(payment.status)]}>
                     {statusLabel(payment.status)}
                   </Text>
                 </View>

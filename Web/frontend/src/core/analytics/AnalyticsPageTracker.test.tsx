@@ -31,7 +31,7 @@ describe('AnalyticsPageTracker', () => {
     view.getByRole('button', { name: 'Next' }).click();
 
     await waitFor(() => {
-      expect(trackPageView).toHaveBeenCalledWith('/catalogue?level=BEGINNER');
+      expect(trackPageView).toHaveBeenCalledWith('/catalogue');
     });
   });
 });

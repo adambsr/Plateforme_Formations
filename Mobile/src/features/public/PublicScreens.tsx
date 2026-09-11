@@ -219,6 +219,26 @@ export function HomeScreen({
             variant="link"
             onPress={() => navigation.navigate('Contact')}
           />
+          <Button
+            label="Confidentialité"
+            variant="link"
+            onPress={() => navigation.navigate('Legal', { kind: 'privacy' })}
+          />
+          <Button
+            label="Conditions générales"
+            variant="link"
+            onPress={() => navigation.navigate('Legal', { kind: 'terms' })}
+          />
+          <Button
+            label="Remboursements"
+            variant="link"
+            onPress={() => navigation.navigate('Legal', { kind: 'refunds' })}
+          />
+          <Button
+            label="Suppression des données"
+            variant="link"
+            onPress={() => navigation.navigate('Legal', { kind: 'deletion' })}
+          />
           {user === null && (
             <Button
               label="Se connecter"
@@ -450,6 +470,18 @@ export function ContactScreen({
           numberOfLines={5}
           textAlignVertical="top"
         />
+        <Text style={styles.body}>
+          Votre nom, votre email, l’objet et le message sont transmis à notre
+          équipe par email pour répondre à votre demande.{' '}
+          <Text
+            accessibilityRole="link"
+            style={styles.link}
+            onPress={() => navigation.navigate('Legal', { kind: 'privacy' })}
+          >
+            Politique de confidentialité
+          </Text>
+          .
+        </Text>
         <Notice message={error} />
         <Notice message={notice} success />
         <Button

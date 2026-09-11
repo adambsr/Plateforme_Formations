@@ -166,6 +166,8 @@ export function EvaluationPage() {
   }
   async function deleteQuestion(question: Question) {
     if (selected === null) return;
+    if (!window.confirm(`Supprimer la question « ${question.prompt} » ?`))
+      return;
     await action(async () => {
       await request(`/questions/${question.id}`, { method: 'DELETE' });
       await detail(selected.id);
@@ -254,6 +256,8 @@ export function EvaluationPage() {
   }
   async function deleteEvaluation() {
     if (selected === null) return;
+    if (!window.confirm(`Supprimer le brouillon « ${selected.title} » ?`))
+      return;
     await action(async () => {
       await request(`/evaluations/${selected.id}`, { method: 'DELETE' });
       setSelected(null);
@@ -436,7 +440,13 @@ export function EvaluationPage() {
           <p className="muted">Les évaluations disponibles apparaîtront ici.</p>
         </div>
       ) : (
-        <div className={inDetailView ? 'evaluation-layout evaluation-detail-route' : 'evaluation-layout'}>
+        <div
+          className={
+            inDetailView
+              ? 'evaluation-layout evaluation-detail-route'
+              : 'evaluation-layout'
+          }
+        >
           <aside className="evaluation-list">
             {page?.items.map((evaluation) => (
               <button
@@ -709,6 +719,12 @@ export function EvaluationPage() {
                       >
                         Générer avec Gemini
                       </button>
+                      <p className="muted">
+                        Le contenu pédagogique autorisé est transmis à Gemini
+                        pour proposer ces questions. Vérifiez le résultat avant
+                        publication et n’incluez aucune donnée personnelle ou
+                        confidentielle dans les ressources.
+                      </p>
                     </form>
                     <form
                       className="content-card evaluation-question-form"
@@ -780,108 +796,111 @@ export function EvaluationPage() {
                   </>
                 )}
                 {user.role !== 'LEARNER' && (
-                <div className="evaluation-questions">
-                  {selected.questions?.map((question) => (
-                    <article className="content-card" key={question.id}>
-                      <small>
-                        {questionTypeLabel(question.type)} · {question.points}{' '}
-                        point(s)
-                      </small>
-                      <h3>
-                        {question.order}. {question.prompt}
-                      </h3>
-                      <ul>
-                        {question.options.map((option) => (
-                          <li key={option.id}>
-                            <strong>{option.id}</strong> — {option.text}
-                          </li>
-                        ))}
-                      </ul>
-                      {question.correctOptionIds !== undefined && (
-                        <p className="muted">
-                          Réponse : {question.correctOptionIds.join(', ')}
-                        </p>
-                      )}
-                      {editingQuestionId === question.id && (
-                        <form
-                          className="evaluation-question-form"
-                          onSubmit={(event) =>
-                            void editQuestion(question, event)
-                          }
-                        >
-                          <label>
-                            Énoncé
-                            <textarea
-                              name="prompt"
-                              defaultValue={question.prompt}
-                              required
-                            />
-                          </label>
-                          <label>
-                            Options, une par ligne
-                            <textarea
-                              name="options"
-                              defaultValue={question.options
-                                .map(({ text }) => text)
-                                .join('\n')}
-                              required
-                            />
-                          </label>
-                          <label>
-                            Réponses correctes
-                            <input
-                              name="correct"
-                              defaultValue={
-                                question.correctOptionIds?.join(',') ?? ''
-                              }
-                              required
-                            />
-                          </label>
-                          <label>
-                            Points
-                            <input
-                              name="points"
-                              type="number"
-                              min="1"
-                              defaultValue={question.points}
-                              required
-                            />
-                          </label>
+                  <div className="evaluation-questions">
+                    {selected.questions?.map((question) => (
+                      <article className="content-card" key={question.id}>
+                        <small>
+                          {questionTypeLabel(question.type)} · {question.points}{' '}
+                          point(s)
+                        </small>
+                        <h3>
+                          {question.order}. {question.prompt}
+                        </h3>
+                        <ul>
+                          {question.options.map((option) => (
+                            <li key={option.id}>
+                              <strong>{option.id}</strong> — {option.text}
+                            </li>
+                          ))}
+                        </ul>
+                        {question.correctOptionIds !== undefined && (
+                          <p className="muted">
+                            Réponse : {question.correctOptionIds.join(', ')}
+                          </p>
+                        )}
+                        {editingQuestionId === question.id && (
+                          <form
+                            className="evaluation-question-form"
+                            onSubmit={(event) =>
+                              void editQuestion(question, event)
+                            }
+                          >
+                            <label>
+                              Énoncé
+                              <textarea
+                                name="prompt"
+                                defaultValue={question.prompt}
+                                required
+                              />
+                            </label>
+                            <label>
+                              Options, une par ligne
+                              <textarea
+                                name="options"
+                                defaultValue={question.options
+                                  .map(({ text }) => text)
+                                  .join('\n')}
+                                required
+                              />
+                            </label>
+                            <label>
+                              Réponses correctes
+                              <input
+                                name="correct"
+                                defaultValue={
+                                  question.correctOptionIds?.join(',') ?? ''
+                                }
+                                required
+                              />
+                            </label>
+                            <label>
+                              Points
+                              <input
+                                name="points"
+                                type="number"
+                                min="1"
+                                defaultValue={question.points}
+                                required
+                              />
+                            </label>
+                            <div className="management-actions">
+                              <button
+                                className="primary-button"
+                                disabled={busy}
+                              >
+                                Enregistrer
+                              </button>
+                              <button
+                                type="button"
+                                className="secondary-button"
+                                onClick={() => setEditingQuestionId(undefined)}
+                              >
+                                Annuler
+                              </button>
+                            </div>
+                          </form>
+                        )}
+                        {owner && selected.status === 'DRAFT' && (
                           <div className="management-actions">
-                            <button className="primary-button" disabled={busy}>
-                              Enregistrer
+                            <button
+                              className="secondary-button compact-button"
+                              disabled={busy}
+                              onClick={() => setEditingQuestionId(question.id)}
+                            >
+                              Modifier
                             </button>
                             <button
-                              type="button"
-                              className="secondary-button"
-                              onClick={() => setEditingQuestionId(undefined)}
+                              className="danger-button compact-button"
+                              disabled={busy}
+                              onClick={() => void deleteQuestion(question)}
                             >
-                              Annuler
+                              Supprimer
                             </button>
                           </div>
-                        </form>
-                      )}
-                      {owner && selected.status === 'DRAFT' && (
-                        <div className="management-actions">
-                          <button
-                            className="secondary-button compact-button"
-                            disabled={busy}
-                            onClick={() => setEditingQuestionId(question.id)}
-                          >
-                            Modifier
-                          </button>
-                          <button
-                            className="danger-button compact-button"
-                            disabled={busy}
-                            onClick={() => void deleteQuestion(question)}
-                          >
-                            Supprimer
-                          </button>
-                        </div>
-                      )}
-                    </article>
-                  ))}
-                </div>
+                        )}
+                      </article>
+                    ))}
+                  </div>
                 )}
                 {user.role === 'LEARNER' &&
                   attempt === null &&

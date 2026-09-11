@@ -71,7 +71,7 @@ describe('Phase 6 learner progress UI', () => {
       </MemoryRouter>,
     );
     expect(await screen.findByRole('alert')).toHaveTextContent(
-      'Progression indisponible.',
+      'Le service est momentanément indisponible.',
     );
   });
 });

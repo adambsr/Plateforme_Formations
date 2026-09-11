@@ -27,7 +27,7 @@ export class ApiError extends Error {
 function localizedApiMessage(
   status: number,
   code: string,
-  message: string,
+  _message: string,
 ): string {
   const known: Record<string, string> = {
     ACCOUNT_UNAVAILABLE: 'Ce compte n’est pas disponible.',
@@ -58,7 +58,7 @@ function localizedApiMessage(
     return 'Cette action est incompatible avec l’état actuel de l’élément.';
   if (status >= 500)
     return 'Le service est momentanément indisponible. Réessayez.';
-  return message;
+  return 'La requête n’a pas pu aboutir. Réessayez.';
 }
 
 type FetchImplementation = typeof fetch;

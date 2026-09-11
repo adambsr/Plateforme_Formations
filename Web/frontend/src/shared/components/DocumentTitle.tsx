@@ -12,6 +12,12 @@ function pageTitleFor(pathname: string): string {
   if (pathname === '/about') return 'À propos';
   if (pathname === '/faq') return 'Questions fréquentes';
   if (pathname === '/contact') return 'Contact';
+  if (pathname === '/privacy') return 'Politique de confidentialité';
+  if (pathname === '/terms') return 'Conditions générales';
+  if (pathname === '/cookies') return 'Cookies et traceurs';
+  if (pathname === '/refund-policy') return 'Remboursements et annulations';
+  if (pathname === '/data-deletion') return 'Suppression du compte';
+  if (pathname.startsWith('/status/')) return 'Information';
   if (pathname === '/login') return 'Connexion';
   if (pathname === '/register') return 'Créer un compte';
   if (pathname === '/forgot-password') return 'Mot de passe oublié';
@@ -27,7 +33,8 @@ function pageTitleFor(pathname: string): string {
   if (pathname === '/app/payments') return 'Mes paiements';
   if (pathname === '/app/categories') return 'Gestion des catégories';
   if (pathname === '/app/users') return 'Gestion des utilisateurs';
-  if (pathname.startsWith('/app/users/trainers/')) return 'Gestion des formateurs';
+  if (pathname.startsWith('/app/users/trainers/'))
+    return 'Gestion des formateurs';
   if (pathname.startsWith('/app/trainings/')) return 'Gestion des formations';
   if (pathname.startsWith('/app/content/')) return 'Contenu de la formation';
   if (pathname.startsWith('/app/sessions')) return 'Gestion des sessions';

@@ -113,7 +113,8 @@ export function LandingPage() {
           <div>
             <span className="eyebrow">Une expérience complète</span>
             <h2>
-              Tout ce qu’il faut pour transformer une inscription en compétences.
+              Tout ce qu’il faut pour transformer une inscription en
+              compétences.
             </h2>
           </div>
         </div>
@@ -222,8 +223,8 @@ export function LandingPage() {
             <span className="eyebrow">Retours de démonstration</span>
             <h2>Une expérience pensée pour rester simple.</h2>
             <p className="muted">
-              Témoignages fictifs affichés uniquement pour illustrer la version de
-              développement.
+              Témoignages fictifs affichés uniquement pour illustrer la version
+              de développement.
             </p>
           </div>
         </div>
@@ -353,7 +354,9 @@ const questions = [
   ],
 ] as const;
 export function FaqPage() {
-  const [openQuestion, setOpenQuestion] = useState<string | null>(questions[0][0]);
+  const [openQuestion, setOpenQuestion] = useState<string | null>(
+    questions[0][0],
+  );
   return (
     <section className="static-page faq-page">
       <span className="eyebrow">Questions fréquentes</span>
@@ -361,17 +364,25 @@ export function FaqPage() {
       <div className="faq-list">
         {questions.map(([question, answer]) => (
           <article
-            className={openQuestion === question ? 'faq-item is-open' : 'faq-item'}
+            className={
+              openQuestion === question ? 'faq-item is-open' : 'faq-item'
+            }
             key={question}
           >
             <button
               type="button"
               aria-expanded={openQuestion === question}
-              onClick={() => setOpenQuestion((current) => current === question ? null : question)}
+              onClick={() =>
+                setOpenQuestion((current) =>
+                  current === question ? null : question,
+                )
+              }
             >
               {question}
             </button>
-            <div className="faq-answer"><p>{answer}</p></div>
+            <div className="faq-answer">
+              <p>{answer}</p>
+            </div>
           </article>
         ))}
       </div>
@@ -394,7 +405,8 @@ export function ContactPage() {
     message: string;
   }>();
   const address =
-    import.meta.env.VITE_CENTER_ADDRESS ?? 'Route Manzel Chaker km 2.5 en face Magasin Général (MG) , Sfax, Tunisia';
+    import.meta.env.VITE_CENTER_ADDRESS ??
+    'Route Manzel Chaker km 2.5 en face Magasin Général (MG) , Sfax, Tunisia';
   const email = import.meta.env.VITE_CENTER_EMAIL ?? 'contact.hsa.tn@gmail.com';
   const phone = import.meta.env.VITE_CENTER_PHONE ?? '+216 70 000 000';
   const hours =
@@ -411,11 +423,15 @@ export function ContactPage() {
         </p>
         <dl className="contact-details">
           <div>
-            <dt><MapPin aria-hidden="true" size={16} /> Adresse</dt>
+            <dt>
+              <MapPin aria-hidden="true" size={16} /> Adresse
+            </dt>
             <dd>{address}</dd>
           </div>
           <div>
-            <dt><Mail aria-hidden="true" size={16} /> Email</dt>
+            <dt>
+              <Mail aria-hidden="true" size={16} /> Email
+            </dt>
             <dd>
               <a href={`mailto:${email}`}>{email}</a>
             </dd>
@@ -427,7 +443,9 @@ export function ContactPage() {
             </dd>
           </div>
           <div>
-            <dt><CalendarClock aria-hidden="true" size={16} /> Horaires</dt>
+            <dt>
+              <CalendarClock aria-hidden="true" size={16} /> Horaires
+            </dt>
             <dd>{hours}</dd>
           </div>
         </dl>
@@ -479,6 +497,11 @@ export function ContactPage() {
             {...form.register('message')}
           />
         </label>
+        <p className="muted">
+          Votre nom, votre email, l’objet et le message sont transmis à notre
+          équipe par email pour répondre à votre demande. Consultez notre{' '}
+          <Link to="/privacy">politique de confidentialité</Link>.
+        </p>
         {submissionError && (
           <p className="form-error" role="alert">
             {submissionError}

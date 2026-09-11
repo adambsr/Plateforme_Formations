@@ -12,8 +12,10 @@ export const linking: LinkingOptions<Record<string, object | undefined>> = {
       About: 'about',
       Faq: 'faq',
       Contact: 'contact',
+      Legal: 'legal/:kind',
       ResetPassword: 'reset-password',
       CheckoutReturn: 'payments/:result',
+      NotFound: '*',
     },
   },
 };

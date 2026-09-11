@@ -151,7 +151,7 @@ describe('Phase 2 public catalogue', () => {
     renderCatalogue();
 
     expect(await screen.findByRole('alert')).toHaveTextContent(
-      'Catalogue indisponible.',
+      'Le service est momentanément indisponible.',
     );
     expect(screen.getByRole('button', { name: 'Réessayer' })).toBeVisible();
   });

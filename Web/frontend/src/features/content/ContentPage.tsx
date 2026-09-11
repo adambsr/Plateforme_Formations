@@ -85,13 +85,19 @@ function ResourceView({
           </button>
           <button
             className="danger-button"
-            onClick={() =>
+            onClick={() => {
+              if (
+                !window.confirm(
+                  `Supprimer la ressource « ${resource.title} » ?`,
+                )
+              )
+                return;
               void mutate(
                 `/resources/${resource.id}`,
                 { method: 'DELETE' },
                 'Ressource supprimée.',
-              )
-            }
+              );
+            }}
           >
             Supprimer
           </button>
@@ -226,13 +232,15 @@ function LessonView({
             </button>
             <button
               className="danger-button"
-              onClick={() =>
+              onClick={() => {
+                if (!window.confirm(`Supprimer la leçon « ${lesson.title} » ?`))
+                  return;
                 void mutate(
                   `/lessons/${lesson.id}`,
                   { method: 'DELETE' },
                   'Leçon supprimée.',
-                )
-              }
+                );
+              }}
             >
               Supprimer
             </button>
@@ -342,13 +350,19 @@ function ModuleView({
             </button>
             <button
               className="danger-button"
-              onClick={() =>
+              onClick={() => {
+                if (
+                  !window.confirm(
+                    `Supprimer le module « ${module.title} » et son contenu ?`,
+                  )
+                )
+                  return;
                 void mutate(
                   `/modules/${module.id}`,
                   { method: 'DELETE' },
                   'Module supprimé.',
-                )
-              }
+                );
+              }}
             >
               Supprimer
             </button>
