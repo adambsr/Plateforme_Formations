@@ -94,6 +94,29 @@ describe('Phase 1 Web routes', () => {
       await screen.findByRole('heading', { name: 'Page introuvable' }),
     ).toBeVisible();
   });
+
+  it('shows only the requested Facebook and Instagram footer links', async () => {
+    renderAt('/about');
+
+    await screen.findByRole('heading', {
+      name: 'La formation professionnelle, rendue plus lisible.',
+    });
+    const facebook = screen.getByRole('link', {
+      name: 'High Skills Academy sur Facebook',
+    });
+    const instagram = screen.getByRole('link', {
+      name: 'High Skills Academy sur Instagram',
+    });
+    expect(facebook).toHaveAttribute(
+      'href',
+      'https://www.facebook.com/p/High-Skills-Academy-100063631059595/',
+    );
+    expect(instagram).toHaveAttribute(
+      'href',
+      'https://www.instagram.com/high_skills_academy?stkn=MWszN3lrZDI4ZjZ1ag==',
+    );
+    expect(screen.getByLabelText('Réseaux sociaux').children).toHaveLength(2);
+  });
 });
 
 describe('Phase 2 management routes', () => {

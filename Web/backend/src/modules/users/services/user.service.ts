@@ -7,6 +7,8 @@ import { hashPassword } from '../../../shared/auth/password.js';
 import { isDuplicateKeyError } from '../../../shared/database/mongo-errors.js';
 import { AppError } from '../../../shared/errors/app-error.js';
 import { RefreshSessionModel } from '../../auth/models/refresh-session.model.js';
+import { PasswordResetTokenModel } from '../../auth/models/password-reset-token.model.js';
+import { NotificationDeviceModel } from '../../notifications/models/notification-device.model.js';
 import type {
   CreateTrainerInput,
   UpdateProfileInput,
@@ -108,27 +110,27 @@ export class UserService {
     return toPublicUser(user);
   }
 
-  async disableTrainer(userId: string): Promise<PublicUser> {
+  async disableUser(userId: string, actingUserId: string): Promise<PublicUser> {
+    if (userId === actingUserId) {
+      throw new AppError(
+        409,
+        'SELF_ACCOUNT_ACTION_FORBIDDEN',
+        'You cannot deactivate your own administrator account.',
+      );
+    }
     const now = new Date();
     return mongoose.connection.transaction(async (session) => {
       const user = await UserModel.findOneAndUpdate(
-        { _id: userId, role: 'TRAINER', isActive: true },
+        { _id: userId, isActive: true },
         { $set: { isActive: false } },
         { returnDocument: 'after', session },
       ).exec();
       if (user === null) {
-        const existing = await UserModel.findOne({
-          _id: userId,
-          role: 'TRAINER',
-        })
+        const existing = await UserModel.findById(userId)
           .session(session)
           .exec();
         if (existing === null) {
-          throw new AppError(
-            404,
-            'TRAINER_NOT_FOUND',
-            'The Trainer does not exist.',
-          );
+          throw new AppError(404, 'USER_NOT_FOUND', 'The user does not exist.');
         }
         return toPublicUser(existing);
       }
@@ -138,6 +140,27 @@ export class UserService {
         { session },
       );
       return toPublicUser(user);
+    });
+  }
+
+  async deleteUser(userId: string, actingUserId: string): Promise<void> {
+    if (userId === actingUserId) {
+      throw new AppError(
+        409,
+        'SELF_ACCOUNT_ACTION_FORBIDDEN',
+        'You cannot delete your own administrator account.',
+      );
+    }
+    await mongoose.connection.transaction(async (session) => {
+      const deleted = await UserModel.findByIdAndDelete(userId, { session });
+      if (deleted === null) {
+        throw new AppError(404, 'USER_NOT_FOUND', 'The user does not exist.');
+      }
+      await Promise.all([
+        RefreshSessionModel.deleteMany({ userId }, { session }),
+        PasswordResetTokenModel.deleteMany({ userId }, { session }),
+        NotificationDeviceModel.deleteMany({ userId }, { session }),
+      ]);
     });
   }
 }

@@ -263,6 +263,41 @@ export const openApiDocument: OpenAPIV3.Document = {
         },
       },
     },
+    '/users/{id}': {
+      delete: {
+        operationId: 'deleteUser',
+        summary: 'Permanently delete a user account as an Admin',
+        tags: ['Users'],
+        security: secured,
+        parameters: [{ $ref: '#/components/parameters/UserId' }],
+        responses: {
+          '204': { description: 'User account deleted.' },
+          '401': errorResponse,
+          '403': errorResponse,
+          '404': errorResponse,
+          '409': errorResponse,
+        },
+      },
+    },
+    '/users/{id}/disable': {
+      post: {
+        operationId: 'disableUser',
+        summary: 'Deactivate any user and revoke sessions as an Admin',
+        tags: ['Users'],
+        security: secured,
+        parameters: [{ $ref: '#/components/parameters/UserId' }],
+        responses: {
+          '200': {
+            description: 'User deactivated.',
+            content: json({ $ref: '#/components/schemas/User' }),
+          },
+          '401': errorResponse,
+          '403': errorResponse,
+          '404': errorResponse,
+          '409': errorResponse,
+        },
+      },
+    },
     '/learners': {
       get: {
         operationId: 'listLearners',
@@ -383,7 +418,7 @@ export const openApiDocument: OpenAPIV3.Document = {
     '/trainers/{id}/disable': {
       post: {
         operationId: 'disableTrainer',
-        summary: 'Deactivate a Trainer and revoke sessions as an Admin',
+        summary: 'Legacy route to deactivate a Trainer as an Admin',
         tags: ['Users'],
         security: secured,
         parameters: [{ $ref: '#/components/parameters/UserId' }],
@@ -832,8 +867,11 @@ export const openApiDocument: OpenAPIV3.Document = {
         },
         responses: {
           '200': {
-            description: 'Grounded tutor answer with authorized Lesson citations.',
-            content: json({ $ref: '#/components/schemas/TutorMessageResponse' }),
+            description:
+              'Grounded tutor answer with authorized Lesson citations.',
+            content: json({
+              $ref: '#/components/schemas/TutorMessageResponse',
+            }),
           },
           default: errorResponse,
         },

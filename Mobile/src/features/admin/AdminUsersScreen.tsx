@@ -141,10 +141,10 @@ export function AdminUsersScreen() {
     }
   }
 
-  function disableTrainer(trainer: User) {
+  function deactivateUser(account: User) {
     Alert.alert(
-      'Désactiver le Formateur',
-      `${name(trainer)} ne pourra plus se connecter.`,
+      'Désactiver le compte',
+      `${name(account)} ne pourra plus se connecter.`,
       [
         { text: 'Annuler', style: 'cancel' },
         {
@@ -153,9 +153,34 @@ export function AdminUsersScreen() {
           onPress: () => {
             setSaving(true);
             setError('');
-            void request(`/trainers/${trainer.id}/disable`, { method: 'POST' })
+            void request(`/users/${account.id}/disable`, { method: 'POST' })
               .then(async () => {
-                setNotice('Compte Formateur désactivé.');
+                setNotice('Compte désactivé.');
+                await load();
+              })
+              .catch((caught: unknown) => setError(message(caught)))
+              .finally(() => setSaving(false));
+          },
+        },
+      ],
+    );
+  }
+
+  function deleteUser(account: User) {
+    Alert.alert(
+      'Supprimer le compte',
+      `Supprimer définitivement le compte de ${name(account)} ? Cette action est irréversible.`,
+      [
+        { text: 'Annuler', style: 'cancel' },
+        {
+          text: 'Supprimer',
+          style: 'destructive',
+          onPress: () => {
+            setSaving(true);
+            setError('');
+            void request(`/users/${account.id}`, { method: 'DELETE' })
+              .then(async () => {
+                setNotice('Compte supprimé.');
                 await load();
               })
               .catch((caught: unknown) => setError(message(caught)))
@@ -288,22 +313,26 @@ export function AdminUsersScreen() {
                 </View>
                 <Text style={styles.muted}>{item.email}</Text>
                 {tab === 'TRAINERS' && (
-                  <>
-                    <Button
-                      label="Modifier"
-                      onPress={() => editTrainer(item)}
-                      variant="secondary"
-                    />
-                    {item.isActive && (
-                      <Button
-                        disabled={saving}
-                        label="Désactiver"
-                        onPress={() => disableTrainer(item)}
-                        variant="danger"
-                      />
-                    )}
-                  </>
+                  <Button
+                    label="Modifier"
+                    onPress={() => editTrainer(item)}
+                    variant="secondary"
+                  />
                 )}
+                {item.isActive && (
+                  <Button
+                    disabled={saving}
+                    label="Désactiver"
+                    onPress={() => deactivateUser(item)}
+                    variant="danger"
+                  />
+                )}
+                <Button
+                  disabled={saving}
+                  label="Supprimer"
+                  onPress={() => deleteUser(item)}
+                  variant="danger"
+                />
               </View>
             ))}
             <View style={styles.pagination}>

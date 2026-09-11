@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react';
-import { Pencil, UserRoundX } from 'lucide-react';
+import { Pencil, Trash2, UserRoundX } from 'lucide-react';
 import { Link, useNavigate, useParams } from 'react-router';
 
 import { ApiError } from '../../core/api/client.js';
@@ -20,6 +20,7 @@ export function AdminUserListPage() {
   const [learnerPage, setLearnerPage] = useState(1);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
+  const [pendingUserId, setPendingUserId] = useState<string>();
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -42,6 +43,48 @@ export function AdminUserListPage() {
     // oxlint-disable-next-line react/set-state-in-effect
     void load();
   }, [load]);
+
+  const displayName = (user: User) =>
+    [user.profile.firstName, user.profile.lastName].filter(Boolean).join(' ') ||
+    user.email;
+
+  async function deactivateUser(user: User) {
+    if (
+      !window.confirm(
+        `Désactiver le compte de ${displayName(user)} ? Cette personne sera déconnectée.`,
+      )
+    )
+      return;
+    setPendingUserId(user.id);
+    setError('');
+    try {
+      await request(`/users/${user.id}/disable`, { method: 'POST' });
+      await load();
+    } catch (caught) {
+      setError(message(caught));
+    } finally {
+      setPendingUserId(undefined);
+    }
+  }
+
+  async function deleteUser(user: User) {
+    if (
+      !window.confirm(
+        `Supprimer définitivement le compte de ${displayName(user)} ? Cette action est irréversible.`,
+      )
+    )
+      return;
+    setPendingUserId(user.id);
+    setError('');
+    try {
+      await request(`/users/${user.id}`, { method: 'DELETE' });
+      await load();
+    } catch (caught) {
+      setError(message(caught));
+    } finally {
+      setPendingUserId(undefined);
+    }
+  }
 
   return (
     <section>
@@ -94,19 +137,8 @@ export function AdminUserListPage() {
                     {trainer.isActive && (
                       <button
                         className="danger-button compact-button"
-                        onClick={() => {
-                          if (
-                            !window.confirm(
-                              `Désactiver le compte de ${trainer.profile.firstName ?? trainer.email} ? Cette personne sera déconnectée.`,
-                            )
-                          )
-                            return;
-                          void request(`/trainers/${trainer.id}/disable`, {
-                            method: 'POST',
-                          })
-                            .then(load)
-                            .catch((caught) => setError(message(caught)));
-                        }}
+                        disabled={pendingUserId === trainer.id}
+                        onClick={() => void deactivateUser(trainer)}
                       >
                         <UserRoundX
                           aria-hidden="true"
@@ -116,6 +148,14 @@ export function AdminUserListPage() {
                         Désactiver
                       </button>
                     )}
+                    <button
+                      className="danger-button compact-button"
+                      disabled={pendingUserId === trainer.id}
+                      onClick={() => void deleteUser(trainer)}
+                    >
+                      <Trash2 aria-hidden="true" size={16} strokeWidth={1.9} />
+                      Supprimer
+                    </button>
                   </div>
                 </li>
               ))}
@@ -155,6 +195,30 @@ export function AdminUserListPage() {
                   >
                     {learner.isActive ? 'Actif' : 'Désactivé'}
                   </span>
+                  <div className="management-actions">
+                    {learner.isActive && (
+                      <button
+                        className="danger-button compact-button"
+                        disabled={pendingUserId === learner.id}
+                        onClick={() => void deactivateUser(learner)}
+                      >
+                        <UserRoundX
+                          aria-hidden="true"
+                          size={16}
+                          strokeWidth={1.9}
+                        />
+                        Désactiver
+                      </button>
+                    )}
+                    <button
+                      className="danger-button compact-button"
+                      disabled={pendingUserId === learner.id}
+                      onClick={() => void deleteUser(learner)}
+                    >
+                      <Trash2 aria-hidden="true" size={16} strokeWidth={1.9} />
+                      Supprimer
+                    </button>
+                  </div>
                 </li>
               ))}
             </ul>

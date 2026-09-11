@@ -139,14 +139,45 @@ export function createUserRouter(
   );
 
   router.post(
+    '/users/:id/disable',
+    authenticated,
+    requirePasswordChanged,
+    requireRoles('ADMIN'),
+    async (request, response) => {
+      response.json(
+        await userService.disableUser(
+          objectIdSchema.parse(request.params.id),
+          authenticatedPrincipal(request).userId,
+        ),
+      );
+    },
+  );
+
+  router.delete(
+    '/users/:id',
+    authenticated,
+    requirePasswordChanged,
+    requireRoles('ADMIN'),
+    async (request, response) => {
+      await userService.deleteUser(
+        objectIdSchema.parse(request.params.id),
+        authenticatedPrincipal(request).userId,
+      );
+      response.status(204).send();
+    },
+  );
+
+  // Kept for older mobile clients while they migrate to the user-wide route.
+  router.post(
     '/trainers/:id/disable',
     authenticated,
     requirePasswordChanged,
     requireRoles('ADMIN'),
     async (request, response) => {
       response.json(
-        await userService.disableTrainer(
+        await userService.disableUser(
           objectIdSchema.parse(request.params.id),
+          authenticatedPrincipal(request).userId,
         ),
       );
     },

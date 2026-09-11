@@ -362,5 +362,42 @@ integrationDescribe('Phase 1 authentication and users integration', () => {
       .select('+tokenHash')
       .exec();
     expect(persistedRefresh?.tokenHash).not.toBe(logoutRefresh);
+
+    const disposableRegistration = await request(app)
+      .post('/api/auth/register')
+      .send({
+        email: 'disposable.phase1@example.com',
+        password: 'Disposable-initial-123!',
+        firstName: 'Ada',
+        lastName: 'Lovelace',
+        client: 'WEB',
+      });
+    expect(disposableRegistration.status).toBe(201);
+    const disposableUserId = String(disposableRegistration.body.user.id);
+
+    const disabledLearner = await request(app)
+      .post(`/api/users/${disposableUserId}/disable`)
+      .set('authorization', `Bearer ${adminAccessToken}`);
+    expect(disabledLearner.status).toBe(200);
+    expect(disabledLearner.body).toMatchObject({
+      id: disposableUserId,
+      role: 'LEARNER',
+      isActive: false,
+    });
+
+    const deletedLearner = await request(app)
+      .delete(`/api/users/${disposableUserId}`)
+      .set('authorization', `Bearer ${adminAccessToken}`);
+    expect(deletedLearner.status).toBe(204);
+    expect(await UserModel.findById(disposableUserId)).toBeNull();
+    expect(
+      await RefreshSessionModel.countDocuments({ userId: disposableUserId }),
+    ).toBe(0);
+
+    const deleteSelf = await request(app)
+      .delete(`/api/users/${firstAdminSeed.id}`)
+      .set('authorization', `Bearer ${adminAccessToken}`);
+    expect(deleteSelf.status).toBe(409);
+    expect(deleteSelf.body.error.code).toBe('SELF_ACCOUNT_ACTION_FORBIDDEN');
   }, 60_000);
 });
