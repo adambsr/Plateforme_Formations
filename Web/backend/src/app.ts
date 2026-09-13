@@ -85,6 +85,8 @@ import {
 } from './modules/public-concierge/infrastructure/gemini-public-concierge.gateway.js';
 import { createNotificationRouter } from './modules/notifications/routes/notification.routes.js';
 import { NotificationService } from './modules/notifications/services/notification.service.js';
+import { createSearchRouter } from './modules/search/routes/search.routes.js';
+import { SearchService } from './modules/search/services/search.service.js';
 
 export interface AppDependencies {
   config: AppConfig;
@@ -125,7 +127,12 @@ export function createApp({
     config.application.nodeEnv === 'test'
       ? noopTransactionalEmailService
       : defaultEmailService;
-  const userService = new UserService(lifecycleEmailService, logger);
+  const notificationService = new NotificationService(config.notifications);
+  const userService = new UserService(
+    lifecycleEmailService,
+    logger,
+    notificationService,
+  );
   const fileStorage = new LocalFileStorage(
     config.uploads.directory,
     config.uploads.maxSizeMb,
@@ -133,7 +140,11 @@ export function createApp({
   const trainingService = new TrainingService(undefined, fileStorage);
   const enrollmentAccess = new EnrollmentAccessService();
   const contentService = new ContentService(fileStorage, enrollmentAccess);
-  const sessionService = new SessionService(lifecycleEmailService, logger);
+  const sessionService = new SessionService(
+    lifecycleEmailService,
+    logger,
+    notificationService,
+  );
   const paymentService = new PaymentService(
     stripeCheckoutGateway ??
       new StripeSdkCheckoutGateway(config.stripe, {
@@ -144,6 +155,7 @@ export function createApp({
     lifecycleEmailService,
     logger,
     config.application.mobileAppScheme,
+    notificationService,
   );
   const invoiceService = new InvoiceService(
     new ProtectedDocumentStorage(config.uploads.directory),
@@ -155,9 +167,10 @@ export function createApp({
     completionService,
     lifecycleEmailService,
     logger,
+    notificationService,
   );
   const attendanceService = new AttendanceService();
-  const evaluationService = new EvaluationService();
+  const evaluationService = new EvaluationService(notificationService);
   const aiEvaluationService = new AiEvaluationService(
     evaluationService,
     new TrainingAiContextService(fileStorage, config.ai.maxContextChars),
@@ -179,6 +192,7 @@ export function createApp({
     config.center,
     lifecycleEmailService,
     logger,
+    notificationService,
   );
   const feedbackService = new FeedbackService(eligibilityService);
   const costService = new CostService();
@@ -189,11 +203,12 @@ export function createApp({
     passwordResetMailService ?? defaultEmailService,
     lifecycleEmailService,
     logger,
+    notificationService,
   );
   const contactService = new ContactService(
     contactMailService ?? defaultEmailService,
   );
-  const notificationService = new NotificationService(config.notifications);
+  const searchService = new SearchService();
 
   app.disable('x-powered-by');
   app.use(requestLogging(logger));
@@ -280,6 +295,7 @@ export function createApp({
   app.use('/api', createDashboardRouter(dashboardService, tokenService));
   app.use('/api', createTutorRouter(aiTutorService, tokenService));
   app.use('/api', createNotificationRouter(notificationService, tokenService));
+  app.use('/api', createSearchRouter(searchService, tokenService));
 
   app.use(notFoundHandler);
   app.use(errorHandler);

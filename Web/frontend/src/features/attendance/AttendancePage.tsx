@@ -138,7 +138,13 @@ export function AttendancePage() {
       <div className="section-heading">
         <div>
           <span className="eyebrow">Présentiel</span>
-          <h1>{staff ? 'Gestion des présences' : 'Mon planning'}</h1>
+          <h1>
+            {user.role === 'TRAINER'
+              ? 'Mes apprenants'
+              : staff
+                ? 'Gestion des présences'
+                : 'Mon planning'}
+          </h1>
         </div>
         {sessions !== null && (
           <span className="count-badge">{sessions.total}</span>
@@ -165,7 +171,9 @@ export function AttendancePage() {
         <>
           <div className="attendance-filter content-card">
             <div>
-              <span className="filter-icon"><SlidersHorizontal aria-hidden="true" size={18} /></span>
+              <span className="filter-icon">
+                <SlidersHorizontal aria-hidden="true" size={18} />
+              </span>
               <label htmlFor="attendance-session">Session à consulter</label>
             </div>
             <Select
@@ -200,7 +208,10 @@ export function AttendancePage() {
                   >
                     {sessionStatusLabel(selected.session.status)}
                   </span>
-                  <h2><CalendarCheck2 aria-hidden="true" size={20} /> {selected.session.training.title}</h2>
+                  <h2>
+                    <CalendarCheck2 aria-hidden="true" size={20} />{' '}
+                    {selected.session.training.title}
+                  </h2>
                   <p>{selected.session.title}</p>
                 </div>
                 <strong>
@@ -239,7 +250,6 @@ export function AttendancePage() {
                             <label key={row.enrollmentId}>
                               <span>
                                 <strong>{learnerName(row.learner)}</strong>
-                                <small>{row.learner.email}</small>
                               </span>
                               <Select
                                 name={row.enrollmentId}

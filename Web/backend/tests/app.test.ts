@@ -104,6 +104,10 @@ describe('HTTP foundation', () => {
       '/costs/trainers',
       '/dashboard/overview',
       '/dashboard/financial',
+      '/search',
+      '/notifications',
+      '/notifications/unread-count',
+      '/notifications/stream',
       '/contact',
       '/trainings/{id}/thumbnail',
     ]) {
@@ -133,10 +137,15 @@ describe('HTTP foundation', () => {
   });
 
   it('protects user administration routes', async () => {
-    const response = await request(testApp()).get('/api/users');
+    const [response, stream] = await Promise.all([
+      request(testApp()).get('/api/users'),
+      request(testApp()).get('/api/notifications/stream'),
+    ]);
 
     expect(response.status).toBe(401);
     expect(response.body.error.code).toBe('AUTHENTICATION_REQUIRED');
+    expect(stream.status).toBe(401);
+    expect(stream.body.error.code).toBe('AUTHENTICATION_REQUIRED');
   });
 
   it('validates and delivers public contact messages without exposing mail internals', async () => {

@@ -70,6 +70,7 @@ import { BackToTop } from '../shared/components/BackToTop.js';
 import { DocumentTitle } from '../shared/components/DocumentTitle.js';
 import { AnalyticsPageTracker } from '../core/analytics/AnalyticsPageTracker.js';
 import { AnalyticsConsentBanner } from '../core/analytics/AnalyticsConsentBanner.js';
+import { NotificationCenterPage } from '../features/notifications/NotificationCenterPage.js';
 
 export function App() {
   return (
@@ -114,6 +115,10 @@ export function App() {
           element={<SystemStatusPage kind="session-expired" />}
         />
         <Route
+          path="/status/rate-limited"
+          element={<SystemStatusPage kind="rate-limited" />}
+        />
+        <Route
           path="/status/account-unavailable"
           element={<SystemStatusPage kind="account-unavailable" />}
         />
@@ -139,6 +144,7 @@ export function App() {
           <Route path="/app" element={<RoleLayout />}>
             <Route index element={<RoleIndexRedirect />} />
             <Route path="profile" element={<ProfilePage />} />
+            <Route path="notifications" element={<NotificationCenterPage />} />
             <Route path="catalogue" element={<CataloguePage embedded />} />
             <Route element={<RequireRole roles={['ADMIN', 'TRAINER']} />}>
               <Route

@@ -12,6 +12,7 @@ export type StatusKind =
   | 'server-error'
   | 'unavailable'
   | 'session-expired'
+  | 'rate-limited'
   | 'account-unavailable'
   | 'resource-unavailable';
 
@@ -51,6 +52,12 @@ const statusCopy: Record<
     title: 'Votre session a expiré',
     message:
       'Reconnectez-vous pour reprendre votre activité en toute sécurité.',
+  },
+  'rate-limited': {
+    code: 'Patientez',
+    title: 'Trop de tentatives',
+    message:
+      'Nous limitons temporairement les vérifications de session. Réessayez dans quelques instants ou reconnectez-vous.',
   },
   'account-unavailable': {
     code: 'Compte',
@@ -95,7 +102,8 @@ export function SystemStatusPage({
         <p>{copy.message}</p>
         <div className="system-actions">
           {(kind === 'authentication-required' ||
-            kind === 'session-expired') && (
+            kind === 'session-expired' ||
+            kind === 'rate-limited') && (
             <Link
               className="primary-button"
               to="/login"
@@ -104,7 +112,9 @@ export function SystemStatusPage({
               Se connecter
             </Link>
           )}
-          {(kind === 'unavailable' || kind === 'server-error') && (
+          {(kind === 'unavailable' ||
+            kind === 'server-error' ||
+            kind === 'rate-limited') && (
             <button
               className="primary-button"
               type="button"

@@ -164,6 +164,45 @@ suite('Phase 11 costs and dashboard integration', () => {
     ).rejects.toMatchObject({ status: 422, code: 'TRAINING_SESSION_MISMATCH' });
   });
 
+  it('returns a trainer-only learner total and real recent activity', async () => {
+    const { trainer, learnerUser, training, otherSession } = await setup();
+    await EnrollmentModel.create({
+      learnerId: learnerUser._id,
+      trainingId: training._id,
+      sessionId: null,
+      paymentId: new mongoose.Types.ObjectId(),
+    });
+    await EnrollmentModel.create({
+      learnerId: learnerUser._id,
+      trainingId: otherSession.trainingId,
+      sessionId: otherSession._id,
+      paymentId: new mongoose.Types.ObjectId(),
+    });
+    const trainerPrincipal: AuthenticatedPrincipal = {
+      userId: String(trainer._id),
+      role: 'TRAINER',
+      mustChangePassword: false,
+    };
+    const result = await dashboard.trainerWorkspace(trainerPrincipal);
+    expect(result.learnerCount).toBe(1);
+    expect(result.activity).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          type: 'ENROLLMENT',
+          description: expect.stringContaining('Learner'),
+        }),
+        expect.objectContaining({ type: 'SESSION' }),
+      ]),
+    );
+    await expect(dashboard.trainerWorkspace(admin)).rejects.toMatchObject({
+      status: 403,
+      code: 'TRAINER_DASHBOARD_REQUIRED',
+    });
+    await expect(dashboard.trainerWorkspace(learner)).rejects.toMatchObject({
+      status: 403,
+    });
+  });
+
   it('uses paid revenue, inclusive Tunis dates, full months, explicit costs, and null at zero revenue', async () => {
     const { trainer, learnerUser, training } = await setup();
     await TrainerCostModel.create([
@@ -425,7 +464,7 @@ suite('Phase 11 costs and dashboard integration', () => {
     if (!completedEnrollment || !inactiveEnrollment) {
       throw new Error('Enrollment fixtures were not created.');
     }
-    await EnrollmentModel.updateOne(
+    await EnrollmentModel.collection.updateOne(
       { _id: inactiveEnrollment._id },
       { $set: { createdAt: new Date('2026-06-01T00:00:00.000Z') } },
     );

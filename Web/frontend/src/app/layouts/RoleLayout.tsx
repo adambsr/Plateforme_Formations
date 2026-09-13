@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link, NavLink, Outlet, useLocation } from 'react-router';
 import awardIcon from 'lucide-static/icons/award.svg';
 import calendarDaysIcon from 'lucide-static/icons/calendar-days.svg';
@@ -22,12 +22,57 @@ import blueLogo from '../../assets/hsa-logo-blue.png';
 import { useAuth } from '../../core/auth/AuthContext.js';
 import { UserMenu } from '../../shared/components/UserMenu.js';
 import { Icon } from '../../shared/components/Icon.js';
+import { HeaderSearch } from '../../features/notifications/HeaderSearch.js';
+import { NotificationBell } from '../../features/notifications/NotificationBell.js';
 
 export function RoleLayout() {
   const { user, logout } = useAuth();
   const location = useLocation();
   const [open, setOpen] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
+  const sidebar = useRef<HTMLElement>(null);
+  const menuButton = useRef<HTMLButtonElement>(null);
+  const [mobile, setMobile] = useState(
+    () => window.matchMedia('(max-width: 1023px)').matches,
+  );
+  useEffect(() => {
+    const media = window.matchMedia('(max-width: 1023px)');
+    const change = () => {
+      setMobile(media.matches);
+      setOpen(false);
+    };
+    media.addEventListener('change', change);
+    return () => media.removeEventListener('change', change);
+  }, []);
+  useEffect(() => {
+    if (!open) return;
+    const previousOverflow = document.body.style.overflow;
+    const trigger = menuButton.current;
+    document.body.style.overflow = 'hidden';
+    sidebar.current?.querySelector<HTMLButtonElement>('.drawer-close')?.focus();
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setOpen(false);
+      if (event.key !== 'Tab') return;
+      const items = Array.from(
+        sidebar.current?.querySelectorAll<HTMLElement>('a[href], button') ?? [],
+      ).filter((item) => item.getClientRects().length > 0);
+      const first = items[0],
+        last = items[items.length - 1];
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last?.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first?.focus();
+      }
+    };
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      document.removeEventListener('keydown', onKey);
+      trigger?.focus();
+    };
+  }, [open]);
   useEffect(() => {
     // Navigation changes close the mobile drawer after route activation.
     // oxlint-disable-next-line react/set-state-in-effect
@@ -41,7 +86,7 @@ export function RoleLayout() {
     LEARNER: 'Espace Apprenant',
   }[user.role];
   const link = (to: string, label: string, icon: string) => (
-    <NavLink to={to} title={collapsed ? label : undefined}>
+    <NavLink to={to} aria-label={label} title={collapsed ? label : undefined}>
       <span className="nav-icon" aria-hidden="true">
         <Icon src={icon} />
       </span>
@@ -53,22 +98,33 @@ export function RoleLayout() {
     <div
       className={collapsed ? 'portal-shell sidebar-collapsed' : 'portal-shell'}
     >
-      <header className="portal-header">
+      <a href="#dashboard-main" className="hsa-skip-link">
+        Aller au contenu
+      </a>
+      <header className="portal-header" inert={open}>
         <div className="portal-header-start">
           <button
             className="icon-button mobile-menu"
             type="button"
             aria-label="Ouvrir le menu"
             aria-expanded={open}
+            aria-controls="dashboard-navigation"
+            ref={menuButton}
             onClick={() => setOpen(true)}
           >
             <Icon src={menuIcon} size={21} />
           </button>
-          <Link className="portal-logo" to="/" aria-label="Accueil High Skills Academy">
+          <Link
+            className="portal-logo"
+            to="/"
+            aria-label="Accueil High Skills Academy"
+          >
             <img src={blueLogo} alt="High Skills Academy" />
           </Link>
         </div>
+        <HeaderSearch />
         <div className="portal-account" aria-label={roleLabel}>
+          <NotificationBell />
           <UserMenu />
         </div>
       </header>
@@ -83,6 +139,12 @@ export function RoleLayout() {
         )}
         <aside
           className={open ? 'portal-sidebar drawer-open' : 'portal-sidebar'}
+          id="dashboard-navigation"
+          ref={sidebar}
+          inert={mobile && !open}
+          role={mobile ? 'dialog' : undefined}
+          aria-modal={mobile && open ? true : undefined}
+          aria-label={mobile ? 'Navigation' : undefined}
         >
           <div className="sidebar-heading">
             <span className="nav-label">Navigation</span>
@@ -113,13 +175,20 @@ export function RoleLayout() {
             </button>
           </div>
           <nav className="portal-nav" aria-label="Navigation principale">
+            <span className="hsa-nav-group nav-label">{roleLabel}</span>
             {user.role === 'ADMIN' &&
               link('/app/dashboard', 'Tableau de bord', layoutDashboardIcon)}
             {user.role === 'TRAINER' &&
               link('/app/trainer', 'Tableau de bord', layoutDashboardIcon)}
             {user.role === 'LEARNER' &&
               link('/app/learner', 'Tableau de bord', layoutDashboardIcon)}
-            {link('/app/catalogue', 'Catalogue', searchIcon)}
+            <span className="hsa-nav-group nav-label">
+              {user.role === 'LEARNER'
+                ? 'Mon apprentissage'
+                : 'Gestion pédagogique'}
+            </span>
+            {user.role !== 'TRAINER' &&
+              link('/app/catalogue', 'Catalogue', searchIcon)}
             {(user.role === 'ADMIN' || user.role === 'TRAINER') && (
               <>
                 {link(
@@ -127,32 +196,46 @@ export function RoleLayout() {
                   user.role === 'ADMIN' ? 'Formations' : 'Mes formations',
                   graduationCapIcon,
                 )}
-                {link('/app/sessions', 'Sessions', calendarDaysIcon)}
+                {link(
+                  '/app/sessions',
+                  user.role === 'TRAINER' ? 'Mes sessions' : 'Sessions',
+                  calendarDaysIcon,
+                )}
               </>
             )}
             {link(
               '/app/attendance',
-              user.role === 'LEARNER' ? 'Mon planning' : 'Présences',
+              user.role === 'LEARNER'
+                ? 'Mon planning'
+                : user.role === 'TRAINER'
+                  ? 'Mes apprenants'
+                  : 'Présences',
               clipboardCheckIcon,
             )}
-            {link('/app/evaluations', 'Évaluations', listChecksIcon)}
             {link(
-              '/app/certificates',
-              user.role === 'ADMIN'
-                ? 'Certificats & satisfaction'
-                : 'Certificats',
-              awardIcon,
+              '/app/evaluations',
+              user.role === 'TRAINER' ? 'Mes évaluations' : 'Évaluations',
+              listChecksIcon,
             )}
+            {user.role === 'ADMIN' &&
+              link(
+                '/app/certificates',
+                'Certificats & satisfaction',
+                awardIcon,
+              )}
             {user.role === 'LEARNER' &&
               link('/app/progress', 'Ma progression', trendingUpIcon)}
             {user.role === 'ADMIN' &&
               link('/app/users', 'Utilisateurs', usersRoundIcon)}
-            {(user.role === 'ADMIN' || user.role === 'LEARNER') &&
-              link(
-                '/app/payments',
-                user.role === 'ADMIN' ? 'Paiements' : 'Mes achats',
-                creditCardIcon,
-              )}
+            {user.role === 'ADMIN' &&
+              link('/app/payments', 'Paiements', creditCardIcon)}
+            {user.role === 'LEARNER' && (
+              <>
+                <span className="hsa-nav-group nav-label">Mon espace</span>
+                {link('/app/certificates', 'Mes certifications', awardIcon)}
+                {link('/app/payments', 'Mes achats', creditCardIcon)}
+              </>
+            )}
           </nav>
           <div className="sidebar-footer">
             {link('/app/profile', 'Mon profil', userRoundIcon)}
@@ -168,7 +251,12 @@ export function RoleLayout() {
             </button>
           </div>
         </aside>
-        <main className="portal-content">
+        <main
+          className="portal-content"
+          id="dashboard-main"
+          tabIndex={-1}
+          inert={open}
+        >
           <Outlet />
         </main>
       </div>

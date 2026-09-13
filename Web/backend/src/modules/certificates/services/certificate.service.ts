@@ -17,6 +17,7 @@ import { SessionScheduleModel } from '../../sessions/models/session-schedule.mod
 import { TrainingSessionModel } from '../../sessions/models/training-session.model.js';
 import { TrainingModel } from '../../trainings/models/training.model.js';
 import { UserModel } from '../../users/models/user.model.js';
+import type { NotificationService } from '../../notifications/services/notification.service.js';
 import type {
   CertificateListInput,
   GenerateCertificateInput,
@@ -48,6 +49,7 @@ export class CertificateService {
   readonly #issuer: AppConfig['center'];
   readonly #mail: TransactionalEmailService;
   readonly #logger: Logger;
+  readonly #notifications: NotificationService | undefined;
 
   constructor(
     eligibility: EligibilityService,
@@ -55,12 +57,14 @@ export class CertificateService {
     issuer: AppConfig['center'],
     mail: TransactionalEmailService,
     logger: Logger,
+    notifications?: NotificationService,
   ) {
     this.#eligibility = eligibility;
     this.#storage = storage;
     this.#issuer = issuer;
     this.#mail = mail;
     this.#logger = logger;
+    this.#notifications = notifications;
   }
 
   async list(principal: AuthenticatedPrincipal, input: CertificateListInput) {
@@ -214,6 +218,35 @@ export class CertificateService {
     }
     certificate = await this.#ensurePdf(certificate);
     if (created) {
+      await deliverBestEffort(
+        this.#logger,
+        'certificate-in-app-notification',
+        async () => {
+          await this.#notifications?.createInApp({
+            recipientUserId: String(certificate.learnerId),
+            type: 'CERTIFICATE_AVAILABLE',
+            title: 'Certificat disponible',
+            message: `Félicitations ! Votre certificat pour « ${certificate.training.title} » est maintenant disponible.`,
+            link: '/app/certificates',
+            dedupeKey: `certificate:${String(certificate._id)}`,
+            metadata: { certificateId: String(certificate._id) },
+          });
+        },
+      );
+      await deliverBestEffort(
+        this.#logger,
+        'admin-certificate-notification',
+        async () => {
+          await this.#notifications?.notifyAdmins({
+            type: 'CERTIFICATE_ISSUED',
+            title: 'Certificat émis',
+            message: `Le certificat ${certificate.number} a été émis pour « ${certificate.training.title} ».`,
+            link: '/app/certificates',
+            dedupeKey: `certificate:${String(certificate._id)}`,
+            metadata: { certificateId: String(certificate._id) },
+          });
+        },
+      );
       await deliverBestEffort(this.#logger, 'certificate-awarded', () =>
         this.#mail.sendCertificateAwarded({
           email: certificate.learner.email,

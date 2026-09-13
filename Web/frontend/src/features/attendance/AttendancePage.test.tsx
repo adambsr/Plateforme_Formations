@@ -1,6 +1,6 @@
-import { render, screen } from '@testing-library/react';
+import { cleanup, render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { AttendancePage } from './AttendancePage.js';
 
@@ -18,6 +18,8 @@ beforeEach(() => {
   request.mockReset();
   currentUser = { id: 'learner-1', role: 'LEARNER' };
 });
+
+afterEach(cleanup);
 
 describe('Phase 7 attendance and learner schedule UI', () => {
   it('shows missing Attendance distinctly from ABSENT', async () => {
@@ -101,5 +103,76 @@ describe('Phase 7 attendance and learner schedule UI', () => {
 
     expect(await screen.findByText(/Aucune session concernée/i)).toBeVisible();
     expect(screen.getByText(/auxquelles vous êtes affecté/i)).toBeVisible();
+  });
+
+  it('shows learner names to trainers while retaining attendance controls', async () => {
+    currentUser = { id: 'trainer-1', role: 'TRAINER' };
+    request.mockImplementation((path: string) => {
+      if (path.startsWith('/sessions?'))
+        return Promise.resolve({
+          items: [
+            {
+              id: 'session-1',
+              training: { id: 'training-1', title: 'Atelier' },
+              title: 'Groupe',
+              assignedTrainers: [{ id: 'trainer-1' }],
+            },
+          ],
+          page: 1,
+          pageSize: 12,
+          total: 1,
+        });
+      return Promise.resolve({
+        session: {
+          id: 'session-1',
+          title: 'Groupe',
+          status: 'IN_PROGRESS',
+          training: { id: 'training-1', title: 'Atelier' },
+        },
+        minimumAttendancePercent: 80,
+        immutable: false,
+        canRecord: true,
+        schedules: [
+          {
+            id: 'schedule-1',
+            startAt: '2026-08-22T08:00:00.000Z',
+            endAt: '2026-08-22T10:00:00.000Z',
+            location: 'Centre',
+          },
+        ],
+        roster: [
+          {
+            enrollmentId: 'enrollment-1',
+            learner: {
+              id: 'learner-1',
+              email: 'amina@example.com',
+              firstName: 'Amina',
+              lastName: 'Ben Ali',
+            },
+            presentCount: 0,
+            recordedCount: 0,
+            totalScheduleCount: 1,
+            attendancePercentage: 0,
+            attendanceCoverageComplete: false,
+            meetsAttendanceThreshold: false,
+            isComplete: false,
+            records: [],
+          },
+        ],
+      });
+    });
+    render(
+      <MemoryRouter>
+        <AttendancePage />
+      </MemoryRouter>,
+    );
+    expect(
+      await screen.findByRole('heading', { name: 'Mes apprenants' }),
+    ).toBeVisible();
+    expect(screen.getByText('Amina Ben Ali')).toBeVisible();
+    expect(screen.queryByText('amina@example.com')).not.toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'Enregistrer cette date' }),
+    ).toBeEnabled();
   });
 });

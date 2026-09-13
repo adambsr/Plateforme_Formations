@@ -11,6 +11,7 @@ import { TrainingCostModel } from '../../costs/models/training-cost.model.js';
 import { TrainerCostModel } from '../../costs/models/trainer-cost.model.js';
 import { EnrollmentModel } from '../../enrollments/models/enrollment.model.js';
 import { EvaluationAttemptModel } from '../../evaluations/models/evaluation-attempt.model.js';
+import { EvaluationModel } from '../../evaluations/models/evaluation.model.js';
 import { FeedbackModel } from '../../feedback/models/feedback.model.js';
 import { PaymentModel } from '../../payments/models/payment.model.js';
 import { LessonProgressModel } from '../../progress/models/lesson-progress.model.js';
@@ -54,6 +55,23 @@ function requireLearner(principal: AuthenticatedPrincipal): void {
   }
 }
 
+function requireTrainer(principal: AuthenticatedPrincipal): void {
+  if (principal.mustChangePassword) {
+    throw new AppError(
+      403,
+      'PASSWORD_CHANGE_REQUIRED',
+      'The temporary password must be changed before continuing.',
+    );
+  }
+  if (principal.role !== 'TRAINER') {
+    throw new AppError(
+      403,
+      'TRAINER_DASHBOARD_REQUIRED',
+      'Only a Trainer can view this teaching workspace.',
+    );
+  }
+}
+
 const INACTIVITY_DAYS = 30;
 
 function period(range: TunisDateRange) {
@@ -79,6 +97,115 @@ export class DashboardService {
 
   constructor(now: () => Date = () => new Date()) {
     this.now = now;
+  }
+
+  async trainerWorkspace(principal: AuthenticatedPrincipal) {
+    requireTrainer(principal);
+    const trainerId = new Types.ObjectId(principal.userId);
+    const [ownedTrainingIds, assignedSessionLinks] = await Promise.all([
+      TrainingModel.find({ ownerTrainerId: trainerId }).distinct('_id'),
+      TrainingSessionModel.find({ assignedTrainerIds: trainerId })
+        .select({ _id: 1, trainingId: 1 })
+        .lean()
+        .exec(),
+    ]);
+    const sessionIds = assignedSessionLinks.map((row) => row._id);
+    const managedTrainingIds = [
+      ...new Map(
+        [
+          ...ownedTrainingIds,
+          ...assignedSessionLinks.map((row) => row.trainingId),
+        ].map((id) => [String(id), id]),
+      ).values(),
+    ];
+    const enrollmentFilter = {
+      $or: [
+        { trainingId: { $in: ownedTrainingIds } },
+        { sessionId: { $in: sessionIds } },
+      ],
+    };
+    const learnerIds = await EnrollmentModel.distinct(
+      'learnerId',
+      enrollmentFilter,
+    );
+    const [enrollments, attempts, sessions, learners, trainings, evaluations] =
+      await Promise.all([
+        EnrollmentModel.find(enrollmentFilter)
+          .sort({ createdAt: -1 })
+          .limit(8)
+          .lean()
+          .exec(),
+        EvaluationAttemptModel.find({
+          trainingId: { $in: ownedTrainingIds },
+          status: { $ne: 'IN_PROGRESS' },
+          submittedAt: { $exists: true },
+        })
+          .sort({ submittedAt: -1 })
+          .limit(8)
+          .lean()
+          .exec(),
+        TrainingSessionModel.find({ assignedTrainerIds: trainerId })
+          .sort({ updatedAt: -1 })
+          .limit(8)
+          .lean()
+          .exec(),
+        UserModel.find({ _id: { $in: learnerIds } })
+          .lean()
+          .exec(),
+        TrainingModel.find({ _id: { $in: managedTrainingIds } })
+          .lean()
+          .exec(),
+        EvaluationModel.find({ ownerTrainerId: trainerId }).lean().exec(),
+      ]);
+    const userById = new Map(learners.map((row) => [String(row._id), row]));
+    const trainingById = new Map(
+      trainings.map((row) => [String(row._id), row]),
+    );
+    const evaluationById = new Map(
+      evaluations.map((row) => [String(row._id), row]),
+    );
+    const name = (userId: Types.ObjectId) => {
+      const learner = userById.get(String(userId));
+      return learner === undefined
+        ? 'Un apprenant'
+        : [learner.profile.firstName, learner.profile.lastName]
+            .filter(Boolean)
+            .join(' ') || learner.email;
+    };
+    const activity = [
+      ...enrollments.map((row) => ({
+        id: `enrollment-${String(row._id)}`,
+        type: 'ENROLLMENT' as const,
+        title: 'Nouvelle inscription',
+        description: `${name(row.learnerId)} · ${trainingById.get(String(row.trainingId))?.title ?? 'Formation'}`,
+        occurredAt: row.createdAt.toISOString(),
+      })),
+      ...attempts.map((row) => ({
+        id: `attempt-${String(row._id)}`,
+        type: 'EVALUATION' as const,
+        title: 'Évaluation soumise',
+        description: `${name(row.learnerId)} · ${evaluationById.get(String(row.evaluationId))?.title ?? 'Évaluation'}`,
+        occurredAt: (row.submittedAt ?? row.updatedAt).toISOString(),
+      })),
+      ...sessions.map((row) => ({
+        id: `session-${String(row._id)}`,
+        type: 'SESSION' as const,
+        title:
+          row.status === 'COMPLETED'
+            ? 'Session terminée'
+            : row.status === 'CANCELLED'
+              ? 'Session annulée'
+              : 'Session mise à jour',
+        description: `${trainingById.get(String(row.trainingId))?.title ?? 'Formation'} · ${row.title}`,
+        occurredAt: row.updatedAt.toISOString(),
+      })),
+    ]
+      .sort(
+        (left, right) =>
+          Date.parse(right.occurredAt) - Date.parse(left.occurredAt),
+      )
+      .slice(0, 6);
+    return { learnerCount: learnerIds.length, activity };
   }
 
   async recommendations(principal: AuthenticatedPrincipal) {
@@ -207,9 +334,9 @@ export class DashboardService {
           reason:
             match === undefined
               ? candidate.enrollmentCount > 0
-                ? 'Populaire aupr\és des apprenants de la plateforme.'
-                : 'Une nouvelle formation \u00e0 d\écouvrir.'
-              : `Dans la continuit\é de \u00ab ${match.latestTrainingTitle} \u00bb.`,
+                ? 'Populaire auprès des apprenants de la plateforme.'
+                : 'Une nouvelle formation à découvrir.'
+              : `Dans la continuité de « ${match.latestTrainingTitle} ».`,
         };
       })
       .sort(
@@ -218,9 +345,7 @@ export class DashboardService {
           right.createdAt.getTime() - left.createdAt.getTime(),
       )
       .slice(0, 3)
-      .map(({ createdAt: _createdAt, ...value }) =>
-        value,
-      );
+      .map(({ createdAt: _createdAt, ...value }) => value);
     return {
       strategy: 'HISTORY_AND_POPULARITY' as const,
       recommendations,

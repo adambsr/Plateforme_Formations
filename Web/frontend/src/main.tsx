@@ -5,6 +5,7 @@ import { App } from './app/App.tsx';
 import { AuthProvider } from './core/auth/AuthProvider.tsx';
 import { AppErrorBoundary } from './features/system/SystemPages.tsx';
 import './shared/styles/global.css';
+import './shared/styles/dashboard.css';
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

@@ -1,11 +1,28 @@
+import { useCallback, useEffect, useState, type FormEvent } from 'react';
 import {
-  useCallback,
-  useEffect,
-  useMemo,
-  useState,
-  type FormEvent,
-} from 'react';
-import { CalendarRange } from 'lucide-react';
+  CalendarDays,
+  Users,
+  GraduationCap,
+  CreditCard,
+  ChartNoAxesCombined,
+  ClipboardCheck,
+  Wallet,
+  BookOpen,
+  Award,
+  Pencil,
+  Plus,
+  Trash2,
+  Tags,
+} from 'lucide-react';
+import {
+  DashboardHero,
+  DashboardStatCard,
+  DashboardSectionHeader,
+  DashboardLoadingState,
+  DashboardErrorState,
+  QuickActionCard,
+  DashboardModal,
+} from './DashboardComponents.js';
 
 import { ApiError } from '../../core/api/client.js';
 import { useAuth } from '../../core/auth/AuthContext.js';
@@ -47,17 +64,17 @@ type DashboardData = {
   learningInsights: LearningInsights;
 };
 
+const rangeEnd = new Date();
+rangeEnd.setUTCMonth(rangeEnd.getUTCMonth() + 1, 0);
+
+const OVERALL_RANGE = {
+  from: '1970-01-01',
+  to: rangeEnd.toISOString().slice(0, 10),
+} as const;
+
 export function DashboardPage() {
-  const { request } = useAuth();
-  const initial = useMemo(() => {
-    const now = new Date();
-    const year = now.getFullYear();
-    return {
-      from: `${year}-01-01`,
-      to: `${year}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`,
-    };
-  }, []);
-  const [range, setRange] = useState(initial);
+  const { request, user } = useAuth();
+  const range = OVERALL_RANGE;
   const [data, setData] = useState<DashboardData>();
   const [options, setOptions] = useState<{
     trainers: PaginatedUsers['items'];
@@ -72,6 +89,8 @@ export function DashboardPage() {
   const [trainerCostPageNumber, setTrainerCostPageNumber] = useState(1);
   const [trainingCostPageNumber, setTrainingCostPageNumber] = useState(1);
   const [editing, setEditing] = useState<TrainingCost>();
+  const [monthlyModalOpen, setMonthlyModalOpen] = useState(false);
+  const [expenseModalOpen, setExpenseModalOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -90,7 +109,7 @@ export function DashboardPage() {
         request<Profitability>(`/dashboard/profitability?${query}`),
         request<LearningInsights>(`/dashboard/learning-insights?${query}`),
         request<PaginatedUsers>('/trainers?pageSize=100'),
-        request<Page<Training>>('/trainings?view=MANAGED&pageSize=100'),
+        loadAllManagedTrainings(request),
         request<PaginatedSessions>('/sessions?view=MANAGED&pageSize=100'),
         request<Page<TrainerCost>>(
           `/costs/trainers?page=${trainerCostPageNumber}&pageSize=8`,
@@ -145,6 +164,7 @@ export function DashboardPage() {
         },
       );
       setNotice('Coût mensuel enregistré.');
+      setMonthlyModalOpen(false);
       await load();
     } catch (caught) {
       setError(message(caught));
@@ -170,6 +190,7 @@ export function DashboardPage() {
         { method: editing ? 'PUT' : 'POST', body: JSON.stringify(body) },
       );
       setEditing(undefined);
+      setExpenseModalOpen(false);
       setNotice('Dépense enregistrée.');
       await load();
     } catch (caught) {
@@ -190,131 +211,73 @@ export function DashboardPage() {
   }
 
   return (
-    <section>
-      <div className="section-heading">
-        <div>
-          <span className="eyebrow">Pilotage du centre</span>
-          <h1>Tableau de bord</h1>
-        </div>
-      </div>
-      <div className="dashboard-range" aria-label="Période d'analyse">
-        <span className="filter-icon"><CalendarRange aria-hidden="true" size={19} /></span>
-        <label className="date-field">
-          Début
-          <input
-            aria-label="Du"
-            type="date"
-            value={range.from}
-            onChange={(event) =>
-              setRange({ ...range, from: event.target.value })
-            }
-            required
-          />
-        </label>
-        <label className="date-field">
-          Fin
-          <input
-            aria-label="Au"
-            type="date"
-            value={range.to}
-            onChange={(event) => setRange({ ...range, to: event.target.value })}
-            required
-          />
-        </label>
-      </div>
+    <section className="hsa-dashboard hsa-admin-dashboard">
+      <DashboardHero
+        role="ADMIN"
+        name={user?.profile.firstName || 'Admin'}
+        description="Gérez la plateforme, suivez les indicateurs et accompagnez la réussite de votre centre de formation."
+      />
+      <nav className="hsa-section-nav" aria-label="Sections du tableau de bord">
+        <a href="#platform-overview">Vue d’ensemble</a>
+        <a href="#learning-insights">Suivi pédagogique</a>
+        <a href="#dashboard-finances">Finances</a>
+        <a href="#dashboard-costs">Gestion des coûts</a>
+      </nav>
       {notice && <p className="success-message">{notice}</p>}
-      {error && (
-        <p className="form-error" role="alert">
-          {error}
-        </p>
-      )}
+      {error && <DashboardErrorState error={error} retry={load} />}
       {loading ? (
-        <p className="muted">Calcul des indicateurs…</p>
+        <DashboardLoadingState />
       ) : data ? (
         <DashboardResults data={data} trainings={options.trainings} />
       ) : null}
+      <DashboardSectionHeader
+        id="dashboard-costs"
+        title="Gestion des coûts"
+        description="Enregistrez les coûts mensuels des formateurs et les dépenses des formations."
+        icon={Wallet}
+      />
       <div className="dashboard-management">
-        <form
-          className="content-card"
-          onSubmit={(event) => void saveMonthly(event)}
-        >
-          <h2>Coût mensuel formateur</h2>
-          <label>
-            Formateur
-            <Select name="trainerId" required>
-              <option value="">Choisir</option>
-              {options.trainers.map((trainer) => (
-                <option key={trainer.id} value={trainer.id}>
-                  {[trainer.profile.firstName, trainer.profile.lastName]
-                    .filter(Boolean)
-                    .join(' ') || trainer.email}
-                </option>
-              ))}
-            </Select>
-          </label>
-          <label className="date-field">
-            Période
-            <input
-              name="period"
-              type="month"
-              defaultValue={`${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}`}
-              required
-            />
-          </label>
-          <div className="form-grid">
-            <label>
-              Année
-              <input
-                name="year"
-                type="number"
-                min="2000"
-                max="2100"
-                defaultValue={new Date().getFullYear()}
-                required
-              />
-            </label>
-            <label>
-              Mois
-              <input
-                name="month"
-                type="number"
-                min="1"
-                max="12"
-                defaultValue={new Date().getMonth() + 1}
-                required
-              />
-            </label>
+        <article className="content-card hsa-cost-card">
+          <div className="hsa-cost-heading">
+            <div>
+              <span className="hsa-icon hsa-tone-blue">
+                <Users aria-hidden="true" />
+              </span>
+              <div>
+                <h2>Coûts mensuels formateurs</h2>
+                <p>Rémunérations mensuelles enregistrées</p>
+              </div>
+            </div>
+            <button
+              className="primary-button compact-button"
+              type="button"
+              onClick={() => setMonthlyModalOpen(true)}
+            >
+              <Plus aria-hidden="true" size={16} /> Ajouter un coût
+            </button>
           </div>
-          <label>
-            Montant EUR
-            <input
-              name="amount"
-              type="number"
-              min="0.001"
-              step="0.001"
-              required
-            />
-          </label>
-          <label>
-            Note
-            <textarea name="note" maxLength={1000} />
-          </label>
-          <button className="primary-button" disabled={saving}>
-            Enregistrer
-          </button>
           {trainerCosts.length === 0 ? (
             <p className="muted">Aucun coût mensuel.</p>
           ) : (
-            <div className="dashboard-table">
+            <CostTable
+              label="Coûts mensuels des formateurs"
+              headers={['Formateur', 'Période', 'Note', 'Montant']}
+            >
               {trainerCosts.map((cost) => (
-                <div key={cost.id}>
-                  <span>
-                    {cost.trainer.email} · {cost.month}/{cost.year}
-                  </span>
-                  <strong>{money(cost.amountMinor)}</strong>
-                </div>
+                <tr key={cost.id}>
+                  <th scope="row">
+                    {[cost.trainer.firstName, cost.trainer.lastName]
+                      .filter(Boolean)
+                      .join(' ') || cost.trainer.email}
+                  </th>
+                  <td>
+                    {String(cost.month).padStart(2, '0')}/{cost.year}
+                  </td>
+                  <td>{cost.note || '—'}</td>
+                  <td className="hsa-amount">{money(cost.amountMinor)}</td>
+                </tr>
               ))}
-            </div>
+            </CostTable>
           )}
           {trainerCostPage !== undefined && (
             <Pagination
@@ -325,116 +288,75 @@ export function DashboardPage() {
               label="Pagination des coûts formateurs"
             />
           )}
-        </form>
-        <form
-          className="content-card"
-          key={editing?.id ?? 'create'}
-          onSubmit={(event) => void saveExplicit(event)}
-        >
-          <h2>
-            {editing ? 'Modifier la dépense' : 'Nouvelle dépense formation'}
-          </h2>
-          <label>
-            Formation
-            <Select
-              name="trainingId"
-              defaultValue={editing?.training.id ?? ''}
-              required
+        </article>
+        <article className="content-card hsa-cost-card">
+          <div className="hsa-cost-heading">
+            <div>
+              <span className="hsa-icon hsa-tone-orange">
+                <Wallet aria-hidden="true" />
+              </span>
+              <div>
+                <h2>Dépenses formations</h2>
+                <p>Dépenses variables par formation</p>
+              </div>
+            </div>
+            <button
+              className="primary-button compact-button"
+              type="button"
+              onClick={() => {
+                setEditing(undefined);
+                setExpenseModalOpen(true);
+              }}
             >
-              <option value="">Choisir</option>
-              {options.trainings.map((training) => (
-                <option key={training.id} value={training.id}>
-                  {training.title}
-                </option>
-              ))}
-            </Select>
-          </label>
-          <label>
-            Session facultative
-            <Select name="sessionId" defaultValue={editing?.session?.id ?? ''}>
-              <option value="">Aucune</option>
-              {options.sessions.map((session) => (
-                <option key={session.id} value={session.id}>
-                  {session.training.title} · {session.title}
-                </option>
-              ))}
-            </Select>
-          </label>
-          <div className="form-grid">
-            <label>
-              Date
-              <input
-                name="date"
-                type="date"
-                defaultValue={editing?.date ?? range.from}
-                required
-              />
-            </label>
-            <label>
-              Montant EUR
-              <input
-                name="amount"
-                type="number"
-                min="0.001"
-                step="0.001"
-                defaultValue={editing ? editing.amountMinor / 100 : ''}
-                required
-              />
-            </label>
-          </div>
-          <label>
-            Libellé
-            <input
-              name="label"
-              maxLength={200}
-              defaultValue={editing?.label ?? ''}
-              required
-            />
-          </label>
-          <div className="form-actions">
-            <button className="primary-button" disabled={saving}>
-              {editing ? 'Mettre à jour' : 'Créer'}
+              <Plus aria-hidden="true" size={16} /> Ajouter une dépense
             </button>
-            {editing && (
-              <button
-                type="button"
-                className="secondary-button"
-                onClick={() => setEditing(undefined)}
-              >
-                Annuler
-              </button>
-            )}
           </div>
           {trainingCosts.length === 0 ? (
-            <p className="muted">Aucune dépense sur cette période.</p>
+            <p className="muted">Aucune dépense enregistrée.</p>
           ) : (
-            <div className="dashboard-table">
+            <CostTable
+              label="Dépenses des formations"
+              headers={['Formation', 'Date et libellé', 'Montant', 'Actions']}
+            >
               {trainingCosts.map((cost) => (
-                <div key={cost.id}>
-                  <span>
-                    <strong>{cost.training.title}</strong>
-                    <small>
-                      {cost.date} · {cost.label}
-                    </small>
-                  </span>
-                  <strong>{money(cost.amountMinor)}</strong>
-                  <button
-                    type="button"
-                    className="secondary-button compact-button"
-                    onClick={() => setEditing(cost)}
-                  >
-                    Modifier
-                  </button>
-                  <button
-                    type="button"
-                    className="danger-button"
-                    onClick={() => void remove(cost)}
-                  >
-                    Supprimer
-                  </button>
-                </div>
+                <tr key={cost.id}>
+                  <th scope="row">
+                    {cost.training.title}
+                    <small>{cost.session?.title}</small>
+                  </th>
+                  <td>
+                    {cost.date}
+                    <small>{cost.label}</small>
+                  </td>
+                  <td className="hsa-amount">{money(cost.amountMinor)}</td>
+                  <td>
+                    <div className="hsa-table-actions">
+                      <button
+                        type="button"
+                        className="hsa-table-action"
+                        title="Modifier"
+                        aria-label={`Modifier la dépense ${cost.label}`}
+                        onClick={() => {
+                          setEditing(cost);
+                          setExpenseModalOpen(true);
+                        }}
+                      >
+                        <Pencil aria-hidden="true" size={16} />
+                      </button>
+                      <button
+                        type="button"
+                        className="hsa-table-action hsa-table-action-danger"
+                        title="Supprimer"
+                        aria-label={`Supprimer la dépense ${cost.label}`}
+                        onClick={() => void remove(cost)}
+                      >
+                        <Trash2 aria-hidden="true" size={16} />
+                      </button>
+                    </div>
+                  </td>
+                </tr>
               ))}
-            </div>
+            </CostTable>
           )}
           {trainingCostPage !== undefined && (
             <Pagination
@@ -445,8 +367,163 @@ export function DashboardPage() {
               label="Pagination des dépenses de formation"
             />
           )}
-        </form>
+        </article>
       </div>
+      {monthlyModalOpen && (
+        <DashboardModal
+          title="Ajouter un coût formateur"
+          close={() => setMonthlyModalOpen(false)}
+        >
+          <form
+            className="hsa-modal-form"
+            onSubmit={(event) => void saveMonthly(event)}
+          >
+            <label>
+              Formateur
+              <Select name="trainerId" required>
+                <option value="">Choisir</option>
+                {options.trainers.map((trainer) => (
+                  <option key={trainer.id} value={trainer.id}>
+                    {[trainer.profile.firstName, trainer.profile.lastName]
+                      .filter(Boolean)
+                      .join(' ') || trainer.email}
+                  </option>
+                ))}
+              </Select>
+            </label>
+            <label>
+              Période
+              <input
+                name="period"
+                type="month"
+                defaultValue={new Date().toISOString().slice(0, 7)}
+                required
+              />
+            </label>
+            <label>
+              Montant EUR
+              <input
+                name="amount"
+                type="number"
+                min="0.001"
+                step="0.001"
+                required
+              />
+            </label>
+            <label>
+              Note
+              <textarea name="note" maxLength={1000} />
+            </label>
+            <div className="form-actions">
+              <button className="primary-button" disabled={saving}>
+                {saving ? 'Enregistrement…' : 'Enregistrer'}
+              </button>
+              <button
+                className="secondary-button"
+                type="button"
+                onClick={() => setMonthlyModalOpen(false)}
+              >
+                Annuler
+              </button>
+            </div>
+          </form>
+        </DashboardModal>
+      )}
+      {expenseModalOpen && (
+        <DashboardModal
+          title={editing ? 'Modifier la dépense' : 'Ajouter une dépense'}
+          close={() => {
+            setEditing(undefined);
+            setExpenseModalOpen(false);
+          }}
+        >
+          <form
+            className="hsa-modal-form"
+            key={editing?.id ?? 'create'}
+            onSubmit={(event) => void saveExplicit(event)}
+          >
+            <label>
+              Formation
+              <Select
+                name="trainingId"
+                defaultValue={editing?.training.id ?? ''}
+                required
+              >
+                <option value="">Choisir</option>
+                {options.trainings.map((training) => (
+                  <option key={training.id} value={training.id}>
+                    {training.title}
+                  </option>
+                ))}
+              </Select>
+            </label>
+            <label>
+              Session facultative
+              <Select
+                name="sessionId"
+                defaultValue={editing?.session?.id ?? ''}
+              >
+                <option value="">Aucune</option>
+                {options.sessions.map((session) => (
+                  <option key={session.id} value={session.id}>
+                    {session.training.title} · {session.title}
+                  </option>
+                ))}
+              </Select>
+            </label>
+            <div className="form-grid">
+              <label>
+                Date
+                <input
+                  name="date"
+                  type="date"
+                  defaultValue={editing?.date ?? range.to}
+                  required
+                />
+              </label>
+              <label>
+                Montant EUR
+                <input
+                  name="amount"
+                  type="number"
+                  min="0.001"
+                  step="0.001"
+                  defaultValue={editing ? editing.amountMinor / 100 : ''}
+                  required
+                />
+              </label>
+            </div>
+            <label>
+              Libellé
+              <input
+                name="label"
+                maxLength={200}
+                defaultValue={editing?.label ?? ''}
+                required
+              />
+            </label>
+            <div className="form-actions">
+              <button className="primary-button" disabled={saving}>
+                {saving
+                  ? 'Enregistrement…'
+                  : editing
+                    ? 'Mettre à jour'
+                    : 'Enregistrer'}
+              </button>
+              <button
+                className="secondary-button"
+                type="button"
+                onClick={() => {
+                  setEditing(undefined);
+                  setExpenseModalOpen(false);
+                }}
+              >
+                Annuler
+              </button>
+            </div>
+          </form>
+        </DashboardModal>
+      )}
     </section>
   );
 }
@@ -458,28 +535,95 @@ function DashboardResults({
   data: DashboardData;
   trainings: Training[];
 }) {
-  const overviewMetrics = {
-    trainings: { label: 'Formations', icon: '▤' },
-    sessions: { label: 'Sessions', icon: '◷' },
-    learners: { label: 'Apprenants', icon: '◎' },
-    trainers: { label: 'Formateurs', icon: '◇' },
-    enrollments: { label: 'Inscriptions', icon: '✓' },
-  } as const;
   return (
     <>
-      <div className="metric-grid">
-        {Object.entries(data.overview.counts).map(([label, value]) => (
-          <article className={`metric-card metric-${label}`} key={label}>
-            <span className="metric-icon" aria-hidden="true">
-              {overviewMetrics[label as keyof typeof overviewMetrics].icon}
-            </span>
-            <span>
-              {overviewMetrics[label as keyof typeof overviewMetrics].label}
-            </span>
-            <strong>{value}</strong>
-          </article>
-        ))}
+      <DashboardSectionHeader
+        id="platform-overview"
+        title="Vue d’ensemble de la plateforme"
+        description="Indicateurs cumulés depuis la création de la plateforme."
+        icon={ChartNoAxesCombined}
+      />
+      <div className="hsa-stats">
+        <DashboardStatCard
+          label="Apprenants"
+          value={data.overview.counts.learners}
+          icon={Users}
+          to="/app/users"
+          action="Voir les utilisateurs"
+        />
+        <DashboardStatCard
+          label="Formations"
+          value={data.overview.counts.trainings}
+          icon={GraduationCap}
+          tone="green"
+          to="/app/trainings"
+          action="Gérer les formations"
+        />
+        <DashboardStatCard
+          label="Sessions"
+          value={data.overview.counts.sessions}
+          icon={CalendarDays}
+          tone="purple"
+          to="/app/sessions"
+          action="Voir les sessions"
+        />
+        <DashboardStatCard
+          label="Revenus payés"
+          value={money(data.profitability.revenueMinor)}
+          icon={CreditCard}
+          tone="orange"
+          to="/app/payments"
+          action="Voir les paiements"
+        />
       </div>
+      <div className="hsa-overview-strip">
+        <span>
+          <Users size={18} aria-hidden="true" />
+          <strong>{data.overview.counts.trainers}</strong> formateurs
+        </span>
+        <span>
+          <ClipboardCheck size={18} aria-hidden="true" />
+          <strong>{data.overview.counts.enrollments}</strong> inscriptions
+        </span>
+        <span>
+          <Award size={18} aria-hidden="true" />
+          <strong>{data.progress.selfPaced.completedEnrollments}</strong>{' '}
+          parcours en ligne terminés
+        </span>
+      </div>
+      <CompletionTrendCard data={data.learningInsights} />
+      <div className="hsa-quick-grid">
+        <QuickActionCard
+          to="/app/users"
+          title="Utilisateurs"
+          text="Gérer les comptes"
+          icon={Users}
+        />
+        <QuickActionCard
+          to="/app/trainings"
+          title="Formations"
+          text="Organiser le catalogue"
+          icon={BookOpen}
+        />
+        <QuickActionCard
+          to="/app/evaluations"
+          title="Évaluations"
+          text="Suivre les résultats"
+          icon={ClipboardCheck}
+        />
+        <QuickActionCard
+          to="/app/certificates"
+          title="Certificats"
+          text="Certifications et avis"
+          icon={Award}
+        />
+      </div>
+      <DashboardSectionHeader
+        id="learning-insights"
+        title="Suivi pédagogique"
+        description="Participation, apprentissage et satisfaction cumulés."
+        icon={GraduationCap}
+      />
       <div className="dashboard-panels">
         <article className="content-card">
           <h2>Participation</h2>
@@ -487,10 +631,10 @@ function DashboardResults({
             {percent(data.participation.overall.participationPercent)}
           </strong>
           {data.participation.overall.expected === 0 ? (
-            <p>Aucune présence n’était attendue sur cette période.</p>
+            <p>Aucune présence n’est enregistrée.</p>
           ) : (
             <p>
-              {data.participation.overall.present} présente(s) sur{' '}
+              {data.participation.overall.present} présence(s) sur{' '}
               {data.participation.overall.expected} présence(s) attendue(s) ·{' '}
               {data.participation.overall.recorded} saisie(s)
             </p>
@@ -526,11 +670,13 @@ function DashboardResults({
           <p>{data.satisfaction.global.count} avis</p>
         </article>
       </div>
-      <div className="metric-grid">
-        <article className="metric-card">
-          <span>Revenus payés</span>
-          <strong>{money(data.profitability.revenueMinor)}</strong>
-        </article>
+      <DashboardSectionHeader
+        id="dashboard-finances"
+        title="Finances et rentabilité"
+        description="Revenus confirmés, dépenses et résultats cumulés."
+        icon={Wallet}
+      />
+      <div className="metric-grid hsa-finance-grid">
         <article className="metric-card">
           <span>Coûts formateurs</span>
           <strong>{money(data.profitability.trainerCostsMinor)}</strong>
@@ -545,67 +691,83 @@ function DashboardResults({
           <small>{percent(data.profitability.profitabilityPercent)}</small>
         </article>
       </div>
-      <LearningInsightCards data={data.learningInsights} />
-      <DashboardCharts data={data} />
-      <TrainingResults rows={data.profitability.byTraining} trainings={trainings} />
+      <DashboardCharts data={data} trainings={trainings} />
+      <TrainingResults
+        rows={data.profitability.byTraining}
+        trainings={trainings}
+      />
     </>
   );
 }
 
-function LearningInsightCards({ data }: { data: LearningInsights }) {
+function CostTable({
+  label,
+  headers,
+  children,
+}: {
+  label: string;
+  headers: string[];
+  children: React.ReactNode;
+}) {
+  return (
+    <div
+      className="hsa-table-scroll"
+      role="region"
+      aria-label={label}
+      tabIndex={0}
+    >
+      <table className="hsa-cost-table">
+        <thead>
+          <tr>
+            {headers.map((header) => (
+              <th scope="col" key={header}>
+                {header}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>{children}</tbody>
+      </table>
+    </div>
+  );
+}
+
+function CompletionTrendCard({ data }: { data: LearningInsights }) {
   const maximum = Math.max(
     1,
     ...data.completionTrend.map((point) => point.completed),
   );
   return (
-    <div className='learning-insight-grid'>
-      <figure className='content-card'>
-        <figcaption>Complétions self-paced par mois</figcaption>
-        {data.completionTrend.length === 0 ? (
-          <p className='muted'>Aucune compl\u00e9tion sur cette p\u00e9riode.</p>
-        ) : (
-          data.completionTrend.map((point) => (
-            <Bar
-              key={point.month}
-              label={point.month}
-              value={point.completed}
-              max={maximum}
-              shown={String(point.completed)}
-            />
-          ))
-        )}
-      </figure>
-      <article className='content-card inactive-learners-card'>
-        <h2>Apprenants devenus inactifs</h2>
-        <p>
-          <strong>{data.inactivity.total}</strong> apprenant(s) sans activit\u00e9
-          depuis au moins {data.inactivity.thresholdDays} jours.
-        </p>
-        {data.inactivity.learners.length === 0 ? (
-          <p className='muted'>Aucun apprenant \u00e0 relancer.</p>
-        ) : (
-          <ul>
-            {data.inactivity.learners.map((row) => (
-              <li key={row.learner.id}>
-                <span>
-                  <strong>
-                    {[row.learner.firstName, row.learner.lastName]
-                      .filter(Boolean)
-                      .join(' ') || row.learner.email}
-                  </strong>
-                  <small>{row.trainingTitles.join(', ')}</small>
-                </span>
-                <span className='status-pill'>{row.inactiveDays} jours</span>
-              </li>
-            ))}
-          </ul>
-        )}
-      </article>
-    </div>
+    <figure className="content-card hsa-wide-chart">
+      <DashboardSectionHeader
+        title="Complétions des formations en ligne"
+        description="Évolution mensuelle sur toute la durée de la plateforme."
+        icon={ChartNoAxesCombined}
+      />
+      {data.completionTrend.length === 0 ? (
+        <p className="muted">Aucune complétion enregistrée.</p>
+      ) : (
+        data.completionTrend.map((point) => (
+          <Bar
+            key={point.month}
+            label={point.month}
+            value={point.completed}
+            max={maximum}
+            shown={String(point.completed)}
+          />
+        ))
+      )}
+    </figure>
   );
 }
 
-function DashboardCharts({ data }: { data: DashboardData }) {
+function DashboardCharts({
+  data,
+  trainings,
+}: {
+  data: DashboardData;
+  trainings: Training[];
+}) {
   const satisfaction = Object.entries(data.satisfaction.global.distribution);
   const popular = [...data.profitability.byTraining]
     .sort((left, right) => right.revenueMinor - left.revenueMinor)
@@ -618,6 +780,7 @@ function DashboardCharts({ data }: { data: DashboardData }) {
   );
   return (
     <div className="chart-grid">
+      <TrainingDistribution trainings={trainings} />
       <SatisfactionDonut data={data.satisfaction.global} />
       <figure className="content-card">
         <figcaption>Revenus et coûts</figcaption>
@@ -657,7 +820,7 @@ function DashboardCharts({ data }: { data: DashboardData }) {
       <figure className="content-card">
         <figcaption>Participation par formation</figcaption>
         {data.participation.byTraining.length === 0 ? (
-          <p className="muted">Aucune présence attendue sur la période.</p>
+          <p className="muted">Aucune présence enregistrée.</p>
         ) : (
           data.participation.byTraining
             .slice(0, 5)
@@ -675,7 +838,7 @@ function DashboardCharts({ data }: { data: DashboardData }) {
       <figure className="content-card">
         <figcaption>Formations par revenus confirmés</figcaption>
         {popular.length === 0 ? (
-          <p className="muted">Aucun revenu confirmé sur la période.</p>
+          <p className="muted">Aucun revenu confirmé.</p>
         ) : (
           popular.map((row) => (
             <Bar
@@ -735,10 +898,62 @@ function SatisfactionDonut({ data }: { data: Satisfaction['global'] }) {
         role="img"
         aria-label={`${Math.round(positive * 100)}% de notes quatre ou cinq étoiles`}
       >
-        <strong>{data.count === 0 ? '—' : `${Math.round(positive * 100)}%`}</strong>
+        <strong>
+          {data.count === 0 ? '—' : `${Math.round(positive * 100)}%`}
+        </strong>
         <span>4–5 étoiles</span>
       </div>
-      <p className="muted">{data.count} avis sur la période</p>
+      <p className="muted">{data.count} avis au total</p>
+    </figure>
+  );
+}
+
+function TrainingDistribution({ trainings }: { trainings: Training[] }) {
+  const counts = Array.from(
+    trainings.reduce((rows, training) => {
+      rows.set(
+        training.category.name,
+        (rows.get(training.category.name) ?? 0) + 1,
+      );
+      return rows;
+    }, new Map<string, number>()),
+  ).sort((left, right) => right[1] - left[1]);
+  const colors = ['#1479e8', '#22ae91', '#8256df', '#f39a30', '#ef6172'];
+  const total = trainings.length;
+  let cursor = 0;
+  const segments = counts.map(([, count], index) => {
+    const start = cursor;
+    cursor += total === 0 ? 0 : (count / total) * 360;
+    return `${colors[index % colors.length]} ${start}deg ${cursor}deg`;
+  });
+  return (
+    <figure className="content-card satisfaction-donut">
+      <DashboardSectionHeader title="Répartition des formations" icon={Tags} />
+      <div
+        className="donut"
+        style={{
+          background:
+            total === 0 ? '#e8edf4' : `conic-gradient(${segments.join(',')})`,
+        }}
+        role="img"
+        aria-label={`${total} formations réparties dans ${counts.length} catégories`}
+      >
+        <strong>{total}</strong>
+        <span>formations</span>
+      </div>
+      {counts.length === 0 ? (
+        <p className="muted">Aucune formation.</p>
+      ) : (
+        <ul className="hsa-chart-legend">
+          {counts.slice(0, 5).map(([label, count], index) => (
+            <li key={label}>
+              <i style={{ background: colors[index % colors.length] }} />{' '}
+              <span>{label}</span>
+              <strong>{count}</strong>
+            </li>
+          ))}
+        </ul>
+      )}
     </figure>
   );
 }
@@ -752,16 +967,24 @@ function TrainingResults({
 }) {
   const [categoryId, setCategoryId] = useState('');
   const [modality, setModality] = useState('');
-  const [visible, setVisible] = useState<Profitability['byTraining']>([]);
+  const [applied, setApplied] = useState({ categoryId: '', modality: '' });
   const details = new Map(trainings.map((training) => [training.id, training]));
-  const categories = Array.from(new Map(trainings.map((training) => [training.category.id, training.category])).values());
+  const categories = Array.from(
+    new Map(
+      trainings.map((training) => [training.category.id, training.category]),
+    ).values(),
+  );
   function applyFilters() {
-    setVisible(rows.filter((row) => {
-      const training = details.get(row.training.id);
-      return (categoryId === '' || training?.category.id === categoryId) &&
-        (modality === '' || training?.type === modality);
-    }));
+    setApplied({ categoryId, modality });
   }
+  const visible = rows.filter((row) => {
+    const training = details.get(row.training.id);
+    return (
+      (applied.categoryId === '' ||
+        training?.category.id === applied.categoryId) &&
+      (applied.modality === '' || training?.type === applied.modality)
+    );
+  });
   if (rows.length === 0)
     return (
       <div className="empty-state">
@@ -771,28 +994,91 @@ function TrainingResults({
   return (
     <div className="content-card dashboard-table training-results-card">
       <div className="result-filters">
-        <label>Catégorie
-          <Select value={categoryId} onChange={(event) => setCategoryId(event.target.value)}>
+        <label>
+          Catégorie
+          <Select
+            value={categoryId}
+            onChange={(event) => setCategoryId(event.target.value)}
+          >
             <option value="">Toutes</option>
-            {categories.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}
+            {categories.map((category) => (
+              <option key={category.id} value={category.id}>
+                {category.name}
+              </option>
+            ))}
           </Select>
         </label>
-        <label>Modalité
-          <Select value={modality} onChange={(event) => setModality(event.target.value)}>
+        <label>
+          Modalité
+          <Select
+            value={modality}
+            onChange={(event) => setModality(event.target.value)}
+          >
             <option value="">Toutes</option>
             <option value="SELF_PACED_ONLINE">En ligne</option>
             <option value="IN_PERSON">Présentiel</option>
           </Select>
         </label>
-        <button className="secondary-button compact-button" type="button" onClick={applyFilters}>Appliquer</button>
+        <button
+          className="secondary-button compact-button"
+          type="button"
+          onClick={applyFilters}
+        >
+          Appliquer
+        </button>
       </div>
       <h2>Résultat avant coûts fixes des formateurs</h2>
-      {visible.map((row) => (
-        <div key={row.training.id}>
-          <span>{row.training.title}</span>
-          <strong>{money(row.resultBeforeFixedTrainerCostsMinor)}</strong>
+      {visible.length === 0 ? (
+        <p className="muted">Aucune formation ne correspond aux filtres.</p>
+      ) : (
+        <div
+          className="hsa-table-scroll"
+          role="region"
+          aria-label="Résultats financiers par formation"
+          tabIndex={0}
+        >
+          <table>
+            <thead>
+              <tr>
+                <th scope="col">Formation</th>
+                <th scope="col">Revenus</th>
+                <th scope="col">Dépenses</th>
+                <th scope="col">Résultat</th>
+              </tr>
+            </thead>
+            <tbody>
+              {visible.map((row) => (
+                <tr key={row.training.id}>
+                  <th scope="row">{row.training.title}</th>
+                  <td>{money(row.revenueMinor)}</td>
+                  <td>{money(row.trainingCostsMinor)}</td>
+                  <td>
+                    <strong>
+                      {money(row.resultBeforeFixedTrainerCostsMinor)}
+                    </strong>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
-      ))}
+      )}
     </div>
   );
+}
+
+async function loadAllManagedTrainings(
+  request: ReturnType<typeof useAuth>['request'],
+): Promise<Page<Training>> {
+  const first = await request<Page<Training>>(
+    '/trainings?view=MANAGED&page=1&pageSize=100',
+  );
+  const items = [...first.items];
+  for (let page = 2; page <= Math.ceil(first.total / first.pageSize); page++) {
+    const next = await request<Page<Training>>(
+      `/trainings?view=MANAGED&page=${page}&pageSize=100`,
+    );
+    items.push(...next.items);
+  }
+  return { ...first, items };
 }

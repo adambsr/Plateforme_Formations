@@ -1,7 +1,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router';
 
-import { ApiError, apiDownload, apiRequest } from '../api/client.js';
+import {
+  ApiError,
+  apiDownload,
+  apiEventStream,
+  apiRequest,
+  type ApiStreamEvent,
+} from '../api/client.js';
 import type { AuthSession, User } from './types.js';
 import {
   AuthContext,
@@ -9,6 +15,20 @@ import {
   type AuthStatus,
 } from './AuthContext.js';
 let sharedRefresh: Promise<AuthSession> | null = null;
+
+function sessionFailurePath(error: unknown): string {
+  if (error instanceof ApiError && error.code === 'ACCOUNT_UNAVAILABLE') {
+    return '/status/account-unavailable';
+  }
+  if (error instanceof ApiError && error.code === 'RATE_LIMITED') {
+    return '/status/rate-limited';
+  }
+  return '/status/session-expired';
+}
+
+function isRateLimited(error: unknown): boolean {
+  return error instanceof ApiError && error.code === 'RATE_LIMITED';
+}
 
 function refreshWebSession(): Promise<AuthSession> {
   sharedRefresh ??= apiRequest<AuthSession>('/auth/refresh', {
@@ -47,6 +67,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       })
       .catch((error: unknown) => {
         if (!active) return;
+        if (isRateLimited(error)) {
+          // Navigate before changing the initial loading state. Otherwise the
+          // protected-route guard can replace this status route with 401.
+          navigate('/status/rate-limited', { replace: true });
+          window.setTimeout(becomeGuest, 0);
+          return;
+        }
         becomeGuest();
         if (error instanceof ApiError && error.code === 'ACCOUNT_UNAVAILABLE') {
           navigate('/status/account-unavailable', { replace: true });
@@ -78,14 +105,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           acceptSession(session);
           return await apiRequest<T>(path, options, session.accessToken);
         } catch (refreshError) {
+          if (isRateLimited(refreshError)) {
+            navigate('/status/rate-limited', { replace: true });
+            throw refreshError;
+          }
           becomeGuest();
-          navigate(
-            refreshError instanceof ApiError &&
-              refreshError.code === 'ACCOUNT_UNAVAILABLE'
-              ? '/status/account-unavailable'
-              : '/status/session-expired',
-            { replace: true },
-          );
+          navigate(sessionFailurePath(refreshError), { replace: true });
           throw refreshError;
         }
       }
@@ -104,17 +129,69 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           acceptSession(session);
           return await apiDownload(path, {}, session.accessToken);
         } catch (refreshError) {
+          if (isRateLimited(refreshError)) {
+            navigate('/status/rate-limited', { replace: true });
+            throw refreshError;
+          }
           becomeGuest();
-          navigate(
-            refreshError instanceof ApiError &&
-              refreshError.code === 'ACCOUNT_UNAVAILABLE'
-              ? '/status/account-unavailable'
-              : '/status/session-expired',
-            { replace: true },
-          );
+          navigate(sessionFailurePath(refreshError), { replace: true });
           throw refreshError;
         }
       }
+    },
+    [acceptSession, becomeGuest, navigate],
+  );
+
+  const subscribe = useCallback(
+    <T,>(
+      path: string,
+      onEvent: (event: ApiStreamEvent<T>) => void,
+    ): (() => void) => {
+      let active = true;
+      let controller: AbortController | undefined;
+      let reconnectTimer: number | undefined;
+      let reconnectDelay = 1_000;
+
+      const connect = async (): Promise<void> => {
+        controller = new AbortController();
+        try {
+          await apiEventStream(
+            path,
+            controller.signal,
+            onEvent,
+            accessToken.current ?? undefined,
+          );
+          reconnectDelay = 1_000;
+        } catch (error) {
+          if (!active || controller.signal.aborted) return;
+          if (error instanceof ApiError && error.status === 401) {
+            try {
+              acceptSession(await refreshWebSession());
+              reconnectDelay = 1_000;
+            } catch (refreshError) {
+              if (isRateLimited(refreshError)) {
+                navigate('/status/rate-limited', { replace: true });
+                return;
+              }
+              becomeGuest();
+              navigate(sessionFailurePath(refreshError), { replace: true });
+              return;
+            }
+          }
+        }
+        if (!active) return;
+        reconnectTimer = window.setTimeout(() => {
+          void connect();
+        }, reconnectDelay);
+        reconnectDelay = Math.min(reconnectDelay * 2, 30_000);
+      };
+
+      void connect();
+      return () => {
+        active = false;
+        controller?.abort();
+        if (reconnectTimer !== undefined) window.clearTimeout(reconnectTimer);
+      };
     },
     [acceptSession, becomeGuest, navigate],
   );
@@ -147,14 +224,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         );
       },
       async logout() {
+        // Keep protected guards neutral while the server revokes the refresh
+        // session, so logout can never flash the authentication error route.
+        setStatus('logging-out');
+        accessToken.current = null;
         try {
           await apiRequest('/auth/logout', {
             method: 'POST',
             body: JSON.stringify({ client: 'WEB' }),
           });
         } finally {
-          becomeGuest();
           navigate('/', { replace: true });
+          // React batches state and router updates. Yield one task so the home
+          // route commits before the authenticated principal is cleared.
+          await new Promise<void>((resolve) => setTimeout(resolve, 0));
+          becomeGuest();
         }
       },
       async changePassword(currentPassword, newPassword) {
@@ -179,8 +263,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       },
       request,
       download,
+      subscribe,
     }),
-    [acceptSession, becomeGuest, download, navigate, request, status, user],
+    [
+      acceptSession,
+      becomeGuest,
+      download,
+      navigate,
+      request,
+      status,
+      subscribe,
+      user,
+    ],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

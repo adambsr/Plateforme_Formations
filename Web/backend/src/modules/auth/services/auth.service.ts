@@ -22,6 +22,7 @@ import { PasswordResetTokenModel } from '../models/password-reset-token.model.js
 import { RefreshSessionModel } from '../models/refresh-session.model.js';
 import { TokenService } from './token.service.js';
 import type { Logger } from 'pino';
+import type { NotificationService } from '../../notifications/services/notification.service.js';
 
 export interface AuthSessionResult {
   accessToken: string;
@@ -55,6 +56,7 @@ export class AuthService {
   readonly #mail: PasswordResetMailService;
   readonly #transactionalMail: TransactionalEmailService;
   readonly #logger: Logger;
+  readonly #notifications: NotificationService | undefined;
 
   constructor(
     config: AppConfig,
@@ -62,12 +64,14 @@ export class AuthService {
     mail: PasswordResetMailService,
     transactionalMail: TransactionalEmailService,
     logger: Logger,
+    notifications?: NotificationService,
   ) {
     this.#config = config;
     this.#tokens = tokens;
     this.#mail = mail;
     this.#transactionalMail = transactionalMail;
     this.#logger = logger;
+    this.#notifications = notifications;
   }
 
   async registerLearner(
@@ -102,6 +106,20 @@ export class AuthService {
           ? {}
           : { firstName: user.profile.firstName }),
       }),
+    );
+    await deliverBestEffort(
+      this.#logger,
+      'admin-new-user-notification',
+      async () => {
+        await this.#notifications?.notifyAdmins({
+          type: 'USER_REGISTERED',
+          title: 'Nouvel utilisateur',
+          message: `${[user.profile.firstName, user.profile.lastName].filter(Boolean).join(' ') || user.email} vient de créer un compte.`,
+          link: '/app/users',
+          dedupeKey: `user-registered:${String(user._id)}`,
+          metadata: { userId: String(user._id) },
+        });
+      },
     );
     return this.#createSession(user);
   }

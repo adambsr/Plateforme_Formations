@@ -468,6 +468,11 @@ integrationDescribe(
       expect(initial.status).toBe(200);
       expect(initial.body.roster).toHaveLength(1);
       expect(initial.body.roster[0]).toMatchObject({
+        learner: {
+          email: 'learner.phase67@example.com',
+          firstName: 'Leila',
+          lastName: 'Learner',
+        },
         presentCount: 0,
         recordedCount: 0,
         attendanceCoverageComplete: false,

@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { ApiError, apiRequest } from './client.js';
+import { ApiError, apiEventStream, apiRequest } from './client.js';
 
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -56,5 +56,37 @@ describe('apiRequest', () => {
       message: 'Les données de la requête sont invalides.',
       fieldErrors: [{ field: 'email', message: 'Invalid email.' }],
     });
+  });
+});
+
+describe('apiEventStream', () => {
+  it('authenticates the stream and parses named JSON events', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(
+        'event: ready\ndata: {}\n\nid: n1\nevent: notification\ndata: {"id":"n1"}\n\n',
+        {
+          status: 200,
+          headers: { 'content-type': 'text/event-stream' },
+        },
+      ),
+    );
+    vi.stubGlobal('fetch', fetchMock);
+    const events: Array<{ type: string; data: unknown; id?: string }> = [];
+
+    await apiEventStream(
+      '/notifications/stream',
+      new AbortController().signal,
+      (event) => events.push(event),
+      'access-token',
+    );
+
+    expect(events).toEqual([
+      { type: 'ready', data: {} },
+      { type: 'notification', id: 'n1', data: { id: 'n1' } },
+    ]);
+    const [, options] = fetchMock.mock.calls[0] as [string, RequestInit];
+    const headers = new Headers(options.headers);
+    expect(headers.get('authorization')).toBe('Bearer access-token');
+    expect(headers.get('accept')).toBe('text/event-stream');
   });
 });

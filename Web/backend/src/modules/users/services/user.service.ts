@@ -9,6 +9,8 @@ import { AppError } from '../../../shared/errors/app-error.js';
 import { RefreshSessionModel } from '../../auth/models/refresh-session.model.js';
 import { PasswordResetTokenModel } from '../../auth/models/password-reset-token.model.js';
 import { NotificationDeviceModel } from '../../notifications/models/notification-device.model.js';
+import { NotificationModel } from '../../notifications/models/notification.model.js';
+import type { NotificationService } from '../../notifications/services/notification.service.js';
 import type {
   CreateTrainerInput,
   UpdateProfileInput,
@@ -27,10 +29,16 @@ export interface PaginatedUsers {
 export class UserService {
   readonly #mail: TransactionalEmailService;
   readonly #logger: Logger;
+  readonly #notifications: NotificationService | undefined;
 
-  constructor(mail: TransactionalEmailService, logger: Logger) {
+  constructor(
+    mail: TransactionalEmailService,
+    logger: Logger,
+    notifications?: NotificationService,
+  ) {
     this.#mail = mail;
     this.#logger = logger;
+    this.#notifications = notifications;
   }
 
   async createTrainer(input: CreateTrainerInput): Promise<PublicUser> {
@@ -53,6 +61,20 @@ export class UserService {
             : { firstName: user.profile.firstName }),
           temporaryPassword: true,
         }),
+      );
+      await deliverBestEffort(
+        this.#logger,
+        'admin-new-trainer-notification',
+        async () => {
+          await this.#notifications?.notifyAdmins({
+            type: 'USER_CREATED',
+            title: 'Nouvel utilisateur',
+            message: `${[user.profile.firstName, user.profile.lastName].filter(Boolean).join(' ') || user.email} a été ajouté comme formateur.`,
+            link: '/app/users',
+            dedupeKey: `user-created:${String(user._id)}`,
+            metadata: { userId: String(user._id) },
+          });
+        },
       );
       return toPublicUser(user);
     } catch (error) {
@@ -160,6 +182,7 @@ export class UserService {
         RefreshSessionModel.deleteMany({ userId }, { session }),
         PasswordResetTokenModel.deleteMany({ userId }, { session }),
         NotificationDeviceModel.deleteMany({ userId }, { session }),
+        NotificationModel.deleteMany({ recipientUserId: userId }, { session }),
       ]);
     });
   }

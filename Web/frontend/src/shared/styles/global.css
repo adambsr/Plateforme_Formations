@@ -129,9 +129,7 @@ label,
   white-space: nowrap;
 }
 .content-card,
-.training-card,
-.quick-action-grid a,
-.role-kpis article {
+.training-card {
   transition:
     transform 150ms ease,
     box-shadow 150ms ease,
@@ -2921,80 +2919,6 @@ textarea:focus {
 .drawer-overlay {
   display: none;
 }
-.dashboard-welcome {
-  margin: -0.4rem 0 1.5rem;
-  border-radius: 18px;
-  padding: 2rem;
-  color: #fff;
-  background: linear-gradient(125deg, #143d70, #246ebd);
-  box-shadow: var(--shadow-sm);
-}
-.dashboard-welcome .eyebrow {
-  color: #bcdcff;
-}
-.dashboard-welcome h1 {
-  margin-bottom: 0.5rem;
-  font-size: clamp(2rem, 4vw, 3rem);
-}
-.dashboard-welcome p {
-  max-width: 720px;
-  margin: 0;
-  color: #d9e9fb;
-  line-height: 1.6;
-}
-.role-kpis {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 1rem;
-  margin-bottom: 1rem;
-}
-.role-kpis article {
-  display: grid;
-  gap: 0.45rem;
-  border: 1px solid var(--line);
-  border-radius: 14px;
-  padding: 1.2rem;
-  background: #fff;
-}
-.role-kpis span {
-  color: var(--muted);
-  font-size: 0.85rem;
-}
-.role-kpis strong {
-  font-size: 1.7rem;
-}
-.quick-action-grid {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 1rem;
-  margin-bottom: 1rem;
-}
-.quick-action-grid a {
-  display: grid;
-  grid-template-columns: 1fr auto;
-  gap: 0.45rem;
-  border: 1px solid var(--line);
-  border-radius: 14px;
-  padding: 1.2rem;
-  color: var(--ink);
-  background: #fff;
-  text-decoration: none;
-  transition:
-    transform 150ms ease,
-    box-shadow 150ms ease;
-}
-.quick-action-grid a:hover {
-  transform: translateY(-2px);
-  box-shadow: var(--shadow-sm);
-}
-.quick-action-grid span {
-  grid-column: 1 / -1;
-  color: var(--muted);
-  line-height: 1.45;
-}
-.quick-action-grid b {
-  color: #246ebd;
-}
 .recent-panel {
   max-width: none;
 }
@@ -3282,8 +3206,6 @@ textarea:focus {
   .portal-content {
     padding: 1rem;
   }
-  .role-kpis,
-  .quick-action-grid,
   .profile-grid,
   .chart-grid {
     grid-template-columns: 1fr;
@@ -3410,10 +3332,6 @@ label,
 .portal-content {
   padding: clamp(1rem, 2.5vw, 2rem);
 }
-.dashboard-welcome {
-  margin-bottom: 1rem;
-  padding: 1.5rem;
-}
 .content-card,
 .auth-card {
   padding: 1.4rem;
@@ -3523,16 +3441,6 @@ label,
 }
 .metric-card:nth-child(3n) {
   border-top-color: #b9822e;
-}
-.metric-icon {
-  display: grid;
-  width: 2.35rem;
-  height: 2.35rem;
-  place-items: center;
-  border-radius: 10px;
-  color: #1859a6 !important;
-  background: #eaf2fd;
-  font-size: 1.15rem;
 }
 .management-editor-page {
   max-width: 1000px !important;

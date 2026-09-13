@@ -27,6 +27,28 @@ function renderAt(path: string) {
   );
 }
 
+function renderRateLimitedAt(path: string) {
+  vi.stubGlobal(
+    'fetch',
+    vi.fn().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          error: { code: 'RATE_LIMITED', message: 'Too many requests.' },
+        }),
+        { status: 429, headers: { 'content-type': 'application/json' } },
+      ),
+    ),
+  );
+
+  return render(
+    <MemoryRouter initialEntries={[path]}>
+      <AuthProvider>
+        <App />
+      </AuthProvider>
+    </MemoryRouter>,
+  );
+}
+
 function jsonResponse(body: unknown): Response {
   return new Response(JSON.stringify(body), {
     status: 200,
@@ -58,6 +80,18 @@ afterEach(() => {
 });
 
 describe('Phase 1 Web routes', () => {
+  it('keeps a rate-limited session check distinct from an authentication failure', async () => {
+    renderRateLimitedAt('/app/learner');
+
+    expect(
+      await screen.findByRole('heading', { name: 'Trop de tentatives' }),
+    ).toBeVisible();
+    expect(screen.getByRole('link', { name: 'Se connecter' })).toHaveAttribute(
+      'href',
+      '/login',
+    );
+  });
+
   it('restores the Web session before rendering the login page', async () => {
     renderAt('/login');
 

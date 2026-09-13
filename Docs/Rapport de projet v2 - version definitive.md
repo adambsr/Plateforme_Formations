@@ -14,21 +14,21 @@
 
 High Skills Academy est une plateforme web de gestion de formations professionnelles. Elle centralise la publication des offres, les inscriptions, les paiements, l'accès au contenu, les sessions présentielles, le suivi pédagogique, les évaluations, la certification et les indicateurs de gestion.
 
-Le projet répond au problème de la fragmentation des opérations d'un centre de formation entre outils de bureautique, échanges manuels, plateformes de paiement et documents isolés. La solution propose une application web et mobile structurée autour d'une API sécurisée, d'une base MongoDB et de services externes sélectionnés : Stripe pour le paiement, Gemini pour des fonctionnalités d'assistance intelligente, Firebase Analytics pour une mesure optionnelle du produit et Firebase Cloud Messaging pour les notifications mobiles.
+Le projet répond au problème de la fragmentation des opérations d'un centre de formation entre outils de bureautique, échanges manuels, plateformes de paiement et documents isolés. La solution propose une application web et mobile structurée autour d'une API sécurisée, d'une base MongoDB et de services externes sélectionnés : Stripe pour le paiement, Gemini pour des fonctionnalités d'assistance intelligente, Firebase Analytics pour une mesure optionnelle du produit et Firebase Cloud Messaging pour les notifications mobiles. Le client Web ajoute une recherche globale contrôlée par rôle et un fil de notifications persistant diffusé en temps quasi réel par Server-Sent Events.
 
 L'architecture retenue est un monolithe modulaire : les domaines métier sont séparés dans le code, tout en restant déployés dans une seule API. Une attention particulière est portée à l'autorisation serveur, à la traçabilité des paiements, à la protection des fichiers, à la limitation des appels IA et au consentement analytique.
 
-**Mots-clés :** plateforme de formation, application web et mobile, monolithe modulaire, MongoDB, paiement en ligne, intelligence artificielle générative, Firebase Analytics, Firebase Cloud Messaging, sécurité applicative.
+**Mots-clés :** plateforme de formation, application web et mobile, monolithe modulaire, MongoDB, paiement en ligne, recherche globale, Server-Sent Events, notifications, intelligence artificielle générative, Firebase Analytics, Firebase Cloud Messaging, sécurité applicative.
 
 ## Abstract
 
 High Skills Academy is a web platform for professional training management. It centralizes course publication, enrollment, payment, content access, in-person sessions, learning tracking, assessment, certification, and management indicators.
 
-The project addresses the fragmentation of training-centre operations across spreadsheets, manual communication, payment tools, and isolated documents. The proposed solution relies on secured web and mobile clients, a protected API, MongoDB, and selected external services: Stripe for payment, Gemini for intelligent assistance, Firebase Analytics for optional product measurement, and Firebase Cloud Messaging for mobile notifications.
+The project addresses the fragmentation of training-centre operations across spreadsheets, manual communication, payment tools, and isolated documents. The proposed solution relies on secured web and mobile clients, a protected API, MongoDB, and selected external services: Stripe for payment, Gemini for intelligent assistance, Firebase Analytics for optional product measurement, and Firebase Cloud Messaging for mobile notifications. The Web client also provides role-scoped global search and a persistent notification feed delivered in near real time through Server-Sent Events.
 
 The system follows a modular-monolith architecture: business domains are separated in code while remaining deployed in a single API. Server-side authorization, payment traceability, file protection, AI request control, and analytics consent are key design concerns.
 
-**Keywords:** training platform, web and mobile application, modular monolith, MongoDB, online payment, generative AI, Firebase Analytics, Firebase Cloud Messaging, application security.
+**Keywords:** training platform, web and mobile application, modular monolith, MongoDB, online payment, global search, Server-Sent Events, notifications, generative AI, Firebase Analytics, Firebase Cloud Messaging, application security.
 
 ---
 
@@ -105,6 +105,7 @@ Une formation suit les états `DRAFT`, `PUBLISHED` et `ARCHIVED`. Seules les for
 | Évaluations | Questions objectives, tentatives, correction automatique, résultats et désignation certifiante |
 | Paiement et documents | Stripe Checkout de test, webhook vérifié, inscriptions, factures et certificats PDF protégés |
 | Gestion | Coûts, satisfaction, revenus, résultat et rentabilité dans les tableaux de bord |
+| Recherche et notifications Web | Recherche globale filtrée par rôle, fil persistant, état lu/non lu, rappels et réception SSE en temps quasi réel |
 | Intelligence artificielle | Tuteur de formation, concierge public, génération de questions brouillon |
 | Application mobile | Client Expo/React Native Android, navigation par rôle, accès au contenu et notifications push |
 | Mesure | Firebase Analytics optionnel pour les pages, écrans et recommandations |
@@ -121,7 +122,7 @@ Ce choix est adapté au périmètre du projet : il évite la complexité de coor
 
 ```mermaid
 flowchart LR
-  Browser[Client React + Vite\nlocalhost:5173] -->|JSON, Bearer + cookie de rafraîchissement| API[API Express\nlocalhost:3000/api]
+  Browser[Client React + Vite\nlocalhost:5173] -->|JSON + SSE, Bearer + cookie de rafraîchissement| API[API Express\nlocalhost:3000/api]
   Browser -->|événements optionnels après consentement| Analytics[Firebase Analytics / Google Analytics]
   Mobile[Client Expo React Native Android] -->|JSON, Bearer token| API
   Mobile -->|événements optionnels après consentement| Analytics
@@ -149,6 +150,7 @@ Le client web et le client mobile présentent les parcours utilisateur et appell
 | Paiement | Stripe Checkout et webhook signé |
 | IA | SDK Google Gen AI / Gemini |
 | Analyse d'usage | Firebase Analytics web et natif, soumis au consentement |
+| Notifications Web | MongoDB, Server-Sent Events via `fetch`, reconnexion exponentielle et polling de secours |
 | Notifications mobiles | Firebase Cloud Messaging, Firebase Admin SDK et Expo Notifications |
 
 ## 4. Modélisation des données et règles métier
@@ -175,7 +177,7 @@ Les modules et leçons portent une référence de formation qui permet de vérif
 | Présentiel | TrainingSession, SessionSchedule, Attendance |
 | Paiement et accès | Payment, Enrollment, Invoice, InvoiceItem |
 | Suivi et validation | LessonProgress, Evaluation, EvaluationQuestion, EvaluationAttempt, EvaluationAnswer, Certificate, Feedback |
-| Pilotage | TrainerCost, TrainingCost |
+| Pilotage | TrainerCost, TrainingCost, Notification, NotificationDevice |
 
 Les index Mongoose sont initialisés au démarrage du backend. Ils protègent notamment l'unicité des comptes, des inscriptions, des présences et des documents métier lorsque cette unicité est nécessaire.
 
@@ -255,7 +257,9 @@ Un Formateur peut appeler `POST /api/evaluations/:id/generate-ai` pour une éval
 
 Les questions retournées sont validées par le backend et importées comme brouillons modifiables. Le Formateur doit les vérifier et publier explicitement l'évaluation. L'IA ne peut ni publier ni désigner une évaluation certifiante. Cette fonction utilise `AI_MAX_CONTEXT_CHARS`, `AI_MODEL`, un plafond de 8 192 jetons et ne réalise ni OCR ni exploration d'URL.
 
-## 7. Firebase Analytics et respect du consentement
+## 7. Mesure, recherche et notifications
+
+### 7.1 Firebase Analytics Web et respect du consentement
 
 Firebase est utilisé exclusivement pour Firebase Analytics / Google Analytics. Les services Firebase d'authentification, de base de données, de stockage ou d'hébergement ne font pas partie de l'implémentation actuelle.
 
@@ -290,6 +294,16 @@ Les notifications reposent sur une séparation entre le client mobile, l'API mé
 L'envoi est réservé à l'Administrateur via `POST /api/notifications/send`. Le service backend utilise le SDK Firebase Admin et les identifiants de compte de service fournis par les identifiants d'application par défaut. Les erreurs indiquant qu'un jeton est invalide ou n'est plus enregistré entraînent sa suppression. La désactivation de FCM (`FCM_ENABLED=false`) ne bloque ni l'authentification ni le reste de l'application.
 
 Sur Android, `expo-notifications` présente les messages reçus au premier plan et utilise le canal `hsa-default`. Une notification ouverte depuis l'arrière-plan ou depuis un état fermé est convertie en destination interne contrôlée : catalogue, détail d'une formation, détail d'une session, achats ou certificats. Une destination inconnue est ignorée. Lors de la déconnexion, l'application supprime le jeton distant avec `DELETE /api/notifications/devices` avant de fermer la session.
+
+### 7.4 Recherche globale et notifications Web en temps quasi réel
+
+La barre de recherche de l'espace authentifié interroge `GET /api/search` après au moins deux caractères et un court debounce. Le backend regroupe les résultats par formation, session, leçon, utilisateur, évaluation, paiement et certificat. Les filtres d'autorisation sont intégrés aux requêtes MongoDB : l'Administrateur dispose de la vue globale ; le Formateur reste limité à ses formations, sessions et apprenants associés ; l'Apprenant ne voit que les formations publiées, les ressources de ses inscriptions, ses sessions, paiements, évaluations et certificats. Cette conception évite qu'un simple masquage d'interface soit confondu avec une règle de sécurité.
+
+Le système de notifications Web est séparé de FCM. Les événements métier réussis créent des documents `Notification` destinés à un utilisateur : création de compte, inscription ou paiement, modification de session, publication ou soumission d'évaluation, fin de formation et disponibilité d'un certificat. Chaque document contient un type, un titre, un message, une date, un lien interne optionnel, des métadonnées et un état de lecture. L'index unique `(recipientUserId, dedupeKey)` empêche qu'un même événement produise plusieurs notifications pour le même destinataire. Les rappels de session à 24 heures et à une heure sont matérialisés lors de l'accès au fil ou de l'ouverture du canal temps réel.
+
+Après authentification, le navigateur ouvre `GET /api/notifications/stream` avec son JWT Bearer. Cette réponse Server-Sent Events reste ouverte. Lorsqu'une notification est insérée, `NotificationService` publie immédiatement son contenu aux connexions actives du destinataire. Le client actualise alors le compteur de la cloche, le panneau récent et, s'il est affiché, le centre de notifications. Un heartbeat est envoyé toutes les 25 secondes. Après une coupure, `AuthProvider` renouvelle au besoin la session et tente une reconnexion avec un délai exponentiel compris entre une et trente secondes. L'événement initial `ready` et le retour d'un onglet à l'état visible déclenchent une resynchronisation du compteur. Le contrôle REST toutes les 30 secondes est conservé comme filet de sécurité ; il ne constitue plus le chemin normal de livraison. En fonctionnement nominal, la notification d'un achat apparaît donc après l'écriture MongoDB et un aller-retour réseau, sans attendre le prochain intervalle de polling ; la latence exacte dépend de la base, du réseau et des intermédiaires HTTP.
+
+Le Web n'utilise ni permission de notification du navigateur, ni service worker, ni Web Push : les messages sont visibles dans l'application lorsque celle-ci est ouverte. FCM continue à servir exclusivement le push mobile. Le registre SSE est actuellement conservé dans la mémoire du processus Express. Pour plusieurs instances backend, il devra être relayé par Redis Pub/Sub, MongoDB Change Streams ou un bus équivalent ; sinon le polling rattrape la notification persistée, mais la diffusion immédiate n'est garantie que lorsque le producteur et la connexion utilisent la même instance.
 
 ## 8. Déploiement et environnement de développement
 
@@ -338,6 +352,7 @@ Les vérifications les plus significatives couvrent notamment :
 - la progression, les présences, les évaluations, les certificats et les tableaux de bord;
 - la configuration, le replica set et les scripts d'initialisation;
 - les garde-fous du tuteur, du concierge public et des événements Firebase;
+- la recherche globale selon les rôles, l'idempotence du fil Web, la propriété des notifications et la diffusion SSE;
 - la configuration mobile, les sessions natives, le consentement Analytics et les flux de notifications.
 
 Pour le mémoire final, cette section devra être complétée par des résultats mesurés : nombre de tests exécutés, taux de réussite, exemples de scénarios, captures d'écran de l'API et tests manuels des parcours critiques.
@@ -349,6 +364,7 @@ Les fonctions actuelles privilégient un périmètre clair et contrôlé. Les li
 - déploiement de production avec gestion sécurisée des secrets, surveillance, stockage objet et sauvegardes automatisées;
 - passage de Stripe test à une configuration de production validée pour le contexte du centre;
 - mécanisme de limitation de requêtes partagé et persistant pour un déploiement à plusieurs instances;
+- bus partagé pour diffuser les notifications SSE entre plusieurs processus, ainsi qu'une configuration de proxy adaptée aux connexions longues;
 - enrichissement de la recherche et de la recommandation, tout en conservant les contraintes de confidentialité;
 - amélioration de l'observabilité, métriques applicatives et journalisation de sécurité;
 - prise en charge complète d'une chaîne de distribution mobile, avec signature de production, notifications iOS et gestion centralisée des paramètres Firebase;
@@ -358,9 +374,9 @@ Ces pistes ne remettent pas en cause les règles actuelles : l'autorisation doit
 
 ## 11. Conclusion générale
 
-High Skills Academy met en œuvre un cycle de formation complet, depuis la publication d'une offre jusqu'à la délivrance d'un certificat. Le projet associe des clients React web et Expo/React Native, une API Express modulaire, MongoDB, Stripe, Gmail SMTP, Gemini, Firebase Analytics et Firebase Cloud Messaging dans une architecture cohérente pour son périmètre.
+High Skills Academy met en œuvre un cycle de formation complet, depuis la publication d'une offre jusqu'à la délivrance d'un certificat. Le projet associe des clients React web et Expo/React Native, une API Express modulaire, MongoDB, Stripe, Gmail SMTP, Gemini, Firebase Analytics, Firebase Cloud Messaging et un canal SSE Web dans une architecture cohérente pour son périmètre.
 
-Les développements récents apportent trois contributions importantes au projet : une assistance IA séparée selon le contexte — tuteur fondé sur les leçons pour l'Apprenant et concierge fondé sur les informations publiques pour le visiteur —, une application mobile native partageant les règles métier de l'API, et une mesure analytique optionnelle complétée par des notifications push FCM, toutes deux limitées par des mécanismes de consentement ou d'activation explicite.
+Les développements récents apportent quatre contributions importantes au projet : une assistance IA séparée selon le contexte — tuteur fondé sur les leçons pour l'Apprenant et concierge fondé sur les informations publiques pour le visiteur —, une application mobile native partageant les règles métier de l'API, une mesure analytique optionnelle complétée par des notifications push FCM, et un espace Web enrichi par une recherche autorisée côté serveur et des notifications persistantes diffusées en temps quasi réel.
 
 La valeur académique de la solution réside autant dans les fonctionnalités délivrées que dans les choix de conception : contrôle backend des droits, protection des flux financiers, modularisation du domaine, contraintes explicites sur l'IA et prise en compte de la confidentialité dès l'implémentation.
 
@@ -698,6 +714,7 @@ Training "1" -- "0..*" TrainingCost
 | Training | possède | Evaluation | 1 à N | Une formation peut comporter plusieurs évaluations |
 | Evaluation | contient | EvaluationQuestion | 1 à N | Une évaluation possède plusieurs questions |
 | Enrollment | peut produire | Certificate / Feedback | 1 à 0..1 chacun | Documents/réponses éligibles et uniques par inscription |
+| User | reçoit | Notification | 1 à N | Le fil persistant et l'état lu/non lu appartiennent au destinataire |
 
 ### B.8 Diagramme de composants
 
@@ -708,6 +725,7 @@ skinparam componentStyle rectangle
 [Interface React] as Web
 [Client API Fetch] as Client
 [Authentification et gardes] as Auth
+[Recherche et notifications Web] as Live
 [Firebase Analytics] as FA
 [Routes Express] as Routes
 [Services métier] as Services
@@ -721,8 +739,10 @@ cloud "Firebase" as Firebase
 
 Web --> Client
 Web --> Auth
+Web --> Live
 Web --> FA
 Client --> Routes
+Live --> Routes : REST + SSE authentifié
 Routes --> Services
 Routes --> AI
 Services --> Infra
@@ -731,6 +751,7 @@ AI --> ODM
 AI --> Gemini
 ODM --> DB
 Services --> Stripe
+Services --> Live : publication locale
 Infra --> DB
 FA --> Firebase
 @enduml
@@ -760,6 +781,7 @@ cloud "Firebase Analytics" as Firebase
 
 Browser --> Vite : HTTP
 Vite --> API : /api
+API --> Browser : SSE notifications
 API --> Mongo
 Init --> Mongo
 API --> Gmail : SMTP authentifié
@@ -797,6 +819,8 @@ Pour un mémoire de master, la structure ci-dessous est plus pertinente qu'une d
 | F07 | Le tuteur IA répond uniquement à partir du cours autorisé | Haute | Citations valides et accès limité à l'Apprenant inscrit |
 | F08 | Le concierge IA utilise uniquement l'information publique | Haute | Pas d'accès aux données métier privées; liens validés par serveur |
 | F09 | Les recommandations peuvent être mesurées avec consentement | Moyenne | Aucun événement Firebase avant consentement |
+| F10 | La recherche globale respecte les droits du rôle | Haute | Aucun résultat hors ownership, affectation ou inscription autorisée |
+| F11 | Le Web présente un fil de notifications persistant en temps quasi réel | Haute | Événement sauvegardé une fois, diffusé par SSE et rattrapé par polling après coupure |
 
 ### C.2 Exigences non fonctionnelles à présenter
 
@@ -806,7 +830,7 @@ Pour un mémoire de master, la structure ci-dessous est plus pertinente qu'une d
 | NF02 | Confidentialité | Minimisation des données transmises à Gemini et consentement préalable pour Analytics |
 | NF03 | Fiabilité | Traitement idempotent du paiement et index d'unicité sur les relations critiques |
 | NF04 | Maintenabilité | Modules métier séparés, TypeScript et validation par schémas |
-| NF05 | Performance | Pagination, contextes IA limités, délais maximum de fournisseur et limitation de requêtes |
+| NF05 | Performance | Pagination, contextes IA limités, délais maximum de fournisseur, limitation de requêtes et notification SSE sans polling intensif |
 | NF06 | Traçabilité | Paiements, inscriptions, factures, progression, présence et résultats persistés |
 | NF07 | Utilisabilité | Espaces adaptés aux rôles, états de chargement/erreur, interface responsive et liens de sources IA |
 
@@ -820,8 +844,10 @@ Pour un mémoire de master, la structure ci-dessous est plus pertinente qu'une d
 6. Espace Formateur : édition de formation et génération de questions IA en brouillon.
 7. Gestion de session et grille de présence.
 8. Espace Administrateur : tableau de bord, coûts et indicateurs.
-9. Bannière Analytics et vue DebugView — uniquement avec données de démonstration non sensibles.
-10. Swagger UI ou réponse `/api/health` illustrant l'état de l'API.
+9. Recherche globale : requête et groupes de résultats autorisés pour un rôle de démonstration.
+10. Cloche et centre de notifications : message récent, compteur et filtres lu/non lu.
+11. Bannière Analytics et vue DebugView — uniquement avec données de démonstration non sensibles.
+12. Swagger UI ou réponse `/api/health` illustrant l'état de l'API.
 
 Pour chaque figure : numéro, titre explicite, source (« réalisation personnelle »), légende et une phrase d'analyse dans le texte. Éviter les captures contenant des e-mails, clés, tokens ou données réelles identifiantes.
 
@@ -843,6 +869,8 @@ Pour chaque figure : numéro, titre explicite, source (« réalisation personnel
 | T08 | Concierge protégé | Question sur des données privées | Refus/orientation Contact sans fuite | Capture du widget |
 | T09 | Consentement Analytics | Acceptation puis navigation | `page_view` visible dans DebugView | Capture DebugView anonymisée |
 | T10 | Refus Analytics | Refus de bannière | Aucun événement Firebase envoyé | Capture/observation documentée |
+| T11 | Recherche selon le rôle | Même terme avec comptes Admin, Formateur et Apprenant | Groupes différents, sans donnée non autorisée | Test d'intégration + captures comparées |
+| T12 | Notification Web d'achat | Webhook de paiement confirmé et navigateur connecté | Document unique, événement SSE reçu et cloche actualisée sans attendre 30 secondes | Test d'intégration + capture du panneau |
 
 ### D.2 Questions de discussion pour la soutenance
 
@@ -852,5 +880,6 @@ Pour chaque figure : numéro, titre explicite, source (« réalisation personnel
 - Comment le système limite-t-il le risque d'hallucination ou de fuite de données dans les assistants IA ?
 - Quelle différence existe-t-il entre le tuteur IA, le concierge public et la génération de questions ?
 - Comment le consentement Firebase est-il respecté et quelles données sont réellement mesurées ?
+- Pourquoi utiliser SSE pour le Web tout en conservant FCM pour le Mobile et un polling de secours ?
 - Quelles limites apparaissent si l'application doit être déployée sur plusieurs instances ?
 - Quelles améliorations prioriser après une évaluation auprès d'utilisateurs réels ?

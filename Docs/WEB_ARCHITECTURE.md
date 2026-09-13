@@ -9,6 +9,7 @@ Le projet Web est la plateforme principale de **High Skills Academy**. Il réuni
 - une SPA publique et des espaces métier pour les rôles `ADMIN`, `TRAINER` et `LEARNER` ;
 - une API REST commune au Web et au Mobile ;
 - la gestion du catalogue, des contenus, sessions, paiements, inscriptions, progressions, présences, évaluations, certificats, factures, feedbacks, coûts et tableaux de bord ;
+- une recherche globale protégée par rôle et un centre de notifications Web persistant, actualisé en temps quasi réel ;
 - trois fonctions Gemini distinctes : tuteur pédagogique, concierge public et génération de questions ;
 - Firebase Analytics facultatif côté navigateur et Firebase Cloud Messaging côté API pour le client mobile.
 
@@ -18,8 +19,9 @@ Le projet Web est la plateforme principale de **High Skills Academy**. Il réuni
 Navigateur — React/Vite
   ├─ pages publiques et espaces par rôle
   ├─ access token JWT en mémoire
-  └─ cookie de refresh HTTP-only
-             │ JSON / multipart / téléchargements protégés
+  ├─ cookie de refresh HTTP-only
+  └─ canal SSE authentifié pour les notifications
+             │ JSON / multipart / téléchargements protégés / SSE
              ▼
 API Express 5 — monolithe modulaire
   ├─ routes + DTO Zod + middlewares
@@ -39,6 +41,7 @@ Choix vérifiables importants :
 - transactions MongoDB pour les opérations atomiques sensibles ; le replica set est donc obligatoire ;
 - fichiers hors de MongoDB, avec métadonnées et empreinte SHA-256 en base ;
 - UI organisée par fonctionnalité, sans gestionnaire d'état global externe : Context React pour la session et état local pour les écrans ;
+- notifications Web poussées par Server-Sent Events (SSE), avec interrogation périodique de secours ;
 - contrats partagés conceptuellement, mais types TypeScript dupliqués entre frontend et backend ; aucune génération de client depuis OpenAPI.
 
 ## Structure du projet
@@ -105,7 +108,8 @@ Tous les chemins ci-dessous sont relatifs à `Web/backend/src/modules`.
 | `costs` / `dashboard`       | coûts formateurs et formations ; agrégats administrateur sur périodes `Africa/Tunis` ; recommandations déterministes par historique de catégorie et popularité                                       |
 | `tutor`                     | sélection de leçons et réponse Gemini fondée avec citations vérifiées                                                                                                                                |
 | `public-concierge`          | contexte limité aux pages publiques et formations publiées, réponses/liens contrôlés                                                                                                                 |
-| `notifications`             | enregistrement des appareils Android et envoi FCM réservé à l'Administrateur                                                                                                                         |
+| `notifications`             | fil Web persistant par destinataire, lecture/non-lecture, rappels, diffusion SSE en temps quasi réel, appareils Android et envoi FCM réservé à l'Administrateur                                      |
+| `search`                    | recherche globale groupée et filtrée côté serveur selon le rôle, les inscriptions, l'ownership et les affectations                                                                                   |
 | `contact`                   | validation, protection anti-abus et envoi vers une adresse fixe via le service email                                                                                                                 |
 
 Les adaptateurs importants se trouvent dans `src/infrastructure` : `StripeSdkCheckoutGateway`, `LocalFileStorage`, `ProtectedDocumentStorage`, générateurs PDF, service email transactionnel avec fournisseur SMTP configurable, connexion/index MongoDB, middleware d'erreurs et document OpenAPI.
@@ -117,8 +121,8 @@ Les adaptateurs importants se trouvent dans `src/infrastructure` : `StripeSdkChe
 | `src/app/App.tsx`                       | définition complète des routes publiques, d'authentification et des espaces par rôle                                    |
 | `src/app/layouts/*`                     | `PublicLayout`, `AuthLayout`, `RoleLayout` et navigation adaptée au rôle                                                |
 | `src/app/routes/guards.tsx`             | `PublicOnly`, `RequireAuthentication`, `RequireRole` ; gardes UX, non frontière de sécurité                             |
-| `src/core/auth/*`                       | `AuthProvider`, `AuthContext`, hook `useAuth`, refresh unique partagé et nouvelle tentative après 401                   |
-| `src/core/api/client.ts`                | `apiRequest`, `apiDownload`, `ApiError`, ajout Bearer/cookie et localisation des erreurs                                |
+| `src/core/auth/*`                       | `AuthProvider`, `AuthContext`, hook `useAuth`, refresh unique partagé, nouvelle tentative après 401 et reconnexion des flux SSE         |
+| `src/core/api/client.ts`                | `apiRequest`, `apiDownload`, `apiEventStream`, `ApiError`, ajout Bearer/cookie et localisation des erreurs                              |
 | `src/core/analytics/*`                  | consentement, vues de page et mesure du tunnel de recommandation                                                        |
 | `src/features/trainings`                | catalogue/fiches, achat, catégories et gestion des formations                                                           |
 | `src/features/content`                  | consultation/édition du contenu, téléchargements, progression et `TutorChat`                                            |
@@ -126,6 +130,7 @@ Les adaptateurs importants se trouvent dans `src/infrastructure` : `StripeSdkChe
 | `src/features/evaluations`              | création, questions manuelles/IA, tentatives, correction et résultats                                                   |
 | `src/features/payments`, `certificates` | statut de paiement, factures, certificats et feedback                                                                   |
 | `src/features/dashboard`                | tableaux de bord par rôle et indicateurs administrateur                                                                 |
+| `src/features/notifications`            | recherche globale, cloche, compteur, centre paginé, filtres et réception SSE                                                          |
 | `src/features/public`                   | accueil, à propos, FAQ, contact et `PublicConcierge`; celui-ci reste monté sur les pages publiques même après connexion |
 | `src/shared/components`                 | avatar, menu utilisateur, pagination, sélection, icônes, titre et gestion du défilement                                 |
 
@@ -138,6 +143,7 @@ Les pages utilisent principalement `useState`, `useEffect`, `useCallback` et `us
 3. Après un `401`, une seule promesse de refresh est partagée, le JWT est remplacé et la requête est rejouée ; un échec remet le client en mode invité.
 4. L'API valide paramètres/corps avec Zod, construit le principal depuis le JWT **et recharge le compte actif en base**, puis le service vérifie rôle, ownership, affectation ou inscription.
 5. Les services lisent/écrivent MongoDB et appellent, si nécessaire, un adaptateur externe. Les erreurs suivent `{ error: { code, message, fieldErrors? }, requestId }`.
+6. Après authentification, `AuthProvider` maintient `GET /notifications/stream` par `fetch` avec le JWT Bearer. Une notification créée est envoyée immédiatement au destinataire connecté ; le client actualise le compteur et les listes. Le flux se reconnecte avec délai exponentiel après une coupure, tandis qu'un contrôle toutes les 30 secondes reste un filet de sécurité.
 
 ### Surface API principale
 
@@ -148,7 +154,8 @@ Les pages utilisent principalement `useState`, `useEffect`, `useCallback` et `us
 | Offre/contenu      | `/trainings/*`, `/modules/*`, `/lessons/*`, `/resources/*`, `/sessions/*`, `/schedules/*`                                |
 | Apprentissage      | `/progress`, `/attendance`, `/evaluations`, `/attempts`, `/trainings/:id/tutor/messages`                                 |
 | Commerce/documents | `/payments/checkout`, `/payments`, `/enrollments`, `/invoices`, `/certificates`, `/feedback`                             |
-| Pilotage           | `/costs/*`, `/dashboard/*`, `/notifications/*`                                                                           |
+| Recherche          | `GET /search?q=...` avec résultats groupés et filtrage d'autorisation côté serveur                                       |
+| Pilotage           | `/costs/*`, `/dashboard/*`, `/notifications`, `/notifications/unread-count`, `/notifications/stream`, routes de lecture  |
 
 Le contrat complet est codé dans `Web/backend/src/infrastructure/openapi/document.ts` et servi sur `/api/openapi.json` et `/api/docs`.
 
@@ -176,11 +183,11 @@ MongoDB contient les collections suivantes, initialisées par `initializeDatabas
 | Présentiel        | `training_sessions`, `session_schedules`, `attendances`                                               |
 | Commerce          | `payments`, `enrollments`, `invoices`, `invoice_items`                                                |
 | Pédagogie         | `lesson_progress`, `evaluations`, `evaluation_questions`, `evaluation_attempts`, `evaluation_answers` |
-| Sorties/pilotage  | `certificates`, `feedback`, `trainer_costs`, `training_costs`, `notification_devices`                 |
+| Sorties/pilotage  | `certificates`, `feedback`, `trainer_costs`, `training_costs`, `notifications`, `notification_devices`                 |
 
 Relations structurantes : `Training` référence sa catégorie et son Formateur propriétaire ; le contenu et les sessions référencent la formation ; `Enrollment` relie Apprenant, formation/session et paiement ; progression, présence et tentative sont rattachées à l'inscription ; facture et certificat stockent des snapshots pour préserver l'historique.
 
-Les index uniques protègent notamment l'e-mail et l'unique Administrateur, l'ordre des contenus, une inscription distancielle par apprenant/formation, une inscription présentielle par apprenant/session, une présence par inscription/créneau, une facture par paiement et un certificat par inscription.
+Les index uniques protègent notamment l'e-mail et l'unique Administrateur, l'ordre des contenus, une inscription distancielle par apprenant/formation, une inscription présentielle par apprenant/session, une présence par inscription/créneau, une facture par paiement, un certificat par inscription et une notification par événement/destinataire. Les index du fil de notifications couvrent aussi le tri chronologique et le compteur non lu.
 
 ## Configuration et variables d'environnement
 
@@ -203,10 +210,21 @@ Navigateur → Stripe → redirection de retour
 Stripe → webhook signé sur corps brut
 API → contrôle IDs/montant/devise/statut
 API → transaction : capacité + Enrollment + Invoice + InvoiceItem + Payment(PAID)
+API → Notification persistée → événement SSE vers l'Apprenant connecté
 Client → interroge /payments/:id ; la redirection seule ne donne aucun accès
 ```
 
 Le traitement est idempotent si le paiement est déjà `PAID`. Les index et la transaction empêchent les doubles inscriptions/documents ; une capacité épuisée au moment du webhook fait échouer le paiement interne. Aucun mécanisme de remboursement Stripe n'est visible dans ce flux : ce cas doit donc être traité opérationnellement ou complété avant une mise en production.
+
+### Recherche globale et notifications Web
+
+`GET /search` exécute une recherche insensible à la casse dans les formations, sessions, leçons, utilisateurs, évaluations, paiements et certificats. Les groupes réellement interrogés dépendent du principal authentifié : l'Administrateur dispose de la vue globale, le Formateur reste limité à ses formations, sessions et apprenants liés, et l'Apprenant ne voit que les ressources publiques ou rattachées à ses inscriptions ainsi que ses propres paiements et certificats. Ce filtrage est appliqué dans MongoDB ; masquer un résultat dans React ne constitue pas la protection.
+
+Les notifications Web sont distinctes de FCM. Les événements métier réussis — compte, inscription/paiement, session, évaluation, progression et certificat — créent un document `Notification` associé à un utilisateur. La clé `(recipientUserId, dedupeKey)` rend cette création idempotente. Les rappels de session à 24 heures et une heure sont matérialisés lors d'un accès au fil ou de l'ouverture du canal. Les routes de lecture ne peuvent modifier que les documents du principal authentifié.
+
+Le canal `GET /notifications/stream` est une réponse SSE longue durée authentifiée par le JWT Bearer. `NotificationService` conserve les abonnés connectés en mémoire et publie chaque nouvelle notification après son insertion en base. Le serveur envoie un commentaire heartbeat toutes les 25 secondes pour limiter les coupures par les intermédiaires. Le navigateur parse le flux, actualise immédiatement la cloche et le centre ouvert, puis se reconnecte avec un délai exponentiel de 1 à 30 secondes en cas de rupture. L'événement initial `ready` et le retour d'un onglet à l'état visible déclenchent une resynchronisation du compteur. Le contrôle toutes les 30 secondes est conservé uniquement comme mécanisme de rattrapage : en fonctionnement normal, la latence correspond au temps d'écriture MongoDB et à un aller-retour réseau, et non à l'intervalle de polling.
+
+Cette diffusion SSE est locale au processus Express. Avec plusieurs instances backend, un utilisateur connecté à une instance ne recevrait pas directement un événement créé sur une autre ; le polling finirait néanmoins par rattraper l'état persistant. Un déploiement horizontal doit remplacer le registre mémoire par Redis Pub/Sub, MongoDB Change Streams ou un autre bus partagé. Il faut également désactiver la mise en tampon des réponses SSE dans le reverse proxy et prévoir des timeouts compatibles avec les connexions longues.
 
 ### Apprentissage et certification
 
@@ -289,7 +307,7 @@ Sur le Web, Analytics reste non initialisé tant que l'option, la configuration,
 
 ### 7. Quelles limites apparaissent si l'application doit être déployée sur plusieurs instances ?
 
-Le limiteur IP est une `Map` locale : ses compteurs divergent et disparaissent au redémarrage. Les uploads/PDF utilisent un disque local, donc une autre instance peut ne pas trouver le fichier. Le replica set Compose n'a qu'un nœud et n'offre pas de haute disponibilité. Il faudrait un rate limiter partagé, un stockage objet commun, un MongoDB répliqué de production, un équilibrage cohérent et une stratégie d'observabilité/secrets. Les transactions et index MongoDB rendent en revanche le fulfillment concurrent plus robuste si toutes les instances partagent la même base.
+Le limiteur IP et le registre des connexions SSE sont des `Map` locales : leurs états divergent et disparaissent au redémarrage. Une notification produite sur une instance n'est poussée qu'aux connexions de cette instance, même si son document MongoDB reste visible au prochain polling. Les uploads/PDF utilisent un disque local, donc une autre instance peut ne pas trouver le fichier. Le replica set Compose n'a qu'un nœud et n'offre pas de haute disponibilité. Il faudrait un rate limiter et un bus de diffusion partagés, un stockage objet commun, un MongoDB répliqué de production, un équilibrage cohérent et une stratégie d'observabilité/secrets. Les transactions et index MongoDB rendent en revanche le fulfillment concurrent plus robuste si toutes les instances partagent la même base.
 
 ### 8. Quelles améliorations prioriser après une évaluation auprès d'utilisateurs réels ?
 
