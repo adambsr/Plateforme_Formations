@@ -1,3 +1,4 @@
+import { ChevronDown } from 'lucide-react';
 import { forwardRef, type SelectHTMLAttributes } from 'react';
 
 export const Select = forwardRef<
@@ -12,9 +13,7 @@ export const Select = forwardRef<
         className={`content-select ${className}`.trim()}
         aria-invalid={invalid}
       />
-      <svg viewBox="0 0 20 20" aria-hidden="true">
-        <path d="m6 8 4 4 4-4" />
-      </svg>
+      <ChevronDown aria-hidden="true" />
     </span>
   );
 });

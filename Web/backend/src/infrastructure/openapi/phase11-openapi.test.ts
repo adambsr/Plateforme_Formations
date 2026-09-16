@@ -15,6 +15,7 @@ describe('Phase 11 OpenAPI contract', () => {
       '/dashboard/satisfaction',
       '/dashboard/financial',
       '/dashboard/profitability',
+      '/dashboard/trainer',
     ])
       expect(openApiDocument.paths[path]).toBeDefined();
   });

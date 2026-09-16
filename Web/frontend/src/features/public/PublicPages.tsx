@@ -1,7 +1,5 @@
-import { useEffect, useState } from 'react';
-import { useForm } from 'react-hook-form';
+import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router';
-import { CalendarClock, Mail, MapPin, Send } from 'lucide-react';
 import badgeCheckIcon from 'lucide-static/icons/badge-check.svg';
 import bookOpenCheckIcon from 'lucide-static/icons/book-open-check.svg';
 import brainCircuitIcon from 'lucide-static/icons/brain-circuit.svg';
@@ -10,21 +8,86 @@ import calendarClockIcon from 'lucide-static/icons/calendar-clock.svg';
 import codeIcon from 'lucide-static/icons/code-2.svg';
 import fileSpreadsheetIcon from 'lucide-static/icons/file-spreadsheet.svg';
 import paletteIcon from 'lucide-static/icons/palette.svg';
+import mousePointerClickIcon from 'lucide-static/icons/mouse-pointer-click.svg';
+import userPlusIcon from 'lucide-static/icons/user-plus.svg';
+import trendingUpIcon from 'lucide-static/icons/trending-up.svg';
+import awardIcon from 'lucide-static/icons/award.svg';
+import starIcon from 'lucide-static/icons/star.svg';
+import arrowLeftIcon from 'lucide-static/icons/arrow-left.svg';
+import arrowRightIcon from 'lucide-static/icons/arrow-right.svg';
 
-import academyHero from '../../assets/academy-hero.png';
+import academyHero from '../../assets/academy-hero.webp';
+import academyHeroCompact from '../../assets/academy-hero-compact.webp';
+import academyHeroAvif from '../../assets/academy-hero.avif';
+import academyHeroCompactAvif from '../../assets/academy-hero-compact.avif';
+import academyStudy from '../../assets/academy-study.webp';
 import { apiRequest } from '../../core/api/client.js';
 import { useAuth } from '../../core/auth/AuthContext.js';
 import { Icon } from '../../shared/components/Icon.js';
-import { TrainingCard } from '../trainings/TrainingPages.js';
+import { TrainingCard } from '../trainings/TrainingCard.js';
 import type {
   PaginatedTrainings,
   TrainingCategory,
 } from '../trainings/types.js';
 
+const categoryVisuals = [
+  {
+    matches: ['bureau', 'office', 'productiv'],
+    image:
+      'https://images.unsplash.com/photo-1521737711867-e3b97375f902?auto=format&fit=crop&w=1800&q=85',
+  },
+  {
+    matches: ['data', 'ia', 'intelligence', 'analytics'],
+    image:
+      'https://images.unsplash.com/photo-1516321318423-f06f85e504b3?auto=format&fit=crop&w=1800&q=85',
+  },
+  {
+    matches: ['design', 'créa', 'crea', 'ux', 'ui'],
+    image:
+      'https://images.unsplash.com/photo-1531482615713-2afd69097998?auto=format&fit=crop&w=1800&q=85',
+  },
+  {
+    matches: ['web', 'développement', 'developpement', 'code', 'programm'],
+    image:
+      'https://images.unsplash.com/photo-1523240795612-9a054b0db644?auto=format&fit=crop&w=1800&q=85',
+  },
+  {
+    matches: ['management', 'leadership', 'projet', 'communication'],
+    image:
+      'https://images.unsplash.com/photo-1524178232363-1fb2b075b655?auto=format&fit=crop&w=1800&q=85',
+  },
+] as const;
+
+function getCategoryImage(category: Pick<TrainingCategory, 'name'>, index: number) {
+  const categoryName = category.name.toLocaleLowerCase();
+  const visual = categoryVisuals.find(({ matches }) =>
+    matches.some((match) => categoryName.includes(match)),
+  );
+  return visual?.image ?? [academyStudy, academyHeroCompact, academyHero][index % 3]!;
+}
+
 export function LandingPage() {
   const { user } = useAuth();
   const [preview, setPreview] = useState<PaginatedTrainings>();
   const [categories, setCategories] = useState<TrainingCategory[]>([]);
+  const categorySliderRef = useRef<HTMLDivElement>(null);
+  const dragStartX = useRef(0);
+  const dragStartScrollLeft = useRef(0);
+  const didDrag = useRef(false);
+  useEffect(() => {
+    const slider = categorySliderRef.current;
+    if (!slider) return;
+    const advance = () => {
+      const maxScroll = slider.scrollWidth - slider.clientWidth;
+      const nextScroll = slider.scrollLeft + slider.clientWidth + 16;
+      slider.scrollTo({
+        left: nextScroll >= maxScroll - 2 ? 0 : nextScroll,
+        behavior: 'smooth',
+      });
+    };
+    const interval = window.setInterval(advance, 5000);
+    return () => window.clearInterval(interval);
+  }, [categories.length]);
   useEffect(() => {
     let active = true;
     void apiRequest<PaginatedTrainings>('/trainings?page=1&pageSize=3')
@@ -57,11 +120,7 @@ export function LandingPage() {
         <div>
           <span className="eyebrow">Apprendre. Progresser. Réussir.</span>
           <h1>La formation qui avance avec vous.</h1>
-          <p>
-            Découvrez des parcours professionnels accessibles en ligne ou en
-            présentiel, suivez votre progression et valorisez vos acquis par un
-            certificat.
-          </p>
+
           <div className="hero-actions">
             <Link className="primary-button" to="/catalogue">
               Explorer les formations
@@ -72,91 +131,171 @@ export function LandingPage() {
               </Link>
             ) : null}
           </div>
-          <dl className="hero-proof">
-            <div>
-              <dt>2 modalités</dt>
-              <dd>En ligne et présentiel</dd>
-            </div>
-            <div>
-              <dt>Suivi clair</dt>
-              <dd>Progression et planning</dd>
-            </div>
-            <div>
-              <dt>Certificats</dt>
-              <dd>Après validation des acquis</dd>
-            </div>
-          </dl>
         </div>
         <figure className="hero-visual">
-          <img
-            src={academyHero}
-            alt="Apprenants accompagnés par une formatrice dans une salle moderne"
-          />
-          <figcaption className="hero-image-caption">
-            <strong>Apprendre ensemble</strong>
-            <span>Des parcours concrets, en ligne et en présentiel.</span>
-          </figcaption>
-          {/* <div className="hero-card hero-card-one">
-            <Icon src={bookOpenCheckIcon} size={22} />
-            <strong>À votre rythme</strong>
-            <span>Progression claire</span>
-          </div>
-          <div className="hero-card hero-card-two">
-            <Icon src={calendarClockIcon} size={22} />
-            <strong>Planning maîtrisé</strong>
-            <span>Sessions en présentiel</span>
-          </div> */}
+          <picture>
+            <source
+              type="image/avif"
+              srcSet={`${academyHeroCompactAvif} 768w, ${academyHeroAvif} 1080w`}
+              sizes="(max-width: 767px) calc(100vw - 40px), 600px"
+            />
+            <img
+              src={academyHero}
+              srcSet={`${academyHeroCompact} 768w, ${academyHero} 1080w`}
+              sizes="(max-width: 767px) calc(100vw - 40px), 600px"
+              alt="Apprenants accompagnés par un formateur dans une salle moderne"
+              width={1200}
+              height={600}
+              fetchPriority="high"
+            />
+          </picture>
         </figure>
       </section>
-      <section className="landing-section">
+      <div className="landing-introduction">
+        <p>
+          Découvrez des parcours professionnels accessibles en ligne ou en
+          présentiel, suivez votre progression et valorisez vos acquis par un
+          certificat.
+        </p>
+        <dl className="hero-proof">
+          <div>
+            <dt>2 modalités</dt>
+            <dd>En ligne et présentiel</dd>
+          </div>
+          <div>
+            <dt>Suivi clair</dt>
+            <dd>Progression et planning</dd>
+          </div>
+          <div>
+            <dt>Certificats</dt>
+            <dd>Après validation des acquis</dd>
+          </div>
+        </dl>
+        <div className="hero-image-caption">
+          <strong>Apprendre ensemble</strong>
+          <span>Des parcours concrets, en ligne et en présentiel.</span>
+        </div>
+      </div>
+      <section className="landing-section benefits-section">
         <div className="section-copy">
           <div>
-            <span className="eyebrow">Une expérience complète</span>
+            <span className="context-label">Une expérience complète</span>
             <h2>
               Tout ce qu’il faut pour transformer une inscription en
               compétences.
             </h2>
           </div>
         </div>
-        <div className="feature-grid">
-          <article>
-            <Icon src={bookOpenCheckIcon} size={32} className="feature-icon" />
-            <h3>Parcours structurés</h3>
-            <p>
-              Modules, leçons et ressources organisés pour avancer sans perdre
-              le fil.
-            </p>
-          </article>
-          <article>
-            <Icon src={calendarClockIcon} size={32} className="feature-icon" />
-            <h3>Sessions maîtrisées</h3>
-            <p>
-              Dates, salles, formateurs et présences réunis dans un planning
-              lisible.
-            </p>
-          </article>
-          <article>
-            <Icon src={badgeCheckIcon} size={32} className="feature-icon" />
-            <h3>Résultats vérifiables</h3>
-            <p>
-              Évaluations, progression et certificats reposent sur des règles
-              transparentes.
-            </p>
-          </article>
+        <div className="benefits-layout">
+          <img
+            className="benefits-image"
+            src={academyStudy}
+            alt="Une apprenante prend des notes pendant sa formation en ligne"
+            width={960}
+            height={640}
+            loading="lazy"
+            decoding="async"
+          />
+          <div className="feature-grid">
+            <article>
+              <Icon
+                src={bookOpenCheckIcon}
+                size={32}
+                className="feature-icon"
+              />
+              <h3>Parcours structurés</h3>
+              <p>
+                Modules, leçons et ressources organisés pour avancer sans perdre
+                le fil.
+              </p>
+            </article>
+            <article>
+              <Icon
+                src={calendarClockIcon}
+                size={32}
+                className="feature-icon"
+              />
+              <h3>Sessions maîtrisées</h3>
+              <p>
+                Dates, salles, formateurs et présences réunis dans un planning
+                lisible.
+              </p>
+            </article>
+            <article>
+              <Icon src={badgeCheckIcon} size={32} className="feature-icon" />
+              <h3>Résultats vérifiables</h3>
+              <p>
+                Évaluations, progression et certificats reposent sur des règles
+                transparentes.
+              </p>
+            </article>
+          </div>
         </div>
       </section>
       <section className="landing-section category-showcase">
         <div className="section-heading">
           <div>
-            <span className="eyebrow">Domaines</span>
+            <span className="context-label">Domaines</span>
             <h2>Explorez par catégorie</h2>
           </div>
           <Link className="tertiary-link" to="/catalogue">
             Parcourir le catalogue <span aria-hidden="true">→</span>
           </Link>
         </div>
-        <div className="category-tiles">
-          {(categories.length > 0
+        <div className="category-slider-wrap">
+          <button
+            className="category-slider-control category-slider-control-prev"
+            type="button"
+            aria-label="Catégorie précédente"
+            onClick={() =>
+              categorySliderRef.current?.scrollBy({
+                left: -(categorySliderRef.current.clientWidth + 16),
+                behavior: 'smooth',
+              })
+            }
+          >
+            <Icon src={arrowLeftIcon} size={20} />
+          </button>
+          <div
+            className="category-slider"
+            aria-label="Catégories de formation"
+            ref={categorySliderRef}
+            tabIndex={0}
+            onPointerDown={(event) => {
+              const slider = categorySliderRef.current;
+              if (!slider) return;
+              dragStartX.current = event.clientX;
+              dragStartScrollLeft.current = slider.scrollLeft;
+              didDrag.current = false;
+              slider.setPointerCapture(event.pointerId);
+            }}
+            onPointerMove={(event) => {
+              const slider = categorySliderRef.current;
+              if (!slider || !slider.hasPointerCapture(event.pointerId)) return;
+              const distance = event.clientX - dragStartX.current;
+              if (Math.abs(distance) > 4) didDrag.current = true;
+              if (didDrag.current) slider.scrollLeft = dragStartScrollLeft.current - distance;
+            }}
+            onPointerUp={(event) => {
+              const slider = categorySliderRef.current;
+              if (slider?.hasPointerCapture(event.pointerId)) {
+                slider.releasePointerCapture(event.pointerId);
+              }
+            }}
+            onPointerCancel={(event) => {
+              const slider = categorySliderRef.current;
+              if (slider?.hasPointerCapture(event.pointerId)) {
+                slider.releasePointerCapture(event.pointerId);
+              }
+            }}
+            onClick={(event) => {
+              if (didDrag.current) {
+                event.preventDefault();
+                didDrag.current = false;
+              }
+            }}
+          >
+            {(categories.length > 0
             ? categories
             : [
                 { id: 'web', name: 'Développement web' },
@@ -172,20 +311,48 @@ export function LandingPage() {
               codeIcon,
               briefcaseBusinessIcon,
             ][index % 5]!;
+            const categoryImage = getCategoryImage(category, index);
             return (
-              <Link key={category.id} to="/catalogue">
-                <Icon src={categoryIcon} size={26} />
-                <strong>{category.name}</strong>
-                <small>Découvrir les parcours</small>
+              <Link
+                className={`category-panel category-panel-${index % 5}`}
+                key={category.id}
+                to="/catalogue"
+              >
+                <img src={categoryImage} alt="" loading="lazy" decoding="async" />
+                <span className="category-panel-overlay" aria-hidden="true" />
+                <span className="category-panel-content">
+                  <Icon src={categoryIcon} size={25} />
+                  <strong>{category.name}</strong>
+                  <small>
+                    {'description' in category && category.description
+                      ? category.description
+                      : 'Des parcours pratiques pour développer des compétences utiles.'}
+                  </small>
+                  <span>Découvrir les parcours</span>
+                </span>
               </Link>
             );
           })}
+          </div>
+          <button
+            className="category-slider-control category-slider-control-next"
+            type="button"
+            aria-label="Catégorie suivante"
+            onClick={() =>
+              categorySliderRef.current?.scrollBy({
+                left: categorySliderRef.current.clientWidth + 16,
+                behavior: 'smooth',
+              })
+            }
+          >
+            <Icon src={arrowRightIcon} size={20} />
+          </button>
         </div>
       </section>
       <section className="landing-section landing-training-preview">
         <div className="section-heading">
           <div>
-            <span className="eyebrow">À découvrir</span>
+            <span className="context-label">À découvrir</span>
             <h2>Formations publiées</h2>
           </div>
           <Link className="tertiary-link" to="/catalogue">
@@ -220,12 +387,8 @@ export function LandingPage() {
       <section className="landing-section testimonial-section">
         <div className="section-copy">
           <div>
-            <span className="eyebrow">Retours de démonstration</span>
+            <span className="eyebrow">Avis des utilisateurs</span>
             <h2>Une expérience pensée pour rester simple.</h2>
-            <p className="muted">
-              Témoignages fictifs affichés uniquement pour illustrer la version
-              de développement.
-            </p>
           </div>
         </div>
         <div className="testimonial-grid">
@@ -234,23 +397,35 @@ export function LandingPage() {
               'Ahmed',
               'Apprenant',
               'Une expérience très simple pour trouver ma formation et reprendre mes leçons.',
+              'Parcours en ligne',
             ],
             [
               'Meriem',
               'Apprenante',
               'Le planning et les étapes à valider sont immédiatement compréhensibles.',
+              'Suivi hebdomadaire',
             ],
             [
               'Sami',
               'Formateur',
               'Je retrouve mes contenus, sessions et évaluations sans détour.',
+              'Accompagnement de groupe',
             ],
-          ].map(([name, role, quote]) => (
+          ].map(([name, role, quote, detail]) => (
             <figure key={name}>
-              <div aria-label="5 étoiles">★★★★★</div>
+              <div
+                className="testimonial-rating"
+                role="img"
+                aria-label="5 étoiles"
+              >
+                {Array.from({ length: 5 }, (_, index) => (
+                  <Icon key={index} src={starIcon} size={16} />
+                ))}
+              </div>
               <blockquote>« {quote} »</blockquote>
               <figcaption>
-                — {name}, {role} · Démo
+                <span aria-hidden="true">{name.slice(0, 1)}</span>
+                <span><strong>{name}</strong><small>{role} · {detail}</small></span>
               </figcaption>
             </figure>
           ))}
@@ -258,31 +433,30 @@ export function LandingPage() {
       </section>
       <section className="landing-section how-section">
         <div>
-          <span className="eyebrow">Comment ça marche</span>
+          <span className="context-label">Comment ça marche</span>
           <h2>Un parcours simple, du choix au certificat.</h2>
         </div>
-        <ol>
-          <li>
-            <strong>Choisissez</strong>
-            <span>Explorez les formations publiées.</span>
+        <ol className="process-stepper">
+          {[
+            [mousePointerClickIcon, 'Choisissez', 'Explorez les formations publiées.'],
+            [userPlusIcon, 'Inscrivez-vous', 'Créez votre compte Apprenant.'],
+            [trendingUpIcon, 'Progressez', 'Suivez les contenus ou votre planning.'],
+            [awardIcon, 'Validez', 'Réussissez les étapes requises.'],
+          ].map(([icon, title, description], index) => (
+          <li key={title}>
+            <span className="process-icon"><Icon src={icon!} size={22} /></span>
+            <small>0{index + 1}</small>
+            <div>
+            <strong>{title}</strong>
+            <span>{description}</span>
+            </div>
           </li>
-          <li>
-            <strong>Inscrivez-vous</strong>
-            <span>Créez votre compte Apprenant.</span>
-          </li>
-          <li>
-            <strong>Progressez</strong>
-            <span>Suivez les contenus ou votre planning.</span>
-          </li>
-          <li>
-            <strong>Validez</strong>
-            <span>Réussissez les étapes requises.</span>
-          </li>
+          ))}
         </ol>
       </section>
       <section className="landing-cta">
         <div>
-          <span className="eyebrow">Prêt à commencer ?</span>
+          <span className="context-label">Prêt à commencer ?</span>
           <h2>Construisez votre prochain savoir-faire.</h2>
           <p>
             Votre espace personnel centralise formations, progression,
@@ -301,13 +475,21 @@ export function LandingPage() {
 
 export function AboutPage() {
   return (
-    <section className="static-page">
+    <section className="static-page about-page">
       <span className="eyebrow">À propos</span>
       <h1>La formation professionnelle, rendue plus lisible.</h1>
       <p className="lead">
         La plateforme accompagne un centre de formation dans la diffusion de
         parcours en ligne et l’organisation de sessions en présentiel.
       </p>
+      <img
+        className="about-image"
+        src={academyHero}
+        width={1200}
+        height={600}
+        alt="Un groupe d’apprenants échange avec un formateur"
+        loading="lazy"
+      />
       <div className="feature-grid">
         <article>
           <h2>Pour les Apprenants</h2>
@@ -362,7 +544,7 @@ export function FaqPage() {
       <span className="eyebrow">Questions fréquentes</span>
       <h1>Les réponses avant de commencer.</h1>
       <div className="faq-list">
-        {questions.map(([question, answer]) => (
+        {questions.map(([question, answer], index) => (
           <article
             className={
               openQuestion === question ? 'faq-item is-open' : 'faq-item'
@@ -372,6 +554,8 @@ export function FaqPage() {
             <button
               type="button"
               aria-expanded={openQuestion === question}
+              aria-controls={`faq-answer-${index}`}
+              id={`faq-question-${index}`}
               onClick={() =>
                 setOpenQuestion((current) =>
                   current === question ? null : question,
@@ -380,7 +564,12 @@ export function FaqPage() {
             >
               {question}
             </button>
-            <div className="faq-answer">
+            <div
+              className="faq-answer"
+              id={`faq-answer-${index}`}
+              aria-labelledby={`faq-question-${index}`}
+              hidden={openQuestion !== question}
+            >
               <p>{answer}</p>
             </div>
           </article>
@@ -392,134 +581,6 @@ export function FaqPage() {
           Nous contacter
         </Link>
       </div>
-    </section>
-  );
-}
-export function ContactPage() {
-  const [submissionError, setSubmissionError] = useState('');
-  const [submissionNotice, setSubmissionNotice] = useState('');
-  const form = useForm<{
-    name: string;
-    email: string;
-    subject: string;
-    message: string;
-  }>();
-  const address =
-    import.meta.env.VITE_CENTER_ADDRESS ??
-    'Route Manzel Chaker km 2.5 en face Magasin Général (MG) , Sfax, Tunisia';
-  const email = import.meta.env.VITE_CENTER_EMAIL ?? 'contact.hsa.tn@gmail.com';
-  const phone = import.meta.env.VITE_CENTER_PHONE ?? '+216 70 000 000';
-  const hours =
-    import.meta.env.VITE_CENTER_HOURS ?? 'Lundi–vendredi, 8 h 30–17 h 30';
-  return (
-    <section className="static-page contact-page">
-      <div className="contact-intro">
-        <span className="eyebrow">Contact</span>
-        <h1>Parlons de votre projet de formation.</h1>
-        <p className="lead">
-          Pour toute question sur un parcours, une session ou votre espace,
-          notre équipe vous répond avec les informations utiles, sans jamais
-          demander de mot de passe ou de données de carte.
-        </p>
-        <dl className="contact-details">
-          <div>
-            <dt>
-              <MapPin aria-hidden="true" size={16} /> Adresse
-            </dt>
-            <dd>{address}</dd>
-          </div>
-          <div>
-            <dt>
-              <Mail aria-hidden="true" size={16} /> Email
-            </dt>
-            <dd>
-              <a href={`mailto:${email}`}>{email}</a>
-            </dd>
-          </div>
-          <div>
-            <dt>Téléphone</dt>
-            <dd>
-              <a href={`tel:${phone.replace(/\s/g, '')}`}>{phone}</a>
-            </dd>
-          </div>
-          <div>
-            <dt>
-              <CalendarClock aria-hidden="true" size={16} /> Horaires
-            </dt>
-            <dd>{hours}</dd>
-          </div>
-        </dl>
-        <Link className="secondary-button" to="/catalogue">
-          Consulter le catalogue
-        </Link>
-      </div>
-      <form
-        className="content-card contact-form"
-        onSubmit={form.handleSubmit(async (values) => {
-          setSubmissionError('');
-          setSubmissionNotice('');
-          try {
-            const result = await apiRequest<{ message: string }>('/contact', {
-              method: 'POST',
-              body: JSON.stringify(values),
-            });
-            setSubmissionNotice(result.message);
-            form.reset();
-          } catch (caught) {
-            setSubmissionError(
-              caught instanceof Error
-                ? caught.message
-                : 'Votre message n’a pas pu être envoyé.',
-            );
-          }
-        })}
-      >
-        <h2>Envoyer un message</h2>
-        <p className="muted">Tous les champs sont obligatoires.</p>
-        <label>
-          Nom
-          <input required minLength={2} {...form.register('name')} />
-        </label>
-        <label>
-          Email
-          <input type="email" required {...form.register('email')} />
-        </label>
-        <label>
-          Objet
-          <input required minLength={3} {...form.register('subject')} />
-        </label>
-        <label>
-          Message
-          <textarea
-            rows={5}
-            required
-            minLength={10}
-            {...form.register('message')}
-          />
-        </label>
-        <p className="muted">
-          Votre nom, votre email, l’objet et le message sont transmis à notre
-          équipe par email pour répondre à votre demande. Consultez notre{' '}
-          <Link to="/privacy">politique de confidentialité</Link>.
-        </p>
-        {submissionError && (
-          <p className="form-error" role="alert">
-            {submissionError}
-          </p>
-        )}
-        {submissionNotice && (
-          <p className="success-message" role="status">
-            {submissionNotice}
-          </p>
-        )}
-        <button
-          className="primary-button"
-          disabled={form.formState.isSubmitting}
-        >
-          <Send aria-hidden="true" size={17} />
-          {form.formState.isSubmitting ? 'Envoi…' : 'Envoyer le message'}
-        </button>
-      </form>
     </section>
   );
 }

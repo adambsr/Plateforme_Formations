@@ -1,4 +1,4 @@
-import mongoose, {
+﻿import mongoose, {
   type HydratedDocument,
   type QueryFilter,
   type Types,
@@ -20,6 +20,7 @@ import { InvoiceModel } from '../../invoices/models/invoice.model.js';
 import { TrainingSessionModel } from '../../sessions/models/training-session.model.js';
 import { TrainingModel } from '../../trainings/models/training.model.js';
 import { UserModel } from '../../users/models/user.model.js';
+import type { NotificationService } from '../../notifications/services/notification.service.js';
 import type { CheckoutRequest, PaymentListInput } from '../dto/payment.dto.js';
 import { PaymentModel, type Payment } from '../models/payment.model.js';
 
@@ -46,6 +47,7 @@ export class PaymentService {
   readonly #mobileAppScheme: string;
   readonly #mail: TransactionalEmailService;
   readonly #logger: Logger;
+  readonly #notifications: NotificationService | undefined;
 
   constructor(
     gateway: StripeCheckoutGateway,
@@ -53,12 +55,14 @@ export class PaymentService {
     mail: TransactionalEmailService,
     logger: Logger,
     mobileAppScheme = 'plateforme-formations',
+    notifications?: NotificationService,
   ) {
     this.#gateway = gateway;
     this.#issuer = issuer;
     this.#mail = mail;
     this.#logger = logger;
     this.#mobileAppScheme = mobileAppScheme;
+    this.#notifications = notifications;
   }
 
   async createCheckout(
@@ -170,7 +174,7 @@ export class PaymentService {
         description:
           session === null
             ? training.title
-            : `${training.title} — ${session.title}`,
+            : `${training.title} â€” ${session.title}`,
         amountMinor: payment.amountMinor,
         currency: payment.currency,
         ...(input.client === 'MOBILE'
@@ -194,6 +198,10 @@ export class PaymentService {
           ? error.message
           : 'Stripe Checkout creation failed.';
       await payment.save();
+      await this.#notifyPaymentFailure(
+        payment,
+        `checkout:${String(payment._id)}`,
+      );
       if (error instanceof AppError) throw error;
       throw new AppError(
         502,
@@ -210,7 +218,7 @@ export class PaymentService {
     const event = this.#gateway.constructWebhookEvent(rawBody, signature);
     if (event.kind === 'IGNORED') return;
     if (event.kind === 'FAILED' || event.kind === 'CANCELLED') {
-      await PaymentModel.updateOne(
+      const update = await PaymentModel.updateOne(
         {
           _id: event.paymentId,
           stripeCheckoutSessionId: event.checkoutSessionId,
@@ -231,6 +239,11 @@ export class PaymentService {
           },
         },
       );
+      if (update.modifiedCount === 1) {
+        const payment = await PaymentModel.findById(event.paymentId).exec();
+        if (payment !== null)
+          await this.#notifyPaymentFailure(payment, event.eventId);
+      }
       return;
     }
     await this.#assertTrustedSuccess(event);
@@ -257,6 +270,9 @@ export class PaymentService {
             },
           },
         );
+        const payment = await PaymentModel.findById(event.paymentId).exec();
+        if (payment !== null)
+          await this.#notifyPaymentFailure(payment, event.eventId);
         return;
       }
       throw error;
@@ -404,7 +420,7 @@ export class PaymentService {
         const description =
           payment.sessionTitle === undefined
             ? payment.trainingTitle
-            : `${payment.trainingTitle} — ${payment.sessionTitle}`;
+            : `${payment.trainingTitle} â€” ${payment.sessionTitle}`;
         const [invoice] = await InvoiceModel.create(
           [
             {
@@ -466,6 +482,12 @@ export class PaymentService {
         }
         await payment.save({ session: databaseSession });
         return {
+          paymentId: String(payment._id),
+          learnerId: String(payment.learnerId),
+          trainingId: String(payment.trainingId),
+          ...(payment.sessionId === undefined
+            ? {}
+            : { sessionId: String(payment.sessionId) }),
           email: learner.email,
           ...(learner.profile.firstName === undefined
             ? {}
@@ -480,10 +502,109 @@ export class PaymentService {
       },
     );
     if (confirmation !== undefined) {
+      await deliverBestEffort(
+        this.#logger,
+        'purchase-in-app-notifications',
+        async () => {
+          await this.#notifications?.createInApp({
+            recipientUserId: confirmation.learnerId,
+            type: 'PURCHASE_CONFIRMED',
+            title: 'Formation achetÃ©e',
+            message: `Votre inscription Ã  Â« ${confirmation.trainingTitle} Â» a Ã©tÃ© confirmÃ©e.`,
+            link: '/app/payments',
+            dedupeKey: `payment-paid:${confirmation.paymentId}`,
+            metadata: {
+              paymentId: confirmation.paymentId,
+              trainingId: confirmation.trainingId,
+            },
+          });
+          await this.#notifications?.notifyAdmins({
+            type: 'PAYMENT_RECEIVED',
+            title: 'Paiement reÃ§u',
+            message: `Un paiement de ${(confirmation.amountMinor / 100).toLocaleString('fr-FR', { style: 'currency', currency: confirmation.currency })} a Ã©tÃ© confirmÃ© pour Â« ${confirmation.trainingTitle} Â».`,
+            link: '/app/payments',
+            dedupeKey: `payment-paid:${confirmation.paymentId}`,
+            metadata: { paymentId: confirmation.paymentId },
+          });
+          await this.#notifications?.notifyAdmins({
+            type: 'ENROLLMENT_CREATED',
+            title: 'Nouvelle inscription',
+            message: `Un apprenant sâ€™est inscrit Ã  Â« ${confirmation.trainingTitle} Â».`,
+            link: '/app/payments',
+            dedupeKey: `enrollment:${confirmation.paymentId}`,
+            metadata: {
+              paymentId: confirmation.paymentId,
+              learnerId: confirmation.learnerId,
+              trainingId: confirmation.trainingId,
+            },
+          });
+          const training = await TrainingModel.findById(confirmation.trainingId)
+            .select({ ownerTrainerId: 1 })
+            .lean()
+            .exec();
+          const trainerIds = new Set<string>();
+          if (training !== null)
+            trainerIds.add(String(training.ownerTrainerId));
+          if (confirmation.sessionId !== undefined) {
+            const session = await TrainingSessionModel.findById(
+              confirmation.sessionId,
+            )
+              .select({ assignedTrainerIds: 1 })
+              .lean()
+              .exec();
+            for (const id of session?.assignedTrainerIds ?? [])
+              trainerIds.add(String(id));
+          }
+          await this.#notifications?.createMany(
+            [...trainerIds].map((recipientUserId) => ({
+              recipientUserId,
+              type: 'LEARNER_ENROLLED',
+              title: 'Nouvelle inscription',
+              message: `Un nouvel apprenant sâ€™est inscrit Ã  Â« ${confirmation.trainingTitle} Â».`,
+              link: '/app/attendance',
+              dedupeKey: `enrollment:${confirmation.paymentId}`,
+              metadata: {
+                paymentId: confirmation.paymentId,
+                learnerId: confirmation.learnerId,
+                trainingId: confirmation.trainingId,
+              },
+            })),
+          );
+        },
+      );
       await deliverBestEffort(this.#logger, 'enrollment-confirmation', () =>
         this.#mail.sendEnrollmentConfirmation(confirmation),
       );
     }
+  }
+
+  async #notifyPaymentFailure(
+    payment: HydratedDocument<Payment>,
+    eventKey: string,
+  ): Promise<void> {
+    await deliverBestEffort(
+      this.#logger,
+      'payment-failure-notifications',
+      async () => {
+        await this.#notifications?.createInApp({
+          recipientUserId: String(payment.learnerId),
+          type: 'PAYMENT_FAILED',
+          title: 'Paiement Ã©chouÃ©',
+          message: `Le paiement pour Â« ${payment.trainingTitle} Â» nâ€™a pas pu Ãªtre confirmÃ©.`,
+          link: '/app/payments',
+          dedupeKey: `payment-failed:${String(payment._id)}:${eventKey}`,
+          metadata: { paymentId: String(payment._id) },
+        });
+        await this.#notifications?.notifyAdmins({
+          type: 'PAYMENT_FAILED',
+          title: 'Paiement Ã©chouÃ©',
+          message: `Un paiement pour Â« ${payment.trainingTitle} Â» a Ã©chouÃ©.`,
+          link: '/app/payments',
+          dedupeKey: `payment-failed:${String(payment._id)}:${eventKey}`,
+          metadata: { paymentId: String(payment._id) },
+        });
+      },
+    );
   }
 
   async #view(payment: HydratedDocument<Payment>) {

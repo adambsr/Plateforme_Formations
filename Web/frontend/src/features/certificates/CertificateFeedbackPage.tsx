@@ -21,17 +21,29 @@ function RatingDistribution({
 }) {
   const total = summary?.count ?? 0;
   return (
-    <div className="satisfaction-distribution" aria-label="Distribution des notes">
+    <div
+      className="satisfaction-distribution"
+      aria-label="Distribution des notes"
+    >
       {ratings.map((rating) => {
         const count = summary?.distribution[rating] ?? 0;
         return (
           <div className="satisfaction-row" key={rating}>
             <span aria-label={`${rating} étoiles`}>
               {Array.from({ length: rating }, (_, index) => (
-                <Star key={index} aria-hidden="true" size={15} fill="currentColor" />
+                <Star
+                  key={index}
+                  aria-hidden="true"
+                  size={15}
+                  fill="currentColor"
+                />
               ))}
             </span>
-            <div><i style={{ width: `${total === 0 ? 0 : (count / total) * 100}%` }} /></div>
+            <div>
+              <i
+                style={{ width: `${total === 0 ? 0 : (count / total) * 100}%` }}
+              />
+            </div>
             <strong>{count}</strong>
           </div>
         );
@@ -376,7 +388,7 @@ export function CertificateFeedbackPage() {
                 moyenne{' '}
                 <strong>
                   {satisfactionSummary?.average == null
-                    ? '—'
+                    ? '-'
                     : `${satisfactionSummary.average.toFixed(2)} / 5`}
                 </strong>
               </p>

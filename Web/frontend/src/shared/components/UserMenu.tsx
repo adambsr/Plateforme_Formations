@@ -38,6 +38,7 @@ export function UserMenu() {
       <button
         type="button"
         className="user-menu-trigger"
+        aria-label={name}
         aria-haspopup="menu"
         aria-expanded={open}
         onClick={() => setOpen((value) => !value)}

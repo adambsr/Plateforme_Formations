@@ -1,5 +1,7 @@
 import { useRef, useState, type FormEvent } from 'react';
 import botIcon from 'lucide-static/icons/bot.svg';
+import chevronDownIcon from 'lucide-static/icons/chevron-down.svg';
+import chevronUpIcon from 'lucide-static/icons/chevron-up.svg';
 
 import { ApiError } from '../../core/api/client.js';
 import { useAuth } from '../../core/auth/AuthContext.js';
@@ -44,7 +46,8 @@ const quickActions: Array<{
   {
     mode: 'PRACTICE',
     label: 'M’entraîner',
-    prompt: 'Prépare quelques questions courtes pour vérifier ma compréhension.',
+    prompt:
+      'Prépare quelques questions courtes pour vérifier ma compréhension.',
   },
   {
     mode: 'REVISION',
@@ -77,6 +80,7 @@ export function TutorChat({ content }: { content: TrainingContent }) {
   const [currentLessonId, setCurrentLessonId] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  const [expanded, setExpanded] = useState(true);
 
   async function send(message: string, mode: TutorMode = 'QUESTION') {
     const trimmed = message.trim();
@@ -149,11 +153,24 @@ export function TutorChat({ content }: { content: TrainingContent }) {
             <h2 id="tutor-title">Tuteur IA de la formation</h2>
           </div>
         </div>
-        <p className="muted">
-          Réponses limitées au contenu du cours, avec sources vérifiables.
-        </p>
+        <div className="tutor-header-actions">
+          <p className="muted">
+            Réponses limitées au contenu du cours, avec sources vérifiables.
+          </p>
+          <button
+            className="secondary-button compact-button"
+            type="button"
+            aria-expanded={expanded}
+            aria-controls="tutor-conversation"
+            onClick={() => setExpanded((value) => !value)}
+          >
+            <Icon src={expanded ? chevronUpIcon : chevronDownIcon} size={17} />
+            {expanded ? 'Réduire' : 'Ouvrir le tuteur'}
+          </button>
+        </div>
       </header>
-
+      {expanded && (
+      <div id="tutor-conversation" className="tutor-conversation">
       <label className="tutor-lesson-filter">
         Leçon à privilégier
         <Select
@@ -164,14 +181,17 @@ export function TutorChat({ content }: { content: TrainingContent }) {
           {content.modules.flatMap((module) =>
             module.lessons.map((lesson) => (
               <option key={lesson.id} value={lesson.id}>
-                {module.title} — {lesson.title}
+                {module.title} - {lesson.title}
               </option>
             )),
           )}
         </Select>
       </label>
 
-      <div className="tutor-quick-actions" aria-label="Actions rapides du tuteur">
+      <div
+        className="tutor-quick-actions"
+        aria-label="Actions rapides du tuteur"
+      >
         {quickActions.map((action) => (
           <button
             key={action.mode}
@@ -261,9 +281,11 @@ export function TutorChat({ content }: { content: TrainingContent }) {
         </div>
       </form>
       <small className="tutor-disclaimer">
-        L’IA peut se tromper : utilisez les liens de source pour vérifier dans le
-        cours.
+        L’IA peut se tromper : utilisez les liens de source pour vérifier dans
+        le cours.
       </small>
+      </div>
+      )}
     </section>
   );
 }

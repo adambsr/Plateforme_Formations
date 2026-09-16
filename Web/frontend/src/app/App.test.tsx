@@ -6,6 +6,7 @@ import { AuthProvider } from '../core/auth/AuthProvider.js';
 import { App } from './App.js';
 
 function renderAt(path: string) {
+  window.localStorage.setItem('hsa-auth-state', 'active');
   vi.stubGlobal(
     'fetch',
     vi.fn().mockResolvedValue(
@@ -43,6 +44,7 @@ function requestUrl(input: RequestInfo | URL): string {
 }
 
 function renderAppAt(path: string) {
+  window.localStorage.setItem('hsa-auth-state', 'active');
   return render(
     <MemoryRouter initialEntries={[path]}>
       <AuthProvider>
@@ -54,6 +56,7 @@ function renderAppAt(path: string) {
 
 afterEach(() => {
   cleanup();
+  window.localStorage.clear();
   vi.unstubAllGlobals();
 });
 

@@ -108,7 +108,12 @@ export class AttendanceService {
         learner: {
           id: String(learner._id),
           email: learner.email,
-          ...learner.profile,
+          ...(learner.profile.firstName === undefined
+            ? {}
+            : { firstName: learner.profile.firstName }),
+          ...(learner.profile.lastName === undefined
+            ? {}
+            : { lastName: learner.profile.lastName }),
         },
         presentCount,
         recordedCount,

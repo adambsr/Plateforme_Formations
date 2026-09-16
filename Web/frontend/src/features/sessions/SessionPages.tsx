@@ -331,7 +331,7 @@ function ManagedSession({
             <div className="schedule-row" key={schedule.id}>
               <span>
                 <strong>{formatTunisDate(schedule.startAt)}</strong>
-                {' — '}
+                {' - '}
                 {formatTunisDate(schedule.endAt)}
                 {' · '}
                 {schedule.trainers.map(name).join(', ')}

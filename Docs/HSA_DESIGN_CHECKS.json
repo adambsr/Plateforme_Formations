@@ -1,0 +1,178 @@
+{
+  "staticDashes": [],
+  "protectedFiles": [
+    {
+      "path": "Web/frontend/src/app/routes/destinations.ts",
+      "unchanged": true,
+      "approvedChange": false
+    },
+    {
+      "path": "Web/frontend/src/app/routes/guards.tsx",
+      "unchanged": false,
+      "approvedChange": true
+    },
+    {
+      "path": "Web/frontend/src/core/analytics/AnalyticsConsentBanner.tsx",
+      "unchanged": true,
+      "approvedChange": false
+    },
+    {
+      "path": "Web/frontend/src/core/analytics/AnalyticsPageTracker.tsx",
+      "unchanged": true,
+      "approvedChange": false
+    },
+    {
+      "path": "Web/frontend/src/core/analytics/AnalyticsPreferences.tsx",
+      "unchanged": true,
+      "approvedChange": false
+    },
+    {
+      "path": "Web/frontend/src/core/analytics/firebase.ts",
+      "unchanged": true,
+      "approvedChange": false
+    },
+    {
+      "path": "Web/frontend/src/core/analytics/recommendation-analytics.ts",
+      "unchanged": true,
+      "approvedChange": false
+    },
+    {
+      "path": "Web/frontend/src/core/api/client.ts",
+      "unchanged": false,
+      "approvedChange": true
+    },
+    {
+      "path": "Web/frontend/src/core/auth/AuthContext.ts",
+      "unchanged": false,
+      "approvedChange": true
+    },
+    {
+      "path": "Web/frontend/src/core/auth/AuthProvider.tsx",
+      "unchanged": false,
+      "approvedChange": true
+    },
+    {
+      "path": "Web/frontend/src/core/auth/types.ts",
+      "unchanged": true,
+      "approvedChange": false
+    },
+    {
+      "path": "Web/frontend/src/shared/components/DocumentTitle.tsx",
+      "unchanged": true,
+      "approvedChange": false
+    }
+  ],
+  "contracts": [],
+  "contrast": [
+    {
+      "mode": "light",
+      "pair": "ink/surface",
+      "ratio": 14.42,
+      "pass": true
+    },
+    {
+      "mode": "light",
+      "pair": "muted/surface",
+      "ratio": 7.95,
+      "pass": true
+    },
+    {
+      "mode": "light",
+      "pair": "muted/subtle",
+      "ratio": 7.12,
+      "pass": true
+    },
+    {
+      "mode": "light",
+      "pair": "primary/accent-soft",
+      "ratio": 6.11,
+      "pass": true
+    },
+    {
+      "mode": "light",
+      "pair": "on-primary/primary",
+      "ratio": 6.9,
+      "pass": true
+    },
+    {
+      "mode": "light",
+      "pair": "success/success-soft",
+      "ratio": 6.32,
+      "pass": true
+    },
+    {
+      "mode": "light",
+      "pair": "warning/warning-soft",
+      "ratio": 6.13,
+      "pass": true
+    },
+    {
+      "mode": "light",
+      "pair": "danger/danger-soft",
+      "ratio": 6.39,
+      "pass": true
+    },
+    {
+      "mode": "light",
+      "pair": "control-line/surface",
+      "ratio": 3.04,
+      "pass": true
+    },
+    {
+      "mode": "dark",
+      "pair": "ink/surface",
+      "ratio": 13.29,
+      "pass": true
+    },
+    {
+      "mode": "dark",
+      "pair": "muted/surface",
+      "ratio": 8.57,
+      "pass": true
+    },
+    {
+      "mode": "dark",
+      "pair": "muted/subtle",
+      "ratio": 7.33,
+      "pass": true
+    },
+    {
+      "mode": "dark",
+      "pair": "primary/accent-soft",
+      "ratio": 6.34,
+      "pass": true
+    },
+    {
+      "mode": "dark",
+      "pair": "on-primary/primary",
+      "ratio": 8.34,
+      "pass": true
+    },
+    {
+      "mode": "dark",
+      "pair": "success/success-soft",
+      "ratio": 7.49,
+      "pass": true
+    },
+    {
+      "mode": "dark",
+      "pair": "warning/warning-soft",
+      "ratio": 7.58,
+      "pass": true
+    },
+    {
+      "mode": "dark",
+      "pair": "danger/danger-soft",
+      "ratio": 7.5,
+      "pass": true
+    },
+    {
+      "mode": "dark",
+      "pair": "control-line/surface",
+      "ratio": 4.91,
+      "pass": true
+    }
+  ],
+  "routeTreeUnchanged": true,
+  "legalApprovedChangeOnly": true
+}

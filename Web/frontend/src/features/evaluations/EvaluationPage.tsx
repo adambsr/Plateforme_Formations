@@ -92,6 +92,8 @@ export function EvaluationPage() {
     void load();
   }, [load]);
   useEffect(() => {
+    // The route parameter loads the selected evaluation into the modal state.
+    // oxlint-disable-next-line react/set-state-in-effect
     if (evaluationId !== undefined) void detail(evaluationId);
   }, [detail, evaluationId]);
   useEffect(() => {
@@ -501,8 +503,8 @@ export function EvaluationPage() {
             >
               <div
                 className="evaluation-detail evaluation-modal"
-                role="dialog"
-                aria-modal="true"
+                role={inDetailView ? 'region' : 'dialog'}
+                aria-modal={inDetailView ? undefined : true}
                 aria-labelledby="evaluation-modal-title"
               >
                 <button
@@ -809,7 +811,7 @@ export function EvaluationPage() {
                         <ul>
                           {question.options.map((option) => (
                             <li key={option.id}>
-                              <strong>{option.id}</strong> — {option.text}
+                              <strong>{option.id}</strong> - {option.text}
                             </li>
                           ))}
                         </ul>
@@ -970,7 +972,7 @@ export function EvaluationPage() {
                             {answer.question.correctOptionIds.join(', ')}
                             {answer.question.explanation === undefined
                               ? ''
-                              : ` — ${answer.question.explanation}`}
+                              : ` - ${answer.question.explanation}`}
                           </p>
                         )}
                       </fieldset>
@@ -991,7 +993,7 @@ export function EvaluationPage() {
                             : 'form-error'
                         }
                       >
-                        Score : {attempt.scorePercentage}% —{' '}
+                        Score : {attempt.scorePercentage}% -{' '}
                         {attempt.status === 'PASSED' ? 'Réussi' : 'Échoué'}
                       </p>
                     )}

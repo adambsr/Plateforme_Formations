@@ -1,15 +1,11 @@
-import {
-  type MouseEventHandler,
-  useCallback,
-  useEffect,
-  useMemo,
-  useState,
-} from 'react';
-import { ImageOff } from 'lucide-react';
+import { formatPrice, formatDuration, typeLabel } from './presentation.js';
+import { TrainingCard, TrainingImage } from './TrainingCard.js';
+export { TrainingCard } from './TrainingCard.js';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { Link, useParams } from 'react-router';
 
-import { ApiError, apiAssetUrl, apiRequest } from '../../core/api/client.js';
+import { ApiError, apiRequest } from '../../core/api/client.js';
 import { useAuth } from '../../core/auth/AuthContext.js';
 import type { PaginatedUsers, User } from '../../core/auth/types.js';
 import { Pagination } from '../../shared/components/Pagination.js';
@@ -28,59 +24,12 @@ function errorMessage(error: unknown): string {
     : 'Une erreur inattendue est survenue.';
 }
 
-function formatPrice(priceMinor: number): string {
-  return new Intl.NumberFormat('fr-FR', {
-    style: 'currency',
-    currency: 'EUR',
-    minimumFractionDigits: 2,
-  }).format(priceMinor / 100);
-}
-
-function formatDuration(minutes: number): string {
-  const hours = Math.floor(minutes / 60);
-  const remainder = minutes % 60;
-  return hours === 0
-    ? `${remainder} min`
-    : remainder === 0
-      ? `${hours} h`
-      : `${hours} h ${remainder} min`;
-}
-
-function typeLabel(type: TrainingType): string {
-  return type === 'SELF_PACED_ONLINE' ? 'En ligne autonome' : 'Présentiel';
-}
-
 function statusLabel(status: Training['status']): string {
   return {
     DRAFT: 'Brouillon',
     PUBLISHED: 'Publiée',
     ARCHIVED: 'Archivée',
   }[status];
-}
-
-function TrainingImage({
-  training,
-}: {
-  training: Pick<Training, 'title' | 'thumbnailUrl'>;
-}) {
-  const [unavailable, setUnavailable] = useState(false);
-  return training.thumbnailUrl === undefined || unavailable ? (
-    <div
-      className="training-thumbnail training-thumbnail-fallback"
-      role="img"
-      aria-label="Aucune miniature disponible"
-    >
-      <ImageOff aria-hidden="true" size={27} strokeWidth={1.7} />
-      <span>Image unavailable</span>
-    </div>
-  ) : (
-    <img
-      className="training-thumbnail"
-      src={apiAssetUrl(training.thumbnailUrl)}
-      alt={`Miniature de la formation ${training.title}`}
-      onError={() => setUnavailable(true)}
-    />
-  );
 }
 
 function lines(value: string): string[] {
@@ -97,64 +46,6 @@ function parseEurMinor(value: string): number | undefined {
   const decimals = Number((match[2] ?? '').padEnd(2, '0'));
   const minor = units * 100 + decimals;
   return Number.isSafeInteger(minor) && minor > 0 ? minor : undefined;
-}
-
-export function TrainingCard({
-  training,
-  headingLevel = 2,
-  onClick,
-}: {
-  training: Pick<
-    Training,
-    | 'id'
-    | 'title'
-    | 'description'
-    | 'category'
-    | 'type'
-    | 'level'
-    | 'durationMinutes'
-    | 'priceMinor'
-    | 'thumbnailUrl'
-  >;
-  headingLevel?: 2 | 3;
-  onClick?: MouseEventHandler<HTMLAnchorElement>;
-}) {
-  const Heading = headingLevel === 3 ? 'h3' : 'h2';
-  return (
-    <Link
-      className="training-card-link"
-      to={`/trainings/${training.id}`}
-      aria-label={`Voir la formation ${training.title}`}
-      onClick={onClick}
-    >
-      <article className="training-card">
-        <TrainingImage training={training} />
-        <div className="training-card-meta">
-          <span className={`type-badge type-${training.type.toLowerCase()}`}>
-            {typeLabel(training.type)}
-          </span>
-          <span>{training.category.name}</span>
-        </div>
-        <Heading>{training.title}</Heading>
-        <p className="muted training-summary">{training.description}</p>
-        <dl className="training-facts">
-          <div>
-            <dt>Niveau</dt>
-            <dd>{training.level}</dd>
-          </div>
-          <div>
-            <dt>Durée</dt>
-            <dd>{formatDuration(training.durationMinutes)}</dd>
-          </div>
-          <div>
-            <dt>Prix</dt>
-            <dd>{formatPrice(training.priceMinor)}</dd>
-          </div>
-        </dl>
-        <span className="primary-link">Voir la formation</span>
-      </article>
-    </Link>
-  );
 }
 
 export function CataloguePage({ embedded = false }: { embedded?: boolean }) {

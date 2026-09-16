@@ -7,7 +7,7 @@ import { ForbiddenPage } from '../../features/system/SystemPages.js';
 
 export function PublicOnly() {
   const { status, user } = useAuth();
-  if (status === 'loading')
+  if (status === 'loading' || status === 'logging-out')
     return <div className="screen-message">Chargement de la session…</div>;
   if (user !== null)
     return (
@@ -24,7 +24,7 @@ export function PublicOnly() {
 export function RequireAuthentication() {
   const { status, user } = useAuth();
   const location = useLocation();
-  if (status === 'loading')
+  if (status === 'loading' || status === 'logging-out')
     return <div className="screen-message">Chargement de la session…</div>;
   if (user === null)
     return (

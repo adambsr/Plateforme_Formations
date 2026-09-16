@@ -13,6 +13,16 @@ export const registerDeviceSchema = z
 
 export const unregisterDeviceSchema = z.object({ token: deviceToken }).strict();
 
+export const notificationListSchema = z
+  .object({
+    page: z.coerce.number().int().min(1).default(1),
+    pageSize: z.coerce.number().int().min(1).max(50).default(20),
+    state: z.enum(['ALL', 'UNREAD', 'READ']).default('ALL'),
+  })
+  .strict();
+
+export const notificationIdSchema = z.object({ id: objectId }).strict();
+
 export const sendNotificationSchema = z
   .object({
     recipientUserIds: z.array(objectId).min(1).max(500),
@@ -25,3 +35,4 @@ export const sendNotificationSchema = z
   .strict();
 
 export type SendNotificationInput = z.infer<typeof sendNotificationSchema>;
+export type NotificationListInput = z.infer<typeof notificationListSchema>;

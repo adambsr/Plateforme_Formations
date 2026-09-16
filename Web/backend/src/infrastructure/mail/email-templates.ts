@@ -160,7 +160,7 @@ export function enrollmentConfirmationEmail(
     style: 'currency',
     currency: input.currency,
   }).format(input.amountMinor / 100);
-  const enrollment = `${input.trainingTitle}${input.sessionTitle === undefined ? '' : ` — ${input.sessionTitle}`}`;
+  const enrollment = `${input.trainingTitle}${input.sessionTitle === undefined ? '' : ` : ${input.sessionTitle}`}`;
   const text = [
     greeting(input.firstName),
     '',
@@ -245,7 +245,7 @@ export function sessionEmail(
   return render(
     brand,
     subject,
-    `${subject} — ${input.trainingTitle}`,
+    `${subject} : ${input.trainingTitle}`,
     text,
     details.map(paragraph).join('') +
       button('Consulter la session', input.sessionUrl),

@@ -59,12 +59,12 @@ The browser calls `/api`; the API authorizes requests, owns access control and e
 
 ### Prerequisites
 
-| Required software                                                 | Reason                                                           |
-| ----------------------------------------------------------------- | ---------------------------------------------------------------- |
-| [Git](https://git-scm.com/downloads)                              | Clone the repository                                             |
-| Node.js **24+** and npm **11+**                                   | Install and run the project; it pins `npm@11.17.0`               |
-| [Docker Desktop](https://www.docker.com/products/docker-desktop/) | Run the API, MongoDB, and database bootstrap                    |
-| [Stripe CLI](https://docs.stripe.com/stripe-cli)                  | Forward Stripe test-mode webhooks to the local API               |
+| Required software                                                 | Reason                                             |
+| ----------------------------------------------------------------- | -------------------------------------------------- |
+| [Git](https://git-scm.com/downloads)                              | Clone the repository                               |
+| Node.js **24+** and npm **11+**                                   | Install and run the project; it pins `npm@11.17.0` |
+| [Docker Desktop](https://www.docker.com/products/docker-desktop/) | Run the API, MongoDB, and database bootstrap       |
+| [Stripe CLI](https://docs.stripe.com/stripe-cli)                  | Forward Stripe test-mode webhooks to the local API |
 
 Optional: [MongoDB Compass](https://www.mongodb.com/products/tools/compass) to inspect data; a Firebase project and Android app for Analytics/FCM; Stripe test credentials for real checkout; and a Google AI Studio API key for Gemini functionality.
 
@@ -158,15 +158,19 @@ npm run dev:frontend
 ```
 
 Open <http://localhost:5173>. The default API is <http://localhost:3000/api>.
+If port 5173 is occupied, Vite may select a loopback port from 5174 onward. In
+development, the API accepts loopback Vite origins from ports 5173 through
+5199; configured origins remain the only origins accepted in test and
+production environments.
 
 ### 7. Verify
 
-| Check         | Address or command                 | Expected result                                                   |
-| ------------- | ---------------------------------- | ----------------------------------------------------------------- |
-| API health    | <http://localhost:3000/api/health> | `status: "ok"`, database `up`                                     |
-| API reference | <http://localhost:3000/api/docs>   | Swagger UI                                                        |
-| Web app       | <http://localhost:5173>            | Public High Skills Academy site                                   |
-| Containers    | `docker compose ps`                | `backend` and `mongodb` running; `mongodb-init` completed         |
+| Check         | Address or command                 | Expected result                                           |
+| ------------- | ---------------------------------- | --------------------------------------------------------- |
+| API health    | <http://localhost:3000/api/health> | `status: "ok"`, database `up`                             |
+| API reference | <http://localhost:3000/api/docs>   | Swagger UI                                                |
+| Web app       | <http://localhost:5173>            | Public High Skills Academy site                           |
+| Containers    | `docker compose ps`                | `backend` and `mongodb` running; `mongodb-init` completed |
 
 The repository also provides `npm run dev:backend`. The normal Compose backend
 loads `Web/backend/.env` directly, while Compose overrides only container-specific

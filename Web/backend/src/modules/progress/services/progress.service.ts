@@ -15,6 +15,7 @@ import {
 } from '../../enrollments/models/enrollment.model.js';
 import { TrainingModel } from '../../trainings/models/training.model.js';
 import { UserModel } from '../../users/models/user.model.js';
+import type { NotificationService } from '../../notifications/services/notification.service.js';
 import type {
   ProgressListInput,
   UpdateLessonProgressInput,
@@ -42,15 +43,18 @@ export class ProgressService {
   readonly #completion: CompletionService;
   readonly #mail: TransactionalEmailService;
   readonly #logger: Logger;
+  readonly #notifications: NotificationService | undefined;
 
   constructor(
     completion: CompletionService,
     mail: TransactionalEmailService,
     logger: Logger,
+    notifications?: NotificationService,
   ) {
     this.#completion = completion;
     this.#mail = mail;
     this.#logger = logger;
+    this.#notifications = notifications;
   }
 
   async list(principal: AuthenticatedPrincipal, input: ProgressListInput) {
@@ -168,6 +172,24 @@ export class ProgressService {
     }
     const completion = await this.#completion.selfPaced(enrollment._id);
     if (input.completed && !wasComplete && completion.isComplete) {
+      await deliverBestEffort(
+        this.#logger,
+        'training-completed-notification',
+        async () => {
+          await this.#notifications?.createInApp({
+            recipientUserId: principal.userId,
+            type: 'TRAINING_COMPLETED',
+            title: 'Formation terminée',
+            message: `Félicitations pour avoir terminé « ${training.title} ».`,
+            link: '/app/progress',
+            dedupeKey: `training-completed:${String(enrollment._id)}`,
+            metadata: {
+              enrollmentId: String(enrollment._id),
+              trainingId: String(training._id),
+            },
+          });
+        },
+      );
       await deliverBestEffort(this.#logger, 'training-completed', async () => {
         const learner = await UserModel.findById(enrollment.learnerId).exec();
         if (learner !== null) {

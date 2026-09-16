@@ -76,6 +76,12 @@ function localizedApiMessage(
 const API_BASE_URL =
   import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:3000/api';
 
+export interface ApiStreamEvent<T = unknown> {
+  id?: string;
+  type: string;
+  data: T;
+}
+
 export function apiAssetUrl(path: string): string {
   return /^https?:\/\//i.test(path) ? path : `${API_BASE_URL}${path}`;
 }
@@ -167,4 +173,91 @@ export async function apiDownload(
     );
   }
   return await response.blob();
+}
+
+export async function apiEventStream<T>(
+  path: string,
+  signal: AbortSignal,
+  onEvent: (event: ApiStreamEvent<T>) => void,
+  accessToken?: string,
+): Promise<void> {
+  const headers = new Headers({ accept: 'text/event-stream' });
+  if (accessToken !== undefined)
+    headers.set('authorization', `Bearer ${accessToken}`);
+
+  const response = await fetch(`${API_BASE_URL}${path}`, {
+    method: 'GET',
+    headers,
+    credentials: 'include',
+    cache: 'no-store',
+    signal,
+  });
+  if (!response.ok) {
+    let body: {
+      error?: { code?: string; message?: string; fieldErrors?: FieldError[] };
+    } = {};
+    try {
+      body = (await response.json()) as typeof body;
+    } catch {
+      // A proxy may return a non-JSON error before the request reaches the API.
+    }
+    throw new ApiError(
+      response.status,
+      body.error?.code ?? 'STREAM_CONNECTION_FAILED',
+      body.error?.message ?? 'The event stream could not be opened.',
+      body.error?.fieldErrors ?? [],
+    );
+  }
+  if (response.body === null) {
+    throw new ApiError(
+      0,
+      'STREAM_UNAVAILABLE',
+      'The browser did not expose a readable event stream.',
+    );
+  }
+
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = '';
+  while (true) {
+    const { done, value } = await reader.read();
+    buffer = `${buffer}${decoder.decode(value, { stream: !done })}`.replaceAll(
+      '\r\n',
+      '\n',
+    );
+    let boundary = buffer.indexOf('\n\n');
+    while (boundary >= 0) {
+      const block = buffer.slice(0, boundary);
+      buffer = buffer.slice(boundary + 2);
+      const fields = block.split('\n').filter((line) => !line.startsWith(':'));
+      let type = 'message';
+      let id: string | undefined;
+      const data: string[] = [];
+      for (const line of fields) {
+        const separator = line.indexOf(':');
+        const field = separator < 0 ? line : line.slice(0, separator);
+        const fieldValue =
+          separator < 0 ? '' : line.slice(separator + 1).replace(/^ /, '');
+        if (field === 'event') type = fieldValue;
+        else if (field === 'id') id = fieldValue;
+        else if (field === 'data') data.push(fieldValue);
+      }
+      if (data.length > 0) {
+        const rawData = data.join('\n');
+        let parsed: unknown = rawData;
+        try {
+          parsed = JSON.parse(rawData);
+        } catch {
+          // SSE permits plain-text data as well as JSON payloads.
+        }
+        onEvent({
+          type,
+          data: parsed as T,
+          ...(id === undefined ? {} : { id }),
+        });
+      }
+      boundary = buffer.indexOf('\n\n');
+    }
+    if (done) break;
+  }
 }

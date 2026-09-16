@@ -1,0 +1,172 @@
+[
+  {
+    "stage": "production",
+    "date": "2026-09-14T17:51:34.205Z",
+    "runtimeError": null,
+    "scores": {
+      "performance": 79,
+      "accessibility": 100,
+      "best-practices": 96,
+      "seo": 92
+    },
+    "metrics": {
+      "first-contentful-paint": 1894.2819999999997,
+      "largest-contentful-paint": 5364.281999999999,
+      "total-blocking-time": 32,
+      "cumulative-layout-shift": 0
+    }
+  },
+  {
+    "stage": "split",
+    "date": "2026-09-15T00:55:20.238Z",
+    "runtimeError": null,
+    "scores": {
+      "performance": 80,
+      "accessibility": 100,
+      "best-practices": 96,
+      "seo": 92
+    },
+    "metrics": {
+      "first-contentful-paint": 1856.8650000000002,
+      "largest-contentful-paint": 5032.913375,
+      "total-blocking-time": 48,
+      "cumulative-layout-shift": 0.0001395475008079637
+    }
+  },
+  {
+    "stage": "optimized",
+    "date": "2026-09-15T00:56:55.912Z",
+    "runtimeError": null,
+    "scores": {
+      "performance": 95,
+      "accessibility": 100,
+      "best-practices": 96,
+      "seo": 92
+    },
+    "metrics": {
+      "first-contentful-paint": 1857.9901999999997,
+      "largest-contentful-paint": 2738.1328999999996,
+      "total-blocking-time": 12.5,
+      "cumulative-layout-shift": 0.0001395475008079637
+    }
+  },
+  {
+    "stage": "current",
+    "date": "2026-09-15T00:58:15.759Z",
+    "runtimeError": null,
+    "scores": {
+      "performance": 96,
+      "accessibility": 100,
+      "best-practices": 96,
+      "seo": 92
+    },
+    "metrics": {
+      "first-contentful-paint": 1555.8874,
+      "largest-contentful-paint": 2688.6353,
+      "total-blocking-time": 27,
+      "cumulative-layout-shift": 0
+    }
+  },
+  {
+    "stage": "final-review",
+    "date": "2026-09-15T01:00:15.300Z",
+    "runtimeError": null,
+    "scores": {
+      "performance": 95,
+      "accessibility": 100,
+      "best-practices": 96,
+      "seo": 92
+    },
+    "metrics": {
+      "first-contentful-paint": 1568.16,
+      "largest-contentful-paint": 2864.152,
+      "total-blocking-time": 33,
+      "cumulative-layout-shift": 0
+    }
+  },
+  {
+    "stage": "layout",
+    "date": "2026-09-15T01:03:42.827Z",
+    "runtimeError": null,
+    "scores": {
+      "performance": 96,
+      "accessibility": 100,
+      "best-practices": 96,
+      "seo": 92
+    },
+    "metrics": {
+      "first-contentful-paint": 1618.6922,
+      "largest-contentful-paint": 2711.3829,
+      "total-blocking-time": 54.5,
+      "cumulative-layout-shift": 0
+    }
+  },
+  {
+    "stage": "responsive",
+    "date": "2026-09-15T01:05:28.364Z",
+    "runtimeError": null,
+    "scores": {
+      "performance": 96,
+      "accessibility": 100,
+      "best-practices": 96,
+      "seo": 92
+    },
+    "metrics": {
+      "first-contentful-paint": 1688.8577,
+      "largest-contentful-paint": 2648.6784,
+      "total-blocking-time": 46,
+      "cumulative-layout-shift": 0
+    }
+  },
+  {
+    "stage": "shells",
+    "date": "2026-09-15T01:07:15.638Z",
+    "runtimeError": null,
+    "scores": {
+      "performance": 96,
+      "accessibility": 100,
+      "best-practices": 96,
+      "seo": 92
+    },
+    "metrics": {
+      "first-contentful-paint": 1575.0809,
+      "largest-contentful-paint": 2588.2088,
+      "total-blocking-time": 52.5,
+      "cumulative-layout-shift": 0
+    }
+  },
+  {
+    "stage": "avif",
+    "date": "2026-09-15T01:09:28.358Z",
+    "runtimeError": null,
+    "scores": {
+      "performance": 97,
+      "accessibility": 100,
+      "best-practices": 96,
+      "seo": 92
+    },
+    "metrics": {
+      "first-contentful-paint": 1569.4399,
+      "largest-contentful-paint": 2516.5388000000003,
+      "total-blocking-time": 50,
+      "cumulative-layout-shift": 0
+    }
+  },
+  {
+    "stage": "release",
+    "date": "2026-09-15T01:10:57.714Z",
+    "runtimeError": null,
+    "scores": {
+      "performance": 97,
+      "accessibility": 100,
+      "best-practices": 96,
+      "seo": 92
+    },
+    "metrics": {
+      "first-contentful-paint": 1571.8622,
+      "largest-contentful-paint": 2421.3839,
+      "total-blocking-time": 43,
+      "cumulative-layout-shift": 0
+    }
+  }
+]

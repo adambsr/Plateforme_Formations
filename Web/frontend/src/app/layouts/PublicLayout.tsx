@@ -4,13 +4,12 @@ import { Link, NavLink, Outlet } from 'react-router';
 import menuIcon from 'lucide-static/icons/menu.svg';
 import xIcon from 'lucide-static/icons/x.svg';
 
-import blueLogo from '../../assets/hsa-logo-blue.png';
-import footerLogo from '../../assets/hsa-logo-footer.png';
-
 import { useAuth } from '../../core/auth/AuthContext.js';
 import { UserMenu } from '../../shared/components/UserMenu.js';
 import { Icon } from '../../shared/components/Icon.js';
 import { PublicConcierge } from '../../features/public/PublicConcierge.js';
+import { ThemeToggle } from '../../shared/components/ThemeToggle.js';
+import { BrandLogo } from '../../shared/components/BrandLogo.js';
 
 function SocialIcon({ kind }: { kind: 'facebook' | 'instagram' }) {
   return kind === 'facebook' ? (
@@ -29,28 +28,26 @@ export function PublicLayout() {
   const [open, setOpen] = useState(false);
   return (
     <div className="public-shell">
+      <a className="skip-link" href="#main-content">
+        Aller au contenu
+      </a>
       <header className="site-header">
-        <Link
-          className="site-logo"
-          to="/"
-          aria-label="Accueil High Skills Academy"
-          onClick={() => setOpen(false)}
-        >
-          <img src={blueLogo} alt="High Skills Academy" />
-        </Link>
-        <button
-          className="site-menu-button"
-          type="button"
-          aria-label="Ouvrir la navigation"
-          aria-expanded={open}
-          onClick={() => setOpen((value) => !value)}
-        >
-          {open ? (
-            <Icon src={xIcon} size={22} />
-          ) : (
-            <Icon src={menuIcon} size={22} />
-          )}
-        </button>
+        <div className="site-header-start">
+          <button
+            className="site-menu-button icon-button"
+            type="button"
+            aria-label="Ouvrir la navigation"
+            aria-expanded={open}
+            onClick={() => setOpen((value) => !value)}
+          >
+            {open ? (
+              <Icon src={xIcon} size={22} />
+            ) : (
+              <Icon src={menuIcon} size={22} />
+            )}
+          </button>
+          <BrandLogo className="site-logo" onClick={() => setOpen(false)} />
+        </div>
         <nav
           className={open ? 'site-nav site-nav-open' : 'site-nav'}
           aria-label="Navigation publique"
@@ -76,27 +73,19 @@ export function PublicLayout() {
                 Créer un compte
               </Link>
             </div>
-          ) : (
-            <UserMenu />
-          )}
+          ) : null}
         </nav>
+        <div className="site-account">
+          <ThemeToggle />
+          {user === null ? null : <UserMenu />}
+        </div>
       </header>
-      <main className="site-main">
+      <main className="site-main" id="main-content" tabIndex={-1}>
         <Outlet />
       </main>
       <footer className="site-footer">
         <div className="footer-about-column">
-          <Link
-            className="footer-logo-link"
-            to="/"
-            aria-label="Accueil High Skills Academy"
-          >
-            <img
-              className="footer-logo"
-              src={footerLogo}
-              alt="High Skills Academy"
-            />
-          </Link>
+          <BrandLogo className="footer-logo-link" />
           <p>
             Des formations professionnelles en ligne et en présentiel pour
             transformer durablement vos compétences.

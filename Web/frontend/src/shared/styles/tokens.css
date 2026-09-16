@@ -1,0 +1,203 @@
+/* HSA: DESIGN_VARIANCE 5 / MOTION_INTENSITY 3 / VISUAL_DENSITY 5.
+   Native CSS on the existing React application. Blue is the brand accent.
+   Green, amber, red communicate actual success, warning, failure.
+   Radius: controls 8px, containers 16px, avatars/status badges fully rounded.
+   Layers: header 30, overlay 40, drawer 50, menu 60, assistant 70, modal 80, consent 90. */
+:root {
+  color-scheme: light;
+  --ink: #152a43;
+  --muted: #405267;
+  --surface: #fefefe;
+  --canvas: #f5f7fa;
+  --subtle: #edf2f8;
+  --primary: #1859a6;
+  --primary-dark: #123f78;
+  --accent-soft: #e9f1fc;
+  --on-primary: #fefefe;
+  --line: #d9e1ec;
+  --control-line: #8495aa;
+  --success: #216446;
+  --success-soft: #eaf5ee;
+  --warning: #795514;
+  --warning-soft: #fcf4df;
+  --danger: #a12b37;
+  --danger-soft: #fceef0;
+  --radius-sm: 8px;
+  --radius-md: 16px;
+  --radius-lg: 16px;
+  --shadow-sm: 0 4px 16px rgb(18 63 120 / 5%);
+  --shadow-lg: 0 16px 48px rgb(18 63 120 / 14%);
+  --page-width: 1240px;
+  --gutter: clamp(20px, 4vw, 56px);
+  --header-height: 76px;
+  --icon-filter: invert(28%) sepia(30%) saturate(980%) hue-rotate(175deg);
+  font-family: 'Manrope Variable', 'Segoe UI', system-ui, sans-serif;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  color: var(--ink);
+  background: var(--canvas);
+}
+* {
+  box-sizing: border-box;
+}
+body {
+  margin: 0;
+  min-width: 0;
+  min-height: 100dvh;
+  font-size: 15px;
+  line-height: 1.65;
+}
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+button,
+a,
+input,
+select,
+textarea {
+  -webkit-tap-highlight-color: transparent;
+}
+button {
+  cursor: pointer;
+}
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+a {
+  color: var(--primary);
+  text-decoration-thickness: 1px;
+  text-underline-offset: 4px;
+}
+a:hover {
+  color: var(--primary-dark);
+}
+img {
+  max-width: 100%;
+}
+h1,
+h2,
+h3,
+h4 {
+  margin: 0 0 0.75rem;
+  color: var(--ink);
+  font-weight: 700;
+  line-height: 1.25;
+  letter-spacing: -0.035em;
+  overflow-wrap: break-word;
+}
+h1 {
+  font-size: clamp(1.9rem, 3vw, 2.75rem);
+}
+h2 {
+  font-size: clamp(1.25rem, 2vw, 1.65rem);
+}
+h3 {
+  font-size: 1.1rem;
+}
+h4 {
+  font-size: 1rem;
+}
+p {
+  margin: 0 0 1rem;
+}
+strong {
+  font-weight: 700;
+}
+small {
+  font-size: 0.82rem;
+}
+::selection {
+  color: var(--on-primary);
+  background: var(--primary);
+}
+:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 4px;
+}
+.muted,
+.lead {
+  color: var(--muted);
+}
+.lead {
+  font-size: 1.08rem;
+  max-width: 65ch;
+  line-height: 1.8;
+}
+.eyebrow {
+  display: block;
+  margin-bottom: 0.75rem;
+  color: var(--primary);
+  font-size: 0.7rem;
+  font-weight: 750;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+}
+.context-label {
+  display: block;
+  color: var(--muted);
+  font-size: 0.82rem;
+  margin-bottom: 0.6rem;
+}
+.lucide {
+  flex-shrink: 0;
+  stroke-width: 1.8;
+}
+.lucide-icon {
+  display: inline-block;
+  flex-shrink: 0;
+  vertical-align: middle;
+  filter: var(--icon-filter);
+}
+.sr-only,
+.visually-hidden,
+.public-concierge-honeypot {
+  position: absolute !important;
+  width: 1px !important;
+  height: 1px !important;
+  padding: 0 !important;
+  overflow: hidden !important;
+  clip-path: inset(50%) !important;
+  white-space: nowrap !important;
+  border: 0 !important;
+}
+.skip-link {
+  position: fixed;
+  left: 1rem;
+  top: -100px;
+  z-index: 100;
+  padding: 0.75rem 1rem;
+  background: var(--surface);
+  border: 2px solid var(--primary);
+  border-radius: var(--radius-sm);
+}
+.skip-link:focus {
+  top: 1rem;
+}
+
+:root[data-theme='dark'] {
+  color-scheme: dark;
+  --ink: #e6edf7;
+  --muted: #b3c1d4;
+  --surface: #152438;
+  --canvas: #101c2c;
+  --subtle: #1d3048;
+  --primary: #99c4ff;
+  --primary-dark: #c4ddff;
+  --accent-soft: #213b5c;
+  --on-primary: #102841;
+  --line: #344860;
+  --control-line: #7d92ad;
+  --success: #9cddba;
+  --success-soft: #203e33;
+  --warning: #eed08b;
+  --warning-soft: #443920;
+  --danger: #ffb4bd;
+  --danger-soft: #472b37;
+  --shadow-sm: 0 4px 16px rgb(4 13 26 / 12%);
+  --shadow-lg: 0 16px 48px rgb(4 13 26 / 35%);
+  --icon-filter: invert(82%) sepia(18%) saturate(680%) hue-rotate(179deg);
+}

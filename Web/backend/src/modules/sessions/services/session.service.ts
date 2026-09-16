@@ -20,6 +20,7 @@ import {
   type Training,
 } from '../../trainings/models/training.model.js';
 import { UserModel, type User } from '../../users/models/user.model.js';
+import type { NotificationService } from '../../notifications/services/notification.service.js';
 import { normalizedRoomKey, type SessionStatus } from '../domain/session.js';
 import type {
   CreateScheduleInput,
@@ -102,10 +103,16 @@ function uniqueObjectIds(values: readonly string[]): Types.ObjectId[] {
 export class SessionService {
   readonly #mail: TransactionalEmailService;
   readonly #logger: Logger;
+  readonly #notifications: NotificationService | undefined;
 
-  constructor(mail: TransactionalEmailService, logger: Logger) {
+  constructor(
+    mail: TransactionalEmailService,
+    logger: Logger,
+    notifications?: NotificationService,
+  ) {
     this.#mail = mail;
     this.#logger = logger;
+    this.#notifications = notifications;
   }
 
   async listAssignableTrainers(principal: AuthenticatedPrincipal) {
@@ -903,6 +910,38 @@ export class SessionService {
           ? {}
           : { startsAt: firstSchedule.startAt.toISOString() }),
         location: session.location,
+      });
+      const labels = {
+        scheduled: ['Session programmée', 'a été programmée'],
+        changed: ['Session mise à jour', 'a été mise à jour'],
+        cancelled: ['Session annulée', 'a été annulée'],
+        completed: ['Session terminée', 'est terminée'],
+      } as const;
+      const [title, verb] = labels[kind];
+      await this.#notifications?.createMany(
+        users.map((user) => ({
+          recipientUserId: String(user._id),
+          type: `SESSION_${kind.toUpperCase()}`,
+          title,
+          message: `La session « ${training.title} - ${session.title} » ${verb}.`,
+          link: user.role === 'LEARNER' ? '/app/attendance' : '/app/sessions',
+          dedupeKey: `session:${String(session._id)}:${kind}:${session.updatedAt.toISOString()}`,
+          metadata: {
+            sessionId: String(session._id),
+            trainingId: String(training._id),
+          },
+        })),
+      );
+      await this.#notifications?.notifyAdmins({
+        type: `SESSION_${kind.toUpperCase()}`,
+        title,
+        message: `La session « ${training.title} - ${session.title} » ${verb}.`,
+        link: '/app/sessions',
+        dedupeKey: `session:${String(session._id)}:${kind}:${session.updatedAt.toISOString()}`,
+        metadata: {
+          sessionId: String(session._id),
+          trainingId: String(training._id),
+        },
       });
     });
   }

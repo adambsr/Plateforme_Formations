@@ -5,6 +5,7 @@ import { AppError } from '../../../shared/errors/app-error.js';
 import { EnrollmentModel } from '../../enrollments/models/enrollment.model.js';
 import { TrainingModel } from '../../trainings/models/training.model.js';
 import { UserModel } from '../../users/models/user.model.js';
+import type { NotificationService } from '../../notifications/services/notification.service.js';
 import {
   questionInputSchema,
   type CreateEvaluationInput,
@@ -41,6 +42,12 @@ function sameSet(left: string[], right: string[]): boolean {
 }
 
 export class EvaluationService {
+  readonly #notifications: NotificationService | undefined;
+
+  constructor(notifications?: NotificationService) {
+    this.#notifications = notifications;
+  }
+
   async ownedDraftForGeneration(
     principal: AuthenticatedPrincipal,
     evaluationId: string,
@@ -425,6 +432,36 @@ export class EvaluationService {
     evaluation.status = 'PUBLISHED';
     evaluation.publishedAt = new Date();
     await evaluation.save();
+    await this.#bestEffortNotify(async () => {
+      const [training, learnerIds] = await Promise.all([
+        TrainingModel.findById(evaluation.trainingId)
+          .select({ title: 1 })
+          .lean()
+          .exec(),
+        EnrollmentModel.find({ trainingId: evaluation.trainingId }).distinct(
+          'learnerId',
+        ),
+      ]);
+      await this.#notifications?.createMany(
+        learnerIds.map((learnerId) => ({
+          recipientUserId: String(learnerId),
+          type: 'EVALUATION_AVAILABLE',
+          title: 'Nouvelle évaluation',
+          message: `Une nouvelle évaluation « ${evaluation.title} » est disponible pour « ${training?.title ?? 'votre formation'} ».`,
+          link: `/app/evaluations/${String(evaluation._id)}`,
+          dedupeKey: `evaluation-published:${String(evaluation._id)}`,
+          metadata: { evaluationId: String(evaluation._id) },
+        })),
+      );
+      await this.#notifications?.notifyAdmins({
+        type: 'EVALUATION_PUBLISHED',
+        title: 'Nouvelle évaluation',
+        message: `L’évaluation « ${evaluation.title} » a été publiée.`,
+        link: `/app/evaluations/${String(evaluation._id)}`,
+        dedupeKey: `evaluation-published:${String(evaluation._id)}`,
+        metadata: { evaluationId: String(evaluation._id) },
+      });
+    });
     return this.detail(principal, evaluationId);
   }
 
@@ -690,6 +727,7 @@ export class EvaluationService {
     const attempt = await this.#learnerAttempt(principal, attemptId);
     if (attempt.status !== 'IN_PROGRESS') return this.#attemptView(attempt);
     await this.#grade(attempt, new Date());
+    await this.#notifyAttemptResult(attempt);
     return this.#attemptView(attempt);
   }
 
@@ -786,9 +824,69 @@ export class EvaluationService {
       attempt.expiresAt.getTime() <= Date.now()
     ) {
       await this.#grade(attempt, attempt.expiresAt);
+      await this.#notifyAttemptResult(attempt);
       return true;
     }
     return false;
+  }
+
+  async #notifyAttemptResult(
+    attempt: HydratedDocument<EvaluationAttempt>,
+  ): Promise<void> {
+    await this.#bestEffortNotify(async () => {
+      const [evaluation, training] = await Promise.all([
+        EvaluationModel.findById(attempt.evaluationId).lean().exec(),
+        TrainingModel.findById(attempt.trainingId)
+          .select({ title: 1 })
+          .lean()
+          .exec(),
+      ]);
+      if (evaluation === null) return;
+      await this.#notifications?.createInApp({
+        recipientUserId: String(attempt.learnerId),
+        type: 'EVALUATION_RESULT_AVAILABLE',
+        title: 'Résultat disponible',
+        message: `Votre résultat pour « ${evaluation.title} » est maintenant disponible.`,
+        link: `/app/evaluations/${String(evaluation._id)}`,
+        dedupeKey: `evaluation-result:${String(attempt._id)}`,
+        metadata: {
+          attemptId: String(attempt._id),
+          evaluationId: String(evaluation._id),
+        },
+      });
+      await this.#notifications?.createInApp({
+        recipientUserId: String(evaluation.ownerTrainerId),
+        type: 'EVALUATION_SUBMITTED',
+        title: 'Évaluation soumise',
+        message: `Un apprenant a soumis « ${evaluation.title} » pour « ${training?.title ?? 'une formation'} ».`,
+        link: `/app/evaluations/${String(evaluation._id)}`,
+        dedupeKey: `evaluation-submitted:${String(attempt._id)}`,
+        metadata: {
+          attemptId: String(attempt._id),
+          evaluationId: String(evaluation._id),
+        },
+      });
+      await this.#notifications?.notifyAdmins({
+        type: 'EVALUATION_SUBMITTED',
+        title: 'Activité d’évaluation',
+        message: `Une évaluation « ${evaluation.title} » a été soumise.`,
+        link: `/app/evaluations/${String(evaluation._id)}`,
+        dedupeKey: `evaluation-submitted:${String(attempt._id)}`,
+        metadata: {
+          attemptId: String(attempt._id),
+          evaluationId: String(evaluation._id),
+        },
+      });
+    });
+  }
+
+  async #bestEffortNotify(task: () => Promise<void>): Promise<void> {
+    if (this.#notifications === undefined) return;
+    try {
+      await task();
+    } catch {
+      // Notification delivery must never roll back a completed evaluation action.
+    }
   }
   async #attemptView(attempt: HydratedDocument<EvaluationAttempt>) {
     const answers = await EvaluationAnswerModel.find({ attemptId: attempt._id })

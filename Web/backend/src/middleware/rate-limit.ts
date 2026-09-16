@@ -7,6 +7,10 @@ interface Counter {
   resetAt: number;
 }
 
+interface RateLimitOptions {
+  skipSuccessfulRequests?: boolean;
+}
+
 const MAX_COUNTERS_PER_LIMITER = 10_000;
 
 function pruneCounters(counters: Map<string, Counter>, now: number): void {
@@ -24,6 +28,7 @@ export function rateLimit(
   name: string,
   maximum: number,
   windowMs = 15 * 60_000,
+  options: RateLimitOptions = {},
 ): RequestHandler {
   const counters = new Map<string, Counter>();
   let requestCount = 0;
@@ -45,6 +50,16 @@ export function rateLimit(
         : existing;
     counter.count += 1;
     counters.set(key, counter);
+
+    if (options.skipSuccessfulRequests === true) {
+      response.once('finish', () => {
+        if (response.statusCode >= 400) return;
+        const current = counters.get(key);
+        if (current !== counter) return;
+        current.count = Math.max(0, current.count - 1);
+        if (current.count === 0) counters.delete(key);
+      });
+    }
 
     if (counter.count > maximum) {
       response.setHeader(

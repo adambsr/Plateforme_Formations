@@ -345,7 +345,7 @@ export async function seedDevelopmentData(environment = process.env) {
     );
     const inPersonTrainingIds = trainingIds.slice(10);
     const sessionTitle = (trainingIndex: number, occurrence: number) =>
-      `${trainingData[trainingIndex]![0]} — ${
+      `${trainingData[trainingIndex]![0]} : ${
         occurrence === 0
           ? 'promotion printemps terminée'
           : 'promotion automne à venir'
@@ -427,7 +427,7 @@ export async function seedDevelopmentData(environment = process.env) {
         _id: evaluationIds[index],
         trainingId: trainingIds[trainingIndex],
         ownerTrainerId: trainerIds[trainingIndex % trainerIds.length],
-        title: `Évaluation finale — ${trainingData[trainingIndex]![0]}`,
+        title: `Évaluation finale : ${trainingData[trainingIndex]![0]}`,
         instructions: 'Sélectionnez la meilleure réponse pour chaque question.',
         status: 'PUBLISHED' as const,
         passPercentage: 70,
@@ -604,7 +604,7 @@ export async function seedDevelopmentData(environment = process.env) {
     );
     const invoiceIds = paidPurchases.map((_, index) => objectId(13, index + 1));
     const issuer = {
-      name: 'High Skills Academy — Démonstration',
+      name: 'High Skills Academy : Démonstration',
       address: 'Route Manzel Chaker km 2.5 en face Magasin Général (MG) , Sfax, Tunisia',
       email: 'contact.hsa.tn@gmail.com',
       phone: '+216 70 000 000',

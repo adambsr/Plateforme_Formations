@@ -2233,6 +2233,151 @@ export const openApiDocument: OpenAPIV3.Document = {
         },
       },
     },
+    '/dashboard/trainer': {
+      get: {
+        operationId: 'getTrainerDashboardWorkspace',
+        summary: 'Get Trainer learner count and recent teaching activity',
+        description:
+          'Trainer-only aggregate from owned Trainings, assigned Sessions, Enrollments, and submitted Evaluation attempts.',
+        tags: ['Dashboard'],
+        security: secured,
+        responses: {
+          '200': {
+            description: 'Trainer workspace summary.',
+            content: json({ type: 'object', additionalProperties: true }),
+          },
+          default: errorResponse,
+        },
+      },
+    },
+    '/search': {
+      get: {
+        operationId: 'searchDashboard',
+        summary: 'Search resources visible to the authenticated role',
+        tags: ['Search'],
+        security: secured,
+        parameters: [
+          {
+            name: 'q',
+            in: 'query',
+            required: true,
+            schema: { type: 'string', minLength: 2, maxLength: 80 },
+          },
+          {
+            name: 'limit',
+            in: 'query',
+            schema: { type: 'integer', minimum: 1, maximum: 10, default: 5 },
+          },
+        ],
+        responses: {
+          '200': {
+            description: 'Role-scoped grouped results.',
+            content: json({ type: 'object', additionalProperties: true }),
+          },
+          default: errorResponse,
+        },
+      },
+    },
+    '/notifications': {
+      get: {
+        operationId: 'listNotifications',
+        summary: 'List the authenticated user notifications',
+        tags: ['Notifications'],
+        security: secured,
+        parameters: [
+          { $ref: '#/components/parameters/Page' },
+          { $ref: '#/components/parameters/PageSize' },
+          {
+            name: 'state',
+            in: 'query',
+            schema: {
+              type: 'string',
+              enum: ['ALL', 'UNREAD', 'READ'],
+              default: 'ALL',
+            },
+          },
+        ],
+        responses: {
+          '200': {
+            description: 'Recipient-owned notification page.',
+            content: json({ type: 'object', additionalProperties: true }),
+          },
+          default: errorResponse,
+        },
+      },
+    },
+    '/notifications/unread-count': {
+      get: {
+        operationId: 'getUnreadNotificationCount',
+        summary: 'Get the authenticated user unread count',
+        tags: ['Notifications'],
+        security: secured,
+        responses: {
+          '200': {
+            description: 'Unread notification count.',
+            content: json({
+              type: 'object',
+              required: ['unread'],
+              properties: { unread: { type: 'integer', minimum: 0 } },
+            }),
+          },
+          default: errorResponse,
+        },
+      },
+    },
+    '/notifications/stream': {
+      get: {
+        operationId: 'streamNotifications',
+        summary:
+          'Stream newly created notifications for the authenticated user',
+        description:
+          'Long-lived Server-Sent Events response. Emits a ready event, notification events, and heartbeat comments. The Authorization header must contain the Web access token.',
+        tags: ['Notifications'],
+        security: secured,
+        responses: {
+          '200': {
+            description: 'Authenticated notification event stream.',
+            content: {
+              'text/event-stream': {
+                schema: { type: 'string' },
+              },
+            },
+          },
+          default: errorResponse,
+        },
+      },
+    },
+    '/notifications/{id}/read': {
+      patch: {
+        operationId: 'markNotificationRead',
+        summary: 'Mark one owned notification as read',
+        tags: ['Notifications'],
+        security: secured,
+        parameters: [{ $ref: '#/components/parameters/EntityId' }],
+        responses: {
+          '200': {
+            description: 'Updated notification.',
+            content: json({ type: 'object', additionalProperties: true }),
+          },
+          default: errorResponse,
+        },
+      },
+    },
+    '/notifications/read-all': {
+      patch: {
+        operationId: 'markAllNotificationsRead',
+        summary: 'Mark every owned notification as read',
+        tags: ['Notifications'],
+        security: secured,
+        responses: {
+          '200': {
+            description: 'Updated count.',
+            content: json({ type: 'object', additionalProperties: true }),
+          },
+          default: errorResponse,
+        },
+      },
+    },
   },
   components: {
     securitySchemes: {
@@ -4252,5 +4397,7 @@ export const openApiDocument: OpenAPIV3.Document = {
     { name: 'Feedback' },
     { name: 'Costs' },
     { name: 'Dashboard' },
+    { name: 'Search' },
+    { name: 'Notifications' },
   ],
 };

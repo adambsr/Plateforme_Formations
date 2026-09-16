@@ -348,7 +348,7 @@ export function RefundPolicyPage() {
           Un paiement annulé, échoué ou encore en attente ne déclenche pas
           d’inscription. Vérifiez son état dans « Mes achats ». En cas de débit
           visible sans accès, contactez le support avec l’email du compte, la
-          formation et la date approximative — jamais avec un numéro de carte
+          formation et la date approximative, jamais avec un numéro de carte
           complet.
         </p>
       </section>

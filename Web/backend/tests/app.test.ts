@@ -6,9 +6,12 @@ import { createApp } from '../src/app.js';
 import { loadAppConfig } from '../src/config/environment.js';
 import { validEnvironment } from './fixtures/environment.js';
 
-function testApp(databaseReady = true) {
+function testApp(
+  databaseReady = true,
+  environment: NodeJS.ProcessEnv = validEnvironment(),
+) {
   return createApp({
-    config: loadAppConfig(validEnvironment()),
+    config: loadAppConfig(environment),
     logger: pino({ level: 'silent' }),
     databaseReady: () => databaseReady,
   });
@@ -70,6 +73,38 @@ describe('HTTP foundation', () => {
     );
     expect(allowed.headers['access-control-allow-credentials']).toBe('true');
     expect(rejected.headers['access-control-allow-origin']).toBeUndefined();
+  });
+
+  it('allows Vite fallback ports on loopback only during development', async () => {
+    const development = validEnvironment();
+    development.NODE_ENV = 'development';
+    const [localhost, loopback, external, testEnvironment] = await Promise.all([
+      request(testApp(true, development))
+        .options('/api/auth/refresh')
+        .set('origin', 'http://localhost:5174')
+        .set('access-control-request-method', 'POST'),
+      request(testApp(true, development))
+        .get('/api/health')
+        .set('origin', 'http://127.0.0.1:5199'),
+      request(testApp(true, development))
+        .get('/api/health')
+        .set('origin', 'https://untrusted.example'),
+      request(testApp())
+        .get('/api/health')
+        .set('origin', 'http://localhost:5174'),
+    ]);
+
+    expect(localhost.headers['access-control-allow-origin']).toBe(
+      'http://localhost:5174',
+    );
+    expect(localhost.headers['access-control-allow-credentials']).toBe('true');
+    expect(loopback.headers['access-control-allow-origin']).toBe(
+      'http://127.0.0.1:5199',
+    );
+    expect(external.headers['access-control-allow-origin']).toBeUndefined();
+    expect(
+      testEnvironment.headers['access-control-allow-origin'],
+    ).toBeUndefined();
   });
 
   it('serves a synchronized OpenAPI document and documentation UI', async () => {

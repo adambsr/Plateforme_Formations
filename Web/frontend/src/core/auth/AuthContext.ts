@@ -1,8 +1,9 @@
 import { createContext, useContext } from 'react';
 
+import type { ApiStreamEvent } from '../api/client.js';
 import type { User } from './types.js';
 
-export type AuthStatus = 'loading' | 'guest' | 'authenticated';
+export type AuthStatus = 'loading' | 'guest' | 'authenticated' | 'logging-out';
 
 export interface AuthContextValue {
   status: AuthStatus;
@@ -19,6 +20,10 @@ export interface AuthContextValue {
   updateProfile(firstName: string, lastName: string): Promise<User>;
   request<T>(path: string, options?: RequestInit): Promise<T>;
   download(path: string): Promise<Blob>;
+  subscribe<T>(
+    path: string,
+    onEvent: (event: ApiStreamEvent<T>) => void,
+  ): () => void;
 }
 
 export const AuthContext = createContext<AuthContextValue | null>(null);

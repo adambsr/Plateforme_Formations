@@ -104,7 +104,10 @@ export function createAuthRouter(
 
   router.post(
     '/refresh',
-    rateLimit('refresh', 30),
+    // Refreshes are expected during normal browser use and many users can share
+    // one public IP. Keep failed refresh attempts bounded without allowing
+    // successful token rotations to lock out unrelated sessions behind a NAT.
+    rateLimit('refresh', 30, 15 * 60_000, { skipSuccessfulRequests: true }),
     async (request, response) => {
       const input = refreshSchema.parse(request.body ?? {});
       const rawToken =

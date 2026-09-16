@@ -34,9 +34,18 @@ export function createDashboardRouter(
       );
     });
   }
-  router.get('/dashboard/recommendations', ...ready, async (request, response) => {
+  router.get(
+    '/dashboard/recommendations',
+    ...ready,
+    async (request, response) => {
+      response.json(
+        await service.recommendations(authenticatedPrincipal(request)),
+      );
+    },
+  );
+  router.get('/dashboard/trainer', ...ready, async (request, response) => {
     response.json(
-      await service.recommendations(authenticatedPrincipal(request)),
+      await service.trainerWorkspace(authenticatedPrincipal(request)),
     );
   });
   return router;
