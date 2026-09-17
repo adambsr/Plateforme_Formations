@@ -174,7 +174,7 @@ export class PaymentService {
         description:
           session === null
             ? training.title
-            : `${training.title} â€” ${session.title}`,
+            : `${training.title} — ${session.title}`,
         amountMinor: payment.amountMinor,
         currency: payment.currency,
         ...(input.client === 'MOBILE'
@@ -420,7 +420,7 @@ export class PaymentService {
         const description =
           payment.sessionTitle === undefined
             ? payment.trainingTitle
-            : `${payment.trainingTitle} â€” ${payment.sessionTitle}`;
+            : `${payment.trainingTitle} — ${payment.sessionTitle}`;
         const [invoice] = await InvoiceModel.create(
           [
             {
@@ -509,8 +509,8 @@ export class PaymentService {
           await this.#notifications?.createInApp({
             recipientUserId: confirmation.learnerId,
             type: 'PURCHASE_CONFIRMED',
-            title: 'Formation achetÃ©e',
-            message: `Votre inscription Ã  Â« ${confirmation.trainingTitle} Â» a Ã©tÃ© confirmÃ©e.`,
+            title: 'Formation achetée',
+            message: `Votre inscription à « ${confirmation.trainingTitle} » a été confirmée.`,
             link: '/app/payments',
             dedupeKey: `payment-paid:${confirmation.paymentId}`,
             metadata: {
@@ -520,8 +520,8 @@ export class PaymentService {
           });
           await this.#notifications?.notifyAdmins({
             type: 'PAYMENT_RECEIVED',
-            title: 'Paiement reÃ§u',
-            message: `Un paiement de ${(confirmation.amountMinor / 100).toLocaleString('fr-FR', { style: 'currency', currency: confirmation.currency })} a Ã©tÃ© confirmÃ© pour Â« ${confirmation.trainingTitle} Â».`,
+            title: 'Paiement reçu',
+            message: `Un paiement de ${(confirmation.amountMinor / 100).toLocaleString('fr-FR', { style: 'currency', currency: confirmation.currency })} a été confirmé pour « ${confirmation.trainingTitle} ».`,
             link: '/app/payments',
             dedupeKey: `payment-paid:${confirmation.paymentId}`,
             metadata: { paymentId: confirmation.paymentId },
@@ -529,7 +529,7 @@ export class PaymentService {
           await this.#notifications?.notifyAdmins({
             type: 'ENROLLMENT_CREATED',
             title: 'Nouvelle inscription',
-            message: `Un apprenant sâ€™est inscrit Ã  Â« ${confirmation.trainingTitle} Â».`,
+            message: `Un apprenant s’est inscrit à « ${confirmation.trainingTitle} ».`,
             link: '/app/payments',
             dedupeKey: `enrollment:${confirmation.paymentId}`,
             metadata: {
@@ -560,7 +560,7 @@ export class PaymentService {
               recipientUserId,
               type: 'LEARNER_ENROLLED',
               title: 'Nouvelle inscription',
-              message: `Un nouvel apprenant sâ€™est inscrit Ã  Â« ${confirmation.trainingTitle} Â».`,
+              message: `Un nouvel apprenant s’est inscrit à « ${confirmation.trainingTitle} ».`,
               link: '/app/attendance',
               dedupeKey: `enrollment:${confirmation.paymentId}`,
               metadata: {
@@ -589,16 +589,16 @@ export class PaymentService {
         await this.#notifications?.createInApp({
           recipientUserId: String(payment.learnerId),
           type: 'PAYMENT_FAILED',
-          title: 'Paiement Ã©chouÃ©',
-          message: `Le paiement pour Â« ${payment.trainingTitle} Â» nâ€™a pas pu Ãªtre confirmÃ©.`,
+          title: 'Paiement échoué',
+          message: `Le paiement pour « ${payment.trainingTitle} » n’a pas pu être confirmé.`,
           link: '/app/payments',
           dedupeKey: `payment-failed:${String(payment._id)}:${eventKey}`,
           metadata: { paymentId: String(payment._id) },
         });
         await this.#notifications?.notifyAdmins({
           type: 'PAYMENT_FAILED',
-          title: 'Paiement Ã©chouÃ©',
-          message: `Un paiement pour Â« ${payment.trainingTitle} Â» a Ã©chouÃ©.`,
+          title: 'Paiement échoué',
+          message: `Un paiement pour « ${payment.trainingTitle} » a échoué.`,
           link: '/app/payments',
           dedupeKey: `payment-failed:${String(payment._id)}:${eventKey}`,
           metadata: { paymentId: String(payment._id) },

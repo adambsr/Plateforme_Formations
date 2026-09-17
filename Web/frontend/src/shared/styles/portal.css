@@ -461,6 +461,25 @@
   max-width: 34rem;
   margin-block: 1.25rem;
 }
+.satisfaction-heading {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 1rem;
+}
+.satisfaction-heading .satisfaction-filter {
+  width: min(100%, 22rem);
+  margin: 0;
+}
+@media (max-width: 600px) {
+  .satisfaction-heading {
+    align-items: stretch;
+    flex-direction: column;
+  }
+  .satisfaction-heading .satisfaction-filter {
+    width: 100%;
+  }
+}
 .satisfaction-donut {
   display: grid;
   justify-items: center;

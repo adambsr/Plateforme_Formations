@@ -34,6 +34,22 @@ function escapedRegex(value: string): RegExp {
   return new RegExp(value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
 }
 
+function userSearchFilter(query: string) {
+  const terms = query.trim().split(/\s+/).filter(Boolean);
+  return {
+    $and: terms.map((term) => {
+      const pattern = escapedRegex(term);
+      return {
+        $or: [
+          { email: pattern },
+          { 'profile.firstName': pattern },
+          { 'profile.lastName': pattern },
+        ],
+      };
+    }),
+  };
+}
+
 function displayName(user: {
   email: string;
   profile: { firstName?: string; lastName?: string };
@@ -180,11 +196,7 @@ export class SearchService {
             ...(principal.role === 'ADMIN'
               ? {}
               : { _id: { $in: visibleLearnerIds }, role: 'LEARNER' }),
-            $or: [
-              { email: pattern },
-              { 'profile.firstName': pattern },
-              { 'profile.lastName': pattern },
-            ],
+            ...userSearchFilter(input.q),
           })
             .select({ email: 1, profile: 1, role: 1 })
             .limit(input.limit)

@@ -93,7 +93,7 @@ export function CertificateFeedbackPage() {
       );
       setCertificates(certificateResult.items);
       setCertificatePage(certificateResult);
-      if (user.role === 'LEARNER' || user.role === 'ADMIN') {
+      if (user.role === 'LEARNER') {
         const enrollmentResult = await request<Page<Enrollment>>(
           `/enrollments?page=${enrollmentPageNumber}&pageSize=10`,
         );
@@ -164,18 +164,25 @@ export function CertificateFeedbackPage() {
     }
   }
 
-  async function downloadCertificate(certificate: Certificate) {
+  async function openCertificate(certificate: Certificate) {
+    const certificateWindow = window.open('', '_blank');
+    if (certificateWindow === null) {
+      setError('Le navigateur a bloqué l’ouverture du certificat.');
+      return;
+    }
+    certificateWindow.opener = null;
+    setBusy(`certificate-view:${certificate.id}`);
     setError('');
     try {
       const blob = await download(`/certificates/${certificate.id}/pdf`);
       const url = URL.createObjectURL(blob);
-      const anchor = document.createElement('a');
-      anchor.href = url;
-      anchor.download = `${certificate.number}.pdf`;
-      anchor.click();
-      URL.revokeObjectURL(url);
+      certificateWindow.location.replace(url);
+      window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
     } catch (caught) {
+      certificateWindow.close();
       setError(message(caught));
+    } finally {
+      setBusy('');
     }
   }
 
@@ -223,13 +230,9 @@ export function CertificateFeedbackPage() {
         </p>
       ) : (
         <div className="certificate-sections">
-          {(user.role === 'LEARNER' || user.role === 'ADMIN') && (
+          {user.role === 'LEARNER' && (
             <section className="content-card">
-              <h2>
-                {user.role === 'ADMIN'
-                  ? 'Génération par inscription'
-                  : 'Mes inscriptions, certificats et avis'}
-              </h2>
+              <h2>Mes inscriptions, certificats et avis</h2>
               {enrollments.length === 0 ? (
                 <p className="muted">Aucune inscription confirmée.</p>
               ) : (
@@ -261,11 +264,12 @@ export function CertificateFeedbackPage() {
                           ) : certificate !== undefined ? (
                             <button
                               className="secondary-button"
-                              onClick={() =>
-                                void downloadCertificate(certificate)
+                              disabled={
+                                busy === `certificate-view:${certificate.id}`
                               }
+                              onClick={() => void openCertificate(certificate)}
                             >
-                              Télécharger {certificate.number}
+                              Voir {certificate.number}
                             </button>
                           ) : (
                             <span className="status-pill">
@@ -329,6 +333,50 @@ export function CertificateFeedbackPage() {
             <h2>Certificats émis</h2>
             {certificates.length === 0 ? (
               <p className="muted">Aucun certificat émis.</p>
+            ) : user.role === 'ADMIN' ? (
+              <div
+                className="hsa-table-scroll certificate-table-scroll"
+                role="region"
+                aria-label="Certificats émis"
+                tabIndex={0}
+              >
+                <table>
+                  <thead>
+                    <tr>
+                      <th scope="col">Username</th>
+                      <th scope="col">Email</th>
+                      <th scope="col">Formation</th>
+                      <th scope="col">Certificate</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {certificates.map((certificate) => (
+                      <tr key={certificate.id}>
+                        <th scope="row">
+                          {[certificate.learner.firstName, certificate.learner.lastName]
+                            .filter(Boolean)
+                            .join(' ') || certificate.learner.email}
+                        </th>
+                        <td>{certificate.learner.email}</td>
+                        <td>{certificate.training.title}</td>
+                        <td>
+                          <button
+                            className="secondary-button compact-button"
+                            disabled={
+                              busy === `certificate-view:${certificate.id}`
+                            }
+                            onClick={() => void openCertificate(certificate)}
+                          >
+                            {busy === `certificate-view:${certificate.id}`
+                              ? 'Ouverture…'
+                              : `Voir ${certificate.number}`}
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             ) : (
               <ul className="certificate-list">
                 {certificates.map((certificate) => (
@@ -343,9 +391,10 @@ export function CertificateFeedbackPage() {
                     </div>
                     <button
                       className="secondary-button"
-                      onClick={() => void downloadCertificate(certificate)}
+                      disabled={busy === `certificate-view:${certificate.id}`}
+                      onClick={() => void openCertificate(certificate)}
                     >
-                      PDF {certificate.number}
+                      Voir {certificate.number}
                     </button>
                   </li>
                 ))}
@@ -365,24 +414,26 @@ export function CertificateFeedbackPage() {
 
           {user.role === 'ADMIN' && statistics !== null && (
             <section className="content-card">
-              <h2>Satisfaction</h2>
+              <div className="satisfaction-heading">
+                <h2>Satisfaction</h2>
+                <label className="satisfaction-filter">
+                  Formation
+                  <Select
+                    value={satisfactionTrainingId}
+                    onChange={(event) =>
+                      setSatisfactionTrainingId(event.target.value)
+                    }
+                  >
+                    <option value="">Vue globale</option>
+                    {statistics.byTraining.map(({ training }) => (
+                      <option key={training.id} value={training.id}>
+                        {training.title}
+                      </option>
+                    ))}
+                  </Select>
+                </label>
+              </div>
               <RatingDistribution summary={satisfactionSummary} />
-              <label className="satisfaction-filter">
-                Formation
-                <Select
-                  value={satisfactionTrainingId}
-                  onChange={(event) =>
-                    setSatisfactionTrainingId(event.target.value)
-                  }
-                >
-                  <option value="">Vue globale</option>
-                  {statistics.byTraining.map(({ training }) => (
-                    <option key={training.id} value={training.id}>
-                      {training.title}
-                    </option>
-                  ))}
-                </Select>
-              </label>
               <p className="satisfaction-total">
                 <strong>{satisfactionSummary?.count ?? 0}</strong> notes ·
                 moyenne{' '}
@@ -392,21 +443,8 @@ export function CertificateFeedbackPage() {
                     : `${satisfactionSummary.average.toFixed(2)} / 5`}
                 </strong>
               </p>
-              <p className="muted">
-                Distribution{satisfactionTrainingId === '' ? ' globale' : ''} :{' '}
-                {ratings
-                  .map(
-                    (rating) =>
-                      `${rating}★ ${satisfactionSummary?.distribution[rating] ?? 0}`,
-                  )
-                  .join(' · ')}
-              </p>
               {statistics.byTraining.length === 0 ? (
                 <p className="muted">Aucune satisfaction enregistrée.</p>
-              ) : satisfactionTrainingId === '' ? (
-                <p className="muted">
-                  Sélectionnez une formation pour consulter son résultat.
-                </p>
               ) : null}
             </section>
           )}

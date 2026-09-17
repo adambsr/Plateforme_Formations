@@ -375,6 +375,7 @@
 .portal-shell .portal-body {
   grid-template-columns: 244px minmax(0, 1fr);
   min-height: calc(100dvh - 74px);
+  transition: grid-template-columns 180ms ease;
 }
 .portal-shell.sidebar-collapsed .portal-body {
   grid-template-columns: 76px minmax(0, 1fr);
@@ -383,6 +384,7 @@
   top: 74px;
   height: calc(100dvh - 74px);
   background: #fcfdff;
+  transition: transform 180ms ease, width 180ms ease;
 }
 .portal-shell .portal-nav {
   background: transparent;
@@ -938,8 +940,14 @@
 .hsa-loading > span:not(.sr-only) {
   height: 145px;
   border-radius: 13px;
-  background: linear-gradient(110deg, #e8f0fb, #f9fbff, #e8f0fb);
+  background: linear-gradient(110deg, #e8f0fb 30%, #f9fbff 45%, #e8f0fb 60%);
+  background-size: 200% 100%;
   border: 1px solid var(--line);
+  animation: hsa-loading-shimmer 1.2s ease-in-out infinite;
+}
+@keyframes hsa-loading-shimmer {
+  from { background-position: 100% 0; }
+  to { background-position: -100% 0; }
 }
 .sr-only {
   position: absolute;
@@ -1189,6 +1197,7 @@
   padding: 20px;
   background: rgb(8 31 61 / 52%);
   backdrop-filter: blur(3px);
+  animation: hsa-modal-backdrop-in 160ms ease-out both;
 }
 .hsa-modal {
   width: min(560px, 100%);
@@ -1198,6 +1207,15 @@
   padding: 23px;
   background: white;
   box-shadow: 0 28px 80px rgb(5 28 60 / 30%);
+  animation: hsa-modal-in 180ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+@keyframes hsa-modal-backdrop-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes hsa-modal-in {
+  from { opacity: 0; transform: translateY(8px) scale(0.985); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
 }
 .hsa-modal-heading {
   display: flex;

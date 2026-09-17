@@ -253,7 +253,12 @@ export class CostService {
       trainer: {
         id: String(trainer._id),
         email: trainer.email,
-        ...trainer.profile,
+        ...(trainer.profile.firstName === undefined
+          ? {}
+          : { firstName: trainer.profile.firstName }),
+        ...(trainer.profile.lastName === undefined
+          ? {}
+          : { lastName: trainer.profile.lastName }),
       },
       year: cost.year,
       month: cost.month,

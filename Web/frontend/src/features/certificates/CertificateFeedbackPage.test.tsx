@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { CertificateFeedbackPage } from './CertificateFeedbackPage.js';
@@ -101,7 +101,8 @@ describe('Phase 10 Certificate and Feedback UI', () => {
       '2 notes · moyenne 4.50 / 5',
     );
     expect(screen.getByRole('option', { name: 'TypeScript' })).toBeVisible();
-    expect(screen.getByText(/5★ 1/)).toBeVisible();
+    expect(screen.getByLabelText('5 étoiles')).toBeVisible();
+    expect(screen.queryByText(/Distribution globale/)).toBeNull();
   });
 
   it('shows an existing immutable rating without sending another POST', async () => {
@@ -145,5 +146,54 @@ describe('Phase 10 Certificate and Feedback UI', () => {
     expect(await screen.findByText('Aucun certificat émis.')).toBeVisible();
     expect(request).toHaveBeenCalledTimes(1);
     expect(request).toHaveBeenCalledWith('/certificates?page=1&pageSize=10');
+  });
+
+  it('shows Admin one issued-certificate table without the enrollment generation list', async () => {
+    currentUser = { id: 'admin-1', role: 'ADMIN' };
+    request.mockImplementation((path: string) => {
+      if (path.startsWith('/certificates')) {
+        return Promise.resolve({
+          items: [
+            {
+              id: 'certificate-1',
+              enrollmentId: 'enrollment-1',
+              learner: {
+                email: 'learner@example.com',
+                firstName: 'Amina',
+                lastName: 'Ben Ali',
+              },
+              training: { title: 'TypeScript' },
+              number: 'CERT-001',
+              issuedAt: '2026-01-01T00:00:00.000Z',
+            },
+          ],
+          page: 1,
+          pageSize: 10,
+          total: 1,
+        });
+      }
+      if (path === '/feedback') {
+        return Promise.resolve({
+          global: {
+            count: 0,
+            average: null,
+            distribution: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 },
+          },
+          byTraining: [],
+        });
+      }
+      return Promise.resolve({ items: [], page: 1, pageSize: 10, total: 0 });
+    });
+    render(<CertificateFeedbackPage />);
+    const table = await screen.findByRole('region', {
+      name: 'Certificats émis',
+    });
+    expect(within(table).getByRole('columnheader', { name: 'Username' })).toBeVisible();
+    expect(within(table).getByRole('columnheader', { name: 'Email' })).toBeVisible();
+    expect(within(table).getByRole('columnheader', { name: 'Formation' })).toBeVisible();
+    expect(within(table).getByRole('columnheader', { name: 'Certificate' })).toBeVisible();
+    expect(within(table).getByRole('button', { name: 'Voir CERT-001' })).toBeVisible();
+    expect(screen.queryByText('Génération par inscription')).toBeNull();
+    expect(request).not.toHaveBeenCalledWith(expect.stringMatching(/^\/enrollments/));
   });
 });

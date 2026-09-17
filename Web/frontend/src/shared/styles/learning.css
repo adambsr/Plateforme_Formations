@@ -589,6 +589,8 @@ progress::-moz-progress-bar {
 .tutor-conversation {
   display: grid;
   gap: 1.25rem;
+  transform-origin: top;
+  animation: assistant-expand 180ms ease-out both;
 }
 @media (max-width: 600px) {
   .tutor-header-actions {
@@ -740,9 +742,11 @@ progress::-moz-progress-bar {
   box-shadow: var(--shadow-lg);
   font-size: 0.82rem;
   font-weight: 750;
+  transition: border-color 150ms ease, background-color 150ms ease, transform 150ms ease;
 }
 .public-concierge-launcher:hover {
   border-color: var(--primary);
+  transform: translateY(-1px);
 }
 .public-concierge-panel {
   display: grid;
@@ -754,6 +758,12 @@ progress::-moz-progress-bar {
   background: var(--surface);
   box-shadow: var(--shadow-lg);
   overflow: hidden;
+  transform-origin: right bottom;
+  animation: assistant-expand 180ms ease-out both;
+}
+@keyframes assistant-expand {
+  from { opacity: 0; transform: translateY(6px) scale(0.985); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
 }
 .public-concierge-header {
   display: grid;

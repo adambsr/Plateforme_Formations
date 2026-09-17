@@ -297,6 +297,16 @@ export function TrainingDetailPage() {
               .filter(Boolean)
               .join(' ') || 'Formateur du centre'}
           </p>
+          {user?.role === 'ADMIN' && (
+            <div className="management-actions training-detail-actions">
+              <Link
+                className="secondary-button"
+                to={`/app/trainings/${training.id}/edit`}
+              >
+                Modifier
+              </Link>
+            </div>
+          )}
           {checkoutError !== '' && (
             <p className="form-error" role="alert">
               {checkoutError}

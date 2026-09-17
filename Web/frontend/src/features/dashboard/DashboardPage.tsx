@@ -269,7 +269,8 @@ export function DashboardPage() {
                   <th scope="row">
                     {[cost.trainer.firstName, cost.trainer.lastName]
                       .filter(Boolean)
-                      .join(' ') || cost.trainer.email}
+                      .join(' ') || 'Formateur'}
+                    <small>{cost.trainer.email}</small>
                   </th>
                   <td>
                     {String(cost.month).padStart(2, '0')}/{cost.year}
@@ -981,6 +982,8 @@ function TrainingResults({
   const [categoryId, setCategoryId] = useState('');
   const [modality, setModality] = useState('');
   const [applied, setApplied] = useState({ categoryId: '', modality: '' });
+  const [pageNumber, setPageNumber] = useState(1);
+  const pageSize = 8;
   const details = new Map(trainings.map((training) => [training.id, training]));
   const categories = Array.from(
     new Map(
@@ -989,6 +992,7 @@ function TrainingResults({
   );
   function applyFilters() {
     setApplied({ categoryId, modality });
+    setPageNumber(1);
   }
   const visible = rows.filter((row) => {
     const training = details.get(row.training.id);
@@ -998,6 +1002,10 @@ function TrainingResults({
       (applied.modality === '' || training?.type === applied.modality)
     );
   });
+  const visiblePage = visible.slice(
+    (pageNumber - 1) * pageSize,
+    pageNumber * pageSize,
+  );
   if (rows.length === 0)
     return (
       <div className="empty-state">
@@ -1060,7 +1068,7 @@ function TrainingResults({
               </tr>
             </thead>
             <tbody>
-              {visible.map((row) => (
+              {visiblePage.map((row) => (
                 <tr key={row.training.id}>
                   <th scope="row">{row.training.title}</th>
                   <td>{money(row.revenueMinor)}</td>
@@ -1075,6 +1083,15 @@ function TrainingResults({
             </tbody>
           </table>
         </div>
+      )}
+      {visible.length > pageSize && (
+        <Pagination
+          page={pageNumber}
+          pageSize={pageSize}
+          total={visible.length}
+          onPageChange={setPageNumber}
+          label="Pagination des résultats financiers"
+        />
       )}
     </div>
   );

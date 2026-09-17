@@ -260,6 +260,20 @@ suite('Search and persistent notification integration', () => {
     expect(
       trainerResult.groups.find(({ type }) => type === 'USER')?.items[0]?.id,
     ).toBe(String(learner._id));
+    for (const query of [
+      'Amina Ben Ali',
+      'Amina Be',
+      'learner.search@example.com',
+      'learner.sea',
+    ]) {
+      const result = await search.search(principal(trainer, 'TRAINER'), {
+        q: query,
+        limit: 5,
+      });
+      expect(
+        result.groups.find(({ type }) => type === 'USER')?.items[0]?.id,
+      ).toBe(String(learner._id));
+    }
     const outsiderResult = await search.search(
       principal(outsiderTrainer, 'TRAINER'),
       { q: 'Amina', limit: 5 },
@@ -274,5 +288,19 @@ suite('Search and persistent notification integration', () => {
     expect(
       adminResult.groups.find(({ type }) => type === 'USER')?.items[0]?.id,
     ).toBe(String(otherLearner._id));
+    for (const query of [
+      'Amina Ben Ali',
+      'Amina Be',
+      'learner.search@example.com',
+      'learner.sea',
+    ]) {
+      const result = await search.search(principal(admin, 'ADMIN'), {
+        q: query,
+        limit: 5,
+      });
+      expect(
+        result.groups.find(({ type }) => type === 'USER')?.items[0]?.id,
+      ).toBe(String(learner._id));
+    }
   });
 });

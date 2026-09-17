@@ -20,7 +20,8 @@
   transition:
     background-color 150ms ease,
     border-color 150ms ease,
-    color 150ms ease;
+    color 150ms ease,
+    transform 150ms ease;
 }
 .primary-button,
 .primary-link {
@@ -31,6 +32,13 @@
 .primary-link:hover {
   color: var(--on-primary);
   background: var(--primary-dark);
+}
+.primary-button:active,
+.secondary-button:active,
+.danger-button:active,
+.link-button:active,
+.primary-link:active {
+  transform: translateY(1px);
 }
 .secondary-button {
   color: var(--ink);
