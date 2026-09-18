@@ -1,4 +1,10 @@
-import { useCallback, useEffect, useState, type FormEvent } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useState,
+  type FormEvent,
+  type ReactNode,
+} from 'react';
 import { Link, useParams } from 'react-router';
 
 import { ApiError } from '../../core/api/client.js';
@@ -33,6 +39,34 @@ function OrderField() {
   );
 }
 
+function ContentComposer({
+  id,
+  label,
+  className = '',
+  children,
+}: {
+  id: string;
+  label: string;
+  className?: string;
+  children(close: () => void): ReactNode;
+}) {
+  const [open, setOpen] = useState(false);
+  return (
+    <section className={`content-composer ${className}`}>
+      <button
+        className="secondary-button compact-button"
+        type="button"
+        aria-expanded={open}
+        aria-controls={id}
+        onClick={() => setOpen((current) => !current)}
+      >
+        {open ? 'Fermer' : label}
+      </button>
+      {open && <div id={id}>{children(() => setOpen(false))}</div>}
+    </section>
+  );
+}
+
 function ResourceView({
   resource,
   canManage,
@@ -41,7 +75,7 @@ function ResourceView({
 }: {
   resource: ContentResource;
   canManage: boolean;
-  mutate(path: string, options: RequestInit, notice: string): Promise<void>;
+  mutate(path: string, options: RequestInit, notice: string): Promise<boolean>;
   download(resource: ContentResource): Promise<void>;
 }) {
   return (
@@ -110,9 +144,11 @@ function ResourceView({
 function ResourceForm({
   lessonId,
   mutate,
+  onSaved,
 }: {
   lessonId: string;
-  mutate(path: string, options: RequestInit, notice: string): Promise<void>;
+  mutate(path: string, options: RequestInit, notice: string): Promise<boolean>;
+  onSaved: () => void;
 }) {
   const [type, setType] = useState<ResourceType>('EXTERNAL_URL');
   return (
@@ -141,7 +177,11 @@ function ResourceForm({
           `/lessons/${lessonId}/resources`,
           { method: 'POST', body: upload },
           'Ressource ajoutée.',
-        ).then(() => element.reset());
+        ).then((saved) => {
+          if (!saved) return;
+          element.reset();
+          onSaved();
+        });
       }}
     >
       <h4>Ajouter une ressource</h4>
@@ -169,7 +209,12 @@ function ResourceForm({
         ) : (
           <label>
             Fichier
-            <input name="file" type="file" required />
+            <input
+              name="file"
+              type="file"
+              accept=".pdf,.docx,.pptx,.xlsx,.txt,.csv,.zip,.png,.jpg,.jpeg,.gif,.webp"
+              required
+            />
           </label>
         )}
       </div>
@@ -181,6 +226,12 @@ function ResourceForm({
         <input name="isVisibleToLearners" type="checkbox" defaultChecked />
         Visible par les apprenants autorisés
       </label>
+      {type === 'FILE' && (
+        <small className="muted">
+          Le tuteur IA utilise les PDF, documents Word, présentations, feuilles
+          de calcul, fichiers texte et CSV visibles par les apprenants.
+        </small>
+      )}
       <button className="primary-button compact-button">Ajouter</button>
     </form>
   );
@@ -200,7 +251,7 @@ function LessonView({
   progress?: ProgressSummary;
   progressSavingLessonId?: string;
   updateProgress?(lessonId: string, completed: boolean): Promise<void>;
-  mutate(path: string, options: RequestInit, notice: string): Promise<void>;
+  mutate(path: string, options: RequestInit, notice: string): Promise<boolean>;
   download(resource: ContentResource): Promise<void>;
 }) {
   return (
@@ -298,7 +349,18 @@ function LessonView({
         ))}
       </ul>
       {canManage && !lesson.isArchived && (
-        <ResourceForm lessonId={lesson.id} mutate={mutate} />
+        <ContentComposer
+          id={`resource-composer-${lesson.id}`}
+          label="Ajouter une ressource"
+        >
+          {(close) => (
+            <ResourceForm
+              lessonId={lesson.id}
+              mutate={mutate}
+              onSaved={close}
+            />
+          )}
+        </ContentComposer>
       )}
     </article>
   );
@@ -318,7 +380,7 @@ function ModuleView({
   progress?: ProgressSummary;
   progressSavingLessonId?: string;
   updateProgress?(lessonId: string, completed: boolean): Promise<void>;
-  mutate(path: string, options: RequestInit, notice: string): Promise<void>;
+  mutate(path: string, options: RequestInit, notice: string): Promise<boolean>;
   download(resource: ContentResource): Promise<void>;
 }) {
   return (
@@ -384,52 +446,63 @@ function ModuleView({
         ))}
       </div>
       {canManage && !module.isArchived && (
-        <form
-          className="compact-form"
-          onSubmit={(event: FormEvent<HTMLFormElement>) => {
-            event.preventDefault();
-            const element = event.currentTarget;
-            const values = new FormData(element);
-            void mutate(
-              `/modules/${module.id}/lessons`,
-              {
-                method: 'POST',
-                body: JSON.stringify({
-                  title: field(values, 'title'),
-                  description: field(values, 'description'),
-                  textContent: field(values, 'textContent'),
-                  instructions: field(values, 'instructions'),
-                  order: Number(field(values, 'order')),
-                }),
-              },
-              'Leçon ajoutée.',
-            ).then(() => element.reset());
-          }}
+        <ContentComposer
+          id={`lesson-composer-${module.id}`}
+          label={'Ajouter une le\u00e7on'}
         >
-          <h3>Ajouter une leçon</h3>
-          <div className="form-grid">
-            <label>
-              Titre
-              <input name="title" required />
-            </label>
-            <OrderField />
-          </div>
-          <label>
-            Description
-            <textarea name="description" rows={2} />
-          </label>
-          <label>
-            Contenu textuel
-            <textarea name="textContent" rows={5} />
-          </label>
-          <label>
-            Instructions
-            <textarea name="instructions" rows={3} />
-          </label>
-          <button className="primary-button compact-button">
-            Ajouter la leçon
-          </button>
-        </form>
+          {(close) => (
+            <form
+              className="compact-form"
+              onSubmit={(event: FormEvent<HTMLFormElement>) => {
+                event.preventDefault();
+                const element = event.currentTarget;
+                const values = new FormData(element);
+                void mutate(
+                  `/modules/${module.id}/lessons`,
+                  {
+                    method: 'POST',
+                    body: JSON.stringify({
+                      title: field(values, 'title'),
+                      description: field(values, 'description'),
+                      textContent: field(values, 'textContent'),
+                      instructions: field(values, 'instructions'),
+                      order: Number(field(values, 'order')),
+                    }),
+                  },
+                  'Leçon ajoutée.',
+                ).then((saved) => {
+                  if (!saved) return;
+                  element.reset();
+                  close();
+                });
+              }}
+            >
+              <h3>Ajouter une leçon</h3>
+              <div className="form-grid">
+                <label>
+                  Titre
+                  <input name="title" required />
+                </label>
+                <OrderField />
+              </div>
+              <label>
+                Description
+                <textarea name="description" rows={2} />
+              </label>
+              <label>
+                Contenu textuel
+                <textarea name="textContent" rows={5} />
+              </label>
+              <label>
+                Instructions
+                <textarea name="instructions" rows={3} />
+              </label>
+              <button className="primary-button compact-button">
+                Ajouter la leçon
+              </button>
+            </form>
+          )}
+        </ContentComposer>
       )}
     </article>
   );
@@ -474,15 +547,21 @@ export function ContentPage() {
     void load();
   }, [load]);
 
-  async function mutate(path: string, options: RequestInit, success: string) {
+  async function mutate(
+    path: string,
+    options: RequestInit,
+    success: string,
+  ): Promise<boolean> {
     setError('');
     setNotice('');
     try {
       await request(path, options);
       setNotice(success);
       await load();
+      return true;
     } catch (caught) {
       setError(message(caught));
+      return false;
     }
   }
 
@@ -568,40 +647,52 @@ export function ContentPage() {
           )}
           {content.access === 'LEARNER_READ' && <TutorChat content={content} />}
           {canManage && (
-            <form
+            <ContentComposer
+              id="module-composer"
+              label="Ajouter un module"
               className="content-card module-create-form"
-              onSubmit={(event) => {
-                event.preventDefault();
-                const element = event.currentTarget;
-                const values = new FormData(element);
-                void mutate(
-                  `/trainings/${content.trainingId}/modules`,
-                  {
-                    method: 'POST',
-                    body: JSON.stringify({
-                      title: field(values, 'title'),
-                      description: field(values, 'description'),
-                      order: Number(field(values, 'order')),
-                    }),
-                  },
-                  'Module ajouté.',
-                ).then(() => element.reset());
-              }}
             >
-              <h2>Ajouter un module</h2>
-              <div className="form-grid">
-                <label>
-                  Titre
-                  <input name="title" required />
-                </label>
-                <OrderField />
-              </div>
-              <label>
-                Description
-                <textarea name="description" rows={2} />
-              </label>
-              <button className="primary-button">Ajouter le module</button>
-            </form>
+              {(close) => (
+                <form
+                  className="compact-form"
+                  onSubmit={(event) => {
+                    event.preventDefault();
+                    const element = event.currentTarget;
+                    const values = new FormData(element);
+                    void mutate(
+                      `/trainings/${content.trainingId}/modules`,
+                      {
+                        method: 'POST',
+                        body: JSON.stringify({
+                          title: field(values, 'title'),
+                          description: field(values, 'description'),
+                          order: Number(field(values, 'order')),
+                        }),
+                      },
+                      'Module ajouté.',
+                    ).then((saved) => {
+                      if (!saved) return;
+                      element.reset();
+                      close();
+                    });
+                  }}
+                >
+                  <h2>Ajouter un module</h2>
+                  <div className="form-grid">
+                    <label>
+                      Titre
+                      <input name="title" required />
+                    </label>
+                    <OrderField />
+                  </div>
+                  <label>
+                    Description
+                    <textarea name="description" rows={2} />
+                  </label>
+                  <button className="primary-button">Ajouter le module</button>
+                </form>
+              )}
+            </ContentComposer>
           )}
           {content.modules.length === 0 ? (
             <div className="empty-state">

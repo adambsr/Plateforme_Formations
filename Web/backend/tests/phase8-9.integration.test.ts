@@ -41,7 +41,7 @@ class FakeAi implements QuestionGenerationGateway {
   output: unknown = { questions: [] };
   async generate(input: { prompt: string }) {
     this.prompts.push(input.prompt);
-    return this.output;
+    return { content: this.output, model: this.model };
   }
 }
 

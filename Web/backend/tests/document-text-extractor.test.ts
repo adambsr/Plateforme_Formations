@@ -31,7 +31,7 @@ function pdf(text: string): Promise<Buffer> {
 }
 
 describe('Phase 9 supported document extraction', () => {
-  it('extracts text PDF, DOCX, PPTX, and TXT without OCR', async () => {
+  it('extracts text PDF, DOCX, PPTX, XLSX, TXT, and CSV without OCR', async () => {
     const directory = await workspace();
     const fixtures: Array<[string, Uint8Array, string]> = [
       ['lesson.txt', Buffer.from('Plain lesson text'), 'Plain lesson text'],
@@ -56,6 +56,19 @@ describe('Phase 9 supported document extraction', () => {
         }),
         'First slide Second slide',
       ],
+      [
+        'lesson.xlsx',
+        zipSync({
+          'xl/sharedStrings.xml': Buffer.from(
+            '<sst><si><t>Spreadsheet lesson text</t></si></sst>',
+          ),
+          'xl/worksheets/sheet1.xml': Buffer.from(
+            '<worksheet><sheetData><row><c t="s"><v>0</v></c></row></sheetData></worksheet>',
+          ),
+        }),
+        'Spreadsheet lesson text',
+      ],
+      ['lesson.csv', Buffer.from('CSV lesson text,value'), 'CSV lesson text'],
       ['lesson.pdf', await pdf('PDF lesson text'), 'PDF lesson text'],
     ];
     const extractor = new DocumentTextExtractor();

@@ -52,6 +52,20 @@ function localizedApiMessage(
       'Le backend de développement doit utiliser une clé secrète Stripe sk_test_.',
     AI_PROVIDER_BUSY:
       'Gemini est temporairement très sollicité. Réessayez dans un instant.',
+    AI_PROVIDER_UNAVAILABLE:
+      'Gemini est temporairement indisponible ou tr\u00e8s sollicit\u00e9. R\u00e9essayez dans quelques instants.',
+    AI_PROVIDER_RATE_LIMITED:
+      'Gemini a temporairement atteint sa limite de requ\u00eates. R\u00e9essayez dans quelques instants.',
+    AI_PROVIDER_CONFIGURATION_ERROR:
+      'La configuration Gemini du serveur a \u00e9t\u00e9 refus\u00e9e. Contactez un administrateur.',
+    AI_PROVIDER_MODEL_UNAVAILABLE:
+      'Le mod\u00e8le Gemini configur\u00e9 est indisponible. Contactez un administrateur.',
+    AI_RESPONSE_INVALID:
+      'Gemini a renvoy\u00e9 une r\u00e9ponse illisible. Aucune question n\u2019a \u00e9t\u00e9 enregistr\u00e9e ; r\u00e9essayez.',
+    AI_RESPONSE_SCHEMA_INVALID:
+      'Gemini a renvoy\u00e9 des questions incompl\u00e8tes ou invalides. Aucune question n\u2019a \u00e9t\u00e9 enregistr\u00e9e ; r\u00e9essayez.',
+    CONTENT_ORDER_ALREADY_USED:
+      'Cet ordre est d\u00e9j\u00e0 utilis\u00e9 dans cette formation. Choisissez un autre num\u00e9ro.',
     TRAINING_HAS_HISTORY:
       'Cette formation possède un historique et ne peut pas être supprimée. Archivez-la pour conserver les inscriptions, paiements et résultats.',
     EVALUATION_ALREADY_COMPLETED:

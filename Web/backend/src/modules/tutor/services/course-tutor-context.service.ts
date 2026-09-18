@@ -1,7 +1,15 @@
+import path from 'node:path';
+
+import type { LocalFileStorage } from '../../../infrastructure/files/local-file-storage.js';
 import type { AuthenticatedPrincipal } from '../../../shared/auth/principal.js';
 import { AppError } from '../../../shared/errors/app-error.js';
 import { LessonModel } from '../../content/models/lesson.model.js';
 import { TrainingModuleModel } from '../../content/models/training-module.model.js';
+import { TrainingResourceModel } from '../../content/models/training-resource.model.js';
+import {
+  DocumentTextExtractor,
+  EXTRACTABLE_EXTENSIONS,
+} from '../../evaluations/infrastructure/document-text-extractor.js';
 import type { TutorMessageInput } from '../dto/tutor.dto.js';
 
 export interface TutorSource {
@@ -58,10 +66,18 @@ function terms(value: string): string[] {
 }
 
 export class CourseTutorContextService implements TutorContextRetriever {
+  readonly #storage: LocalFileStorage;
   readonly #maximumChars: number;
+  readonly #extractor: DocumentTextExtractor;
 
-  constructor(maximumChars: number) {
+  constructor(
+    storage: LocalFileStorage,
+    maximumChars: number,
+    extractor = new DocumentTextExtractor(),
+  ) {
+    this.#storage = storage;
     this.#maximumChars = maximumChars;
+    this.#extractor = extractor;
   }
 
   async retrieve(
@@ -76,22 +92,57 @@ export class CourseTutorContextService implements TutorContextRetriever {
         'The course tutor is available only to Learners.',
       );
 
-    const modules = await TrainingModuleModel.find({
-      trainingId,
-      isArchived: false,
-    })
-      .sort({ order: 1, _id: 1 })
-      .exec();
+    const [modules, lessons, resources] = await Promise.all([
+      TrainingModuleModel.find({
+        trainingId,
+        isArchived: false,
+      })
+        .sort({ order: 1, _id: 1 })
+        .exec(),
+      LessonModel.find({ trainingId, isArchived: false })
+        .sort({ order: 1, _id: 1 })
+        .exec(),
+      TrainingResourceModel.find({
+        trainingId,
+        isArchived: false,
+        isVisibleToLearners: true,
+      })
+        .sort({ lessonId: 1, order: 1, _id: 1 })
+        .exec(),
+    ]);
     const moduleById = new Map(
       modules.map((module) => [String(module._id), module]),
     );
-    const lessons = await LessonModel.find({
-      trainingId,
-      moduleId: { $in: modules.map(({ _id }) => _id) },
-      isArchived: false,
-    })
-      .sort({ order: 1, _id: 1 })
-      .exec();
+    const lessonIds = new Set(lessons.map(({ _id }) => String(_id)));
+    const resourceTexts = new Map<string, string[]>();
+    await Promise.all(
+      resources.map(async (resource) => {
+        const file = resource.file;
+        if (
+          resource.type !== 'FILE' ||
+          file === undefined ||
+          !lessonIds.has(String(resource.lessonId)) ||
+          !(EXTRACTABLE_EXTENSIONS as readonly string[]).includes(
+            path.extname(file.originalName).toLowerCase(),
+          )
+        )
+          return;
+        try {
+          const text = await this.#extractor.extract(
+            this.#storage.resolve(file.relativePath),
+            file.originalName,
+          );
+          if (text === '') return;
+          const existing = resourceTexts.get(String(resource.lessonId)) ?? [];
+          existing.push(
+            `RESOURCE: ${resource.title} (${file.originalName})\n${text.slice(0, this.#maximumChars)}`,
+          );
+          resourceTexts.set(String(resource.lessonId), existing);
+        } catch {
+          // One damaged learner resource must not make the tutor unavailable.
+        }
+      }),
+    );
 
     if (
       input.currentLessonId !== undefined &&
@@ -118,6 +169,7 @@ export class CourseTutorContextService implements TutorContextRetriever {
           lesson.description,
           lesson.textContent,
           lesson.instructions,
+          ...(resourceTexts.get(String(lesson._id)) ?? []),
         ]
           .map((value) => value.trim())
           .filter(Boolean)

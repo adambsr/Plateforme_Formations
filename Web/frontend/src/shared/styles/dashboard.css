@@ -118,6 +118,7 @@
   border-radius: 9px;
   padding: 9px 10px;
   color: var(--ink);
+  text-decoration: none;
 }
 .hsa-search-results a:hover,
 .hsa-search-results a:focus-visible {
@@ -384,7 +385,9 @@
   top: 74px;
   height: calc(100dvh - 74px);
   background: #fcfdff;
-  transition: transform 180ms ease, width 180ms ease;
+  transition:
+    transform 180ms ease,
+    width 180ms ease;
 }
 .portal-shell .portal-nav {
   background: transparent;
@@ -946,8 +949,12 @@
   animation: hsa-loading-shimmer 1.2s ease-in-out infinite;
 }
 @keyframes hsa-loading-shimmer {
-  from { background-position: 100% 0; }
-  to { background-position: -100% 0; }
+  from {
+    background-position: 100% 0;
+  }
+  to {
+    background-position: -100% 0;
+  }
 }
 .sr-only {
   position: absolute;
@@ -1210,12 +1217,22 @@
   animation: hsa-modal-in 180ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
 }
 @keyframes hsa-modal-backdrop-in {
-  from { opacity: 0; }
-  to { opacity: 1; }
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
 }
 @keyframes hsa-modal-in {
-  from { opacity: 0; transform: translateY(8px) scale(0.985); }
-  to { opacity: 1; transform: translateY(0) scale(1); }
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
 }
 .hsa-modal-heading {
   display: flex;
@@ -1305,20 +1322,20 @@
 }
 .hsa-trainer-sessions li strong {
   margin-top: 5px;
-  font-size: 13px;
+  font-size: 14px;
   overflow-wrap: anywhere;
 }
 .hsa-trainer-sessions li small {
   margin-top: 3px;
   color: var(--muted);
-  font-size: 11px;
+  font-size: 12px;
 }
 .hsa-session-learners {
   display: inline-flex;
   align-items: center;
   gap: 5px;
   color: var(--muted);
-  font-size: 11px;
+  font-size: 12px;
   white-space: nowrap;
 }
 .hsa-activity-panel li {
@@ -1339,17 +1356,17 @@
   min-width: 0;
 }
 .hsa-activity-panel li strong {
-  font-size: 12px;
+  font-size: 14px;
 }
 .hsa-activity-panel li small {
   margin-top: 3px;
   color: var(--muted);
-  font-size: 10px;
+  font-size: 12px;
   overflow-wrap: anywhere;
 }
 .hsa-activity-panel time {
   color: #7890ad;
-  font-size: 10px;
+  font-size: 11px;
   white-space: nowrap;
 }
 .hsa-activity-enrollment {
@@ -1769,4 +1786,174 @@
     transition: none;
     animation: none;
   }
+}
+
+/* Dashboard-specific values were introduced as light-only literals. Keep the
+   existing composition while mapping every authenticated surface to the
+   semantic dark palette when the persisted theme is dark. */
+:root[data-theme='dark'] .portal-shell {
+  --primary: #9bc5ff;
+  --primary-dark: #c9e1ff;
+  --ink: #e8f0fb;
+  --muted: #b4c5dc;
+  --line: #324a66;
+  --canvas: #0f1d2f;
+  --shadow-sm: 0 3px 12px rgb(2 10 23 / 30%);
+  --hsa-surface: #15283f;
+  --hsa-surface-raised: #1a304b;
+  --hsa-subtle: #1d3552;
+  --hsa-blue-soft: #203d64;
+  --hsa-green-soft: #193d36;
+  --hsa-green-line: #2d685b;
+  --hsa-purple-soft: #342b59;
+  --hsa-orange-soft: #50371f;
+}
+:root[data-theme='dark'] .portal-shell .portal-header,
+:root[data-theme='dark'] .portal-shell .portal-sidebar,
+:root[data-theme='dark'] .hsa-search-results,
+:root[data-theme='dark'] .hsa-notification-panel,
+:root[data-theme='dark'] .hsa-notification-panel > header,
+:root[data-theme='dark'] .hsa-notification-list article,
+:root[data-theme='dark'] .hsa-notification-center-list article,
+:root[data-theme='dark'] .hsa-stat,
+:root[data-theme='dark'] .hsa-dashboard .content-card,
+:root[data-theme='dark'] .hsa-quick-action,
+:root[data-theme='dark'] .hsa-overview-strip,
+:root[data-theme='dark'] .hsa-modal,
+:root[data-theme='dark'] .hsa-table-action {
+  background: var(--hsa-surface);
+}
+:root[data-theme='dark'] .hsa-header-search,
+:root[data-theme='dark'] .hsa-search-field {
+  background: var(--hsa-subtle);
+}
+:root[data-theme='dark'] .hsa-search-field:focus-within {
+  border-color: var(--primary);
+  background: var(--hsa-surface-raised);
+}
+:root[data-theme='dark'] .hsa-search-field input::placeholder,
+:root[data-theme='dark'] .hsa-notification-list article time,
+:root[data-theme='dark'] .hsa-notification-center-list article time,
+:root[data-theme='dark'] .hsa-activity-panel time {
+  color: var(--muted);
+}
+:root[data-theme='dark'] .hsa-search-results section + section,
+:root[data-theme='dark'] .hsa-notification-list article,
+:root[data-theme='dark'] .hsa-notification-center-list article,
+:root[data-theme='dark'] .hsa-dashboard .recent-panel li {
+  border-color: var(--line);
+}
+:root[data-theme='dark'] .hsa-search-results h2,
+:root[data-theme='dark'] .hsa-notification-button,
+:root[data-theme='dark'] .hsa-notification-slot,
+:root[data-theme='dark'] .portal-shell .portal-nav a,
+:root[data-theme='dark'] .portal-shell .sidebar-footer a,
+:root[data-theme='dark'] .portal-shell .nav-logout,
+:root[data-theme='dark'] .hsa-nav-group {
+  color: var(--muted);
+}
+:root[data-theme='dark'] .hsa-search-results a:hover,
+:root[data-theme='dark'] .hsa-search-results a:focus-visible,
+:root[data-theme='dark'] .hsa-notification-button:hover,
+:root[data-theme='dark'] .hsa-notification-button:focus-visible,
+:root[data-theme='dark'] .portal-shell .portal-nav a:hover,
+:root[data-theme='dark'] .portal-shell .sidebar-footer a:hover,
+:root[data-theme='dark'] .hsa-text-link:hover,
+:root[data-theme='dark'] .hsa-table-action:hover {
+  background: var(--hsa-blue-soft);
+}
+:root[data-theme='dark'] .portal-shell .portal-nav a.active,
+:root[data-theme='dark'] .hsa-notification-list article.unread,
+:root[data-theme='dark'] .hsa-notification-center-list article.unread,
+:root[data-theme='dark'] .hsa-notification-filters button.active,
+:root[data-theme='dark'] .hsa-section-nav a,
+:root[data-theme='dark'] .hsa-result-icon,
+:root[data-theme='dark'] .hsa-session-date {
+  color: var(--primary);
+  background: var(--hsa-blue-soft);
+}
+:root[data-theme='dark'] .hsa-notification-badge {
+  border-color: var(--hsa-surface);
+}
+:root[data-theme='dark'] .hsa-notification-filters button {
+  color: var(--muted);
+  background: var(--hsa-surface);
+}
+:root[data-theme='dark'] .hsa-quick-action:hover {
+  border-color: var(--primary);
+  background: var(--hsa-surface-raised);
+}
+:root[data-theme='dark'] .hsa-tone-blue,
+:root[data-theme='dark'] .hsa-activity-session {
+  color: #9bc5ff;
+  background: var(--hsa-blue-soft);
+}
+:root[data-theme='dark'] .hsa-tone-green,
+:root[data-theme='dark'] .hsa-activity-enrollment {
+  color: #9cddba;
+  background: var(--hsa-green-soft);
+}
+:root[data-theme='dark'] .hsa-tone-purple,
+:root[data-theme='dark'] .hsa-activity-evaluation {
+  color: #c7b5ff;
+  background: var(--hsa-purple-soft);
+}
+:root[data-theme='dark'] .hsa-tone-orange {
+  color: #ffd19b;
+  background: var(--hsa-orange-soft);
+}
+:root[data-theme='dark'] .hsa-progress {
+  border-color: var(--hsa-green-line);
+  background: var(--hsa-green-soft);
+}
+:root[data-theme='dark'] .hsa-progress-ring {
+  background: conic-gradient(#57caa9 var(--progress), #29594f 0);
+}
+:root[data-theme='dark'] .hsa-progress-ring::before {
+  background: #17372f;
+}
+:root[data-theme='dark'] .hsa-progress-copy p,
+:root[data-theme='dark'] .hsa-progress-copy small,
+:root[data-theme='dark'] .hsa-progress-achievement small {
+  color: #b7d8cf;
+}
+:root[data-theme='dark'] .hsa-progress progress,
+:root[data-theme='dark'] .hsa-progress progress::-webkit-progress-bar {
+  background: #29594f;
+}
+:root[data-theme='dark'] .hsa-progress progress::-webkit-progress-value,
+:root[data-theme='dark'] .hsa-progress progress::-moz-progress-bar {
+  background: #57caa9;
+}
+:root[data-theme='dark'] .hsa-medal {
+  color: #a8d1ff;
+  border-color: #214968;
+  background: linear-gradient(145deg, #315d86, #1d3f63);
+}
+:root[data-theme='dark'] .hsa-loading > span:not(.sr-only) {
+  background: linear-gradient(110deg, #19304a 30%, #264563 45%, #19304a 60%);
+}
+:root[data-theme='dark'] .hsa-dashboard .chart-track {
+  background: var(--hsa-subtle);
+}
+:root[data-theme='dark'] .hsa-dashboard .chart-bar {
+  background: #6caeff;
+}
+:root[data-theme='dark'] .hsa-dashboard .chart-cost {
+  background: #bba4ff;
+}
+:root[data-theme='dark'] .hsa-dashboard .chart-result {
+  background: #57caa9;
+}
+:root[data-theme='dark'] .hsa-table-action-danger:hover {
+  border-color: var(--danger);
+  background: var(--danger-soft);
+}
+:root[data-theme='dark'] .hsa-table-scroll th {
+  color: var(--muted);
+  background: var(--hsa-subtle);
+}
+:root[data-theme='dark'] .hsa-skip-link {
+  color: var(--primary);
+  background: var(--hsa-surface);
 }

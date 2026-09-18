@@ -250,6 +250,22 @@
   max-width: 820px;
   margin-bottom: 1.5rem;
 }
+.content-composer {
+  margin-top: 1.25rem;
+}
+.content-composer > button {
+  min-height: 38px;
+}
+.content-composer > div {
+  animation: assistant-expand 180ms ease-out both;
+}
+.content-composer .compact-form {
+  margin-top: 1rem;
+  padding-top: 1rem;
+}
+.module-create-form.content-composer {
+  margin-top: 0;
+}
 .content-heading {
   margin-top: 1.5rem;
 }
@@ -577,15 +593,22 @@ progress::-moz-progress-bar {
 }
 .tutor-header {
   display: grid;
-  gap: 0.5rem;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+  column-gap: 1rem;
+  row-gap: 0.5rem;
 }
 .tutor-header-actions {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 1rem;
+  display: contents;
 }
-.tutor-header-actions button { flex-shrink: 0; }
+.tutor-header-actions button {
+  grid-column: 2;
+  grid-row: 1;
+  flex-shrink: 0;
+}
+.tutor-header-actions p {
+  grid-column: 1 / -1;
+}
 .tutor-conversation {
   display: grid;
   gap: 1.25rem;
@@ -593,9 +616,13 @@ progress::-moz-progress-bar {
   animation: assistant-expand 180ms ease-out both;
 }
 @media (max-width: 600px) {
-  .tutor-header-actions {
-    align-items: flex-start;
-    flex-direction: column;
+  .tutor-header {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .tutor-header-actions button {
+    grid-column: auto;
+    grid-row: auto;
+    justify-self: start;
   }
 }
 .tutor-header p {
@@ -742,7 +769,10 @@ progress::-moz-progress-bar {
   box-shadow: var(--shadow-lg);
   font-size: 0.82rem;
   font-weight: 750;
-  transition: border-color 150ms ease, background-color 150ms ease, transform 150ms ease;
+  transition:
+    border-color 150ms ease,
+    background-color 150ms ease,
+    transform 150ms ease;
 }
 .public-concierge-launcher:hover {
   border-color: var(--primary);
@@ -762,8 +792,14 @@ progress::-moz-progress-bar {
   animation: assistant-expand 180ms ease-out both;
 }
 @keyframes assistant-expand {
-  from { opacity: 0; transform: translateY(6px) scale(0.985); }
-  to { opacity: 1; transform: translateY(0) scale(1); }
+  from {
+    opacity: 0;
+    transform: translateY(6px) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
 }
 .public-concierge-header {
   display: grid;

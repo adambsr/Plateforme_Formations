@@ -205,11 +205,16 @@ export function createApp({
   const aiEvaluationService = new AiEvaluationService(
     evaluationService,
     new TrainingAiContextService(fileStorage, config.ai.maxContextChars),
-    questionGenerationGateway ?? new GeminiQuestionGenerationGateway(config.ai),
+    questionGenerationGateway ??
+      new GeminiQuestionGenerationGateway(config.ai, logger),
+    logger,
   );
   const aiTutorService = new AiTutorService(
     enrollmentAccess,
-    new CourseTutorContextService(Math.min(config.ai.maxContextChars, 24_000)),
+    new CourseTutorContextService(
+      fileStorage,
+      Math.min(config.ai.maxContextChars, 24_000),
+    ),
     tutorGenerationGateway ?? new GeminiTutorGateway(config.ai),
   );
   const publicConciergeService = new PublicConciergeService(

@@ -55,7 +55,7 @@ describe('Phase 3 authorized content UI', () => {
     ).not.toBeInTheDocument();
   });
 
-  it('shows the complete authoring entry point to managers', async () => {
+  it('keeps manager authoring forms closed until the tutor opens one', async () => {
     request.mockResolvedValue({
       trainingId: 'training-1',
       access: 'MANAGE',
@@ -64,6 +64,13 @@ describe('Phase 3 authorized content UI', () => {
 
     renderPage();
 
+    const addModule = await screen.findByRole('button', {
+      name: 'Ajouter un module',
+    });
+    expect(
+      screen.queryByRole('heading', { name: 'Ajouter un module' }),
+    ).not.toBeInTheDocument();
+    fireEvent.click(addModule);
     expect(
       await screen.findByRole('heading', { name: 'Ajouter un module' }),
     ).toBeVisible();
