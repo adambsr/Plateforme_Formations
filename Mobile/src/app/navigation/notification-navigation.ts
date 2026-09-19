@@ -1,4 +1,5 @@
 import { navigationRef } from './navigation-ref';
+import { openBackendLink } from './backend-link';
 
 type NotificationData = Record<string, string | undefined>;
 
@@ -9,6 +10,15 @@ export function openNotification(data: NotificationData): void {
     pending = data;
     return;
   }
+  if (
+    data.link !== undefined &&
+    openBackendLink(
+      (name, params) =>
+        navigationRef.navigate({ name, params } as never),
+      data.link,
+    )
+  )
+    return;
   switch (data.screen) {
     case 'Catalogue':
       navigationRef.navigate('Catalogue');
@@ -30,6 +40,17 @@ export function openNotification(data: NotificationData): void {
       break;
     case 'Certificates':
       navigationRef.navigate('Certificates');
+      break;
+    case 'Evaluations':
+      navigationRef.navigate(
+        'Evaluations',
+        data.evaluationId === undefined
+          ? undefined
+          : { evaluationId: data.evaluationId },
+      );
+      break;
+    case 'Notifications':
+      navigationRef.navigate('Notifications');
       break;
     default:
       break;

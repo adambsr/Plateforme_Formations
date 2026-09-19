@@ -3,7 +3,7 @@ import { AnalyticsPreferences } from '../../core/analytics/AnalyticsPreferences.
 
 const effectiveDate = '9 septembre 2026';
 const supportEmail =
-  import.meta.env.VITE_CENTER_EMAIL ?? 'contact.hsa.tn@gmail.com';
+  import.meta.env.VITE_CENTER_EMAIL ?? 'hsa.tn.contact@gmail.com';
 
 function LegalPage({
   eyebrow,

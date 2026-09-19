@@ -107,17 +107,20 @@ export async function unregisterPushDevice(
 
 export async function startPushNotifications(
   request: AuthenticatedRequest,
+  onReceived?: () => void,
 ): Promise<() => void> {
   await configureForegroundNotifications();
   // Permission is explicitly requested by NotificationPreferences.  Keep the
   // listeners alive for an already-authorized device without prompting again.
-  if (await hasAndroidNotificationPermission()) await registerCurrentDevice(request);
+  if (await hasAndroidNotificationPermission())
+    await registerCurrentDevice(request);
   const messagingModule = await import('@react-native-firebase/messaging');
   const messaging = messagingModule.getMessaging();
   const handleMessage = async (message: {
     notification?: { title?: string; body?: string };
     data?: Record<string, string | object>;
   }) => {
+    onReceived?.();
     const title = message.notification?.title;
     const body = message.notification?.body;
     if (title === undefined || body === undefined) return;

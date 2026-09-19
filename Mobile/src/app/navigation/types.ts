@@ -42,7 +42,7 @@ export type AppStackParamList = {
   Purchases: undefined;
   CheckoutReturn: { paymentId?: string; result?: string };
   ResetPassword: { token?: string };
-  Evaluations: undefined;
+  Evaluations: { evaluationId?: string } | undefined;
   EvaluationCreate: undefined;
   Certificates: undefined;
   AdminDashboard: undefined;
@@ -51,6 +51,8 @@ export type AppStackParamList = {
   AdminCategories: undefined;
   Profile: undefined;
   Settings: undefined;
+  Search: undefined;
+  Notifications: undefined;
   ChangePassword: undefined;
   Legal: { kind: LegalKind };
   Status: { kind: StatusKind };

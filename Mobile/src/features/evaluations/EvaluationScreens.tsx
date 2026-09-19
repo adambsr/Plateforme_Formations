@@ -1,5 +1,5 @@
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   Alert,
   Pressable,
@@ -168,6 +168,7 @@ function AttemptView({
 
 export function EvaluationsScreen({
   navigation,
+  route,
 }: NativeStackScreenProps<AppStackParamList, 'Evaluations'>) {
   const { user, request } = useAuth();
   const [page, setPage] = useState<Page<Evaluation> | null>(null);
@@ -189,6 +190,8 @@ export function EvaluationsScreen({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
+  const [aiQuestionCount, setAiQuestionCount] = useState(5);
+  const openedEvaluationId = useRef<string | null>(null);
 
   const load = useCallback(async () => {
     if (user === null) return;
@@ -196,14 +199,20 @@ export function EvaluationsScreen({
     try {
       const view =
         user.role === 'LEARNER' ? 'ACCESSIBLE&status=PUBLISHED' : 'MANAGED';
-      setPage(
-        await request<Page<Evaluation>>(
-          `/evaluations?view=${view}&page=${pageNumber}&pageSize=12`,
-        ),
-      );
       if (user.role === 'LEARNER') {
-        setEnrollments(
-          (await request<Page<Enrollment>>('/enrollments?pageSize=100')).items,
+        const [evaluationPage, enrollmentPage] = await Promise.all([
+          request<Page<Evaluation>>(
+            `/evaluations?view=${view}&page=${pageNumber}&pageSize=12`,
+          ),
+          request<Page<Enrollment>>('/enrollments?pageSize=100'),
+        ]);
+        setEnrollments(enrollmentPage.items);
+        setPage(evaluationPage);
+      } else {
+        setPage(
+          await request<Page<Evaluation>>(
+            `/evaluations?view=${view}&page=${pageNumber}&pageSize=12`,
+          ),
         );
       }
     } catch (caught) {
@@ -256,6 +265,23 @@ export function EvaluationsScreen({
       setBusy(false);
     }
   }
+
+  useEffect(() => {
+    const evaluationId = route.params?.evaluationId;
+    if (
+      evaluationId === undefined ||
+      page === null ||
+      openedEvaluationId.current === evaluationId
+    )
+      return;
+    openedEvaluationId.current = evaluationId;
+    const target = page.items.find(({ id }) => id === evaluationId) ?? {
+      id: evaluationId,
+    };
+    // Deep links may target an evaluation outside the first page.
+    void selectEvaluation(target as Evaluation);
+    // oxlint-disable-next-line react/exhaustive-deps
+  }, [page, route.params?.evaluationId]);
 
   async function saveAnswer(
     answer: Attempt['answers'][number],
@@ -320,15 +346,26 @@ export function EvaluationsScreen({
     setBusy(true);
     setError('');
     try {
-      await request(`/evaluations/${selected.id}/generate-ai`, {
+      const response = await request<{
+        evaluation: Evaluation;
+        extraction: {
+          contextChars: number;
+          extractedResources: Array<{ id: string; name: string }>;
+          skippedResources: Array<{ id: string; name: string; reason: string }>;
+        };
+      }>(`/evaluations/${selected.id}/generate-ai`, {
         method: 'POST',
         body: JSON.stringify({
-          questionCount: 5,
+          questionCount: aiQuestionCount,
           questionTypes: ['SINGLE_CHOICE', 'MULTIPLE_CHOICE', 'TRUE_FALSE'],
         }),
       });
-      setSelected(await request<Evaluation>(`/evaluations/${selected.id}`));
-      setNotice('Questions IA importées en brouillon pour révision.');
+      setSelected(response.evaluation);
+      setNotice(
+        `${aiQuestionCount} questions IA importées en brouillon pour révision. ` +
+          `${response.extraction.extractedResources.length} document(s) exploité(s), ` +
+          `${response.extraction.skippedResources.length} ignoré(s).`,
+      );
     } catch (caught) {
       setError(message(caught));
     } finally {
@@ -573,11 +610,47 @@ export function EvaluationsScreen({
             {user?.role !== 'LEARNER' && (
               <>
                 {user?.role === 'TRAINER' && selected.status === 'DRAFT' && (
-                  <Button
-                    label="Générer 5 questions avec l’IA"
-                    loading={busy}
-                    onPress={() => void generateAi()}
-                  />
+                  <View style={styles.aiPanel}>
+                    <Text style={styles.label}>
+                      Questions à générer avec Gemini
+                    </Text>
+                    <View style={styles.aiCounts}>
+                      {[3, 5, 10].map((count) => (
+                        <Pressable
+                          key={count}
+                          accessibilityRole="radio"
+                          accessibilityState={{
+                            checked: aiQuestionCount === count,
+                          }}
+                          onPress={() => setAiQuestionCount(count)}
+                          style={[
+                            styles.aiCount,
+                            aiQuestionCount === count && styles.aiCountSelected,
+                          ]}
+                        >
+                          <Text
+                            style={[
+                              styles.optionText,
+                              aiQuestionCount === count &&
+                                styles.optionTextSelected,
+                            ]}
+                          >
+                            {count}
+                          </Text>
+                        </Pressable>
+                      ))}
+                    </View>
+                    <Text style={styles.muted}>
+                      Le backend extrait les cours et les documents PDF, DOCX,
+                      PPTX, XLSX, TXT et CSV, puis importe un brouillon à
+                      relire.
+                    </Text>
+                    <Button
+                      label={`Générer ${aiQuestionCount} questions avec l’IA`}
+                      loading={busy}
+                      onPress={() => void generateAi()}
+                    />
+                  </View>
                 )}
                 {user?.role === 'TRAINER' && selected.status === 'DRAFT' && (
                   <Button
@@ -992,5 +1065,28 @@ const styles = StyleSheet.create({
     borderRadius: radii.sm,
     padding: spacing.md,
     backgroundColor: colors.canvas,
+  },
+  aiPanel: {
+    gap: spacing.md,
+    borderWidth: 1,
+    borderColor: colors.line,
+    borderRadius: radii.sm,
+    padding: spacing.md,
+    backgroundColor: colors.subtle,
+  },
+  aiCounts: { flexDirection: 'row', gap: spacing.sm },
+  aiCount: {
+    minWidth: 52,
+    minHeight: 42,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: colors.line,
+    borderRadius: radii.sm,
+    backgroundColor: colors.surface,
+  },
+  aiCountSelected: {
+    borderColor: colors.primary,
+    backgroundColor: colors.primarySoft,
   },
 });

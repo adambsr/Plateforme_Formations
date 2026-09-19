@@ -20,7 +20,13 @@ export function Brand({
   );
   return (
     <View style={styles.brand} accessibilityLabel={appConfig.centerName}>
-      {onPress === undefined ? logo : <Pressable accessibilityLabel="Accueil public" onPress={onPress}>{logo}</Pressable>}
+      {onPress === undefined ? (
+        logo
+      ) : (
+        <Pressable accessibilityLabel="Accueil public" onPress={onPress}>
+          {logo}
+        </Pressable>
+      )}
     </View>
   );
 }

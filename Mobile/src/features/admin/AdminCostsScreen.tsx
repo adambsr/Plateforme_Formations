@@ -381,7 +381,13 @@ export function AdminCostsScreen() {
                 </View>
               )}
             </View>
-            <Button label="Ajouter une dépense de formation" onPress={() => { resetTrainingCost(); setExpenseModalVisible(true); }} />
+            <Button
+              label="Ajouter une dépense de formation"
+              onPress={() => {
+                resetTrainingCost();
+                setExpenseModalVisible(true);
+              }}
+            />
             <View style={styles.card}>
               <Text style={styles.cardTitle}>Dépenses de Formation</Text>
               {trainingCosts?.items.length === 0 ? (
@@ -434,18 +440,71 @@ export function AdminCostsScreen() {
           </>
         )}
       </ScrollView>
-      <Modal animationType="slide" transparent visible={expenseModalVisible} onRequestClose={() => setExpenseModalVisible(false)}>
+      <Modal
+        animationType="slide"
+        transparent
+        visible={expenseModalVisible}
+        onRequestClose={() => setExpenseModalVisible(false)}
+      >
         <KeyboardAvoidingView behavior="padding" style={styles.modalBackdrop}>
           <View style={styles.modalCard}>
-            <Text style={styles.cardTitle}>{editing === null ? 'Nouvelle dépense' : 'Modifier la dépense'}</Text>
-            <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={styles.modalForm}>
+            <Text style={styles.cardTitle}>
+              {editing === null ? 'Nouvelle dépense' : 'Modifier la dépense'}
+            </Text>
+            <ScrollView
+              keyboardShouldPersistTaps="handled"
+              contentContainerStyle={styles.modalForm}
+            >
               <Text style={styles.label}>Formation</Text>
-              <View style={styles.options}>{trainings.map((training) => <Choice key={training.id} label={training.title} onPress={() => setTrainingId(training.id)} selected={trainingId === training.id} />)}</View>
-              <TextField autoCapitalize="none" label="Date (AAAA-MM-JJ)" onChangeText={setDate} value={date} />
-              <TextField inputMode="decimal" label="Montant EUR" onChangeText={setTrainingAmount} value={trainingAmount} />
-              <TextField label="Libellé" maxLength={200} onChangeText={setLabel} value={label} />
-              <Button label={editing === null ? 'Créer la dépense' : 'Enregistrer les modifications'} loading={saving} onPress={() => void saveTrainingCost().then((saved) => { if (saved) setExpenseModalVisible(false); })} />
-              <Button label="Annuler" variant="secondary" onPress={() => { resetTrainingCost(); setExpenseModalVisible(false); }} />
+              <View style={styles.options}>
+                {trainings.map((training) => (
+                  <Choice
+                    key={training.id}
+                    label={training.title}
+                    onPress={() => setTrainingId(training.id)}
+                    selected={trainingId === training.id}
+                  />
+                ))}
+              </View>
+              <TextField
+                autoCapitalize="none"
+                label="Date (AAAA-MM-JJ)"
+                onChangeText={setDate}
+                value={date}
+              />
+              <TextField
+                inputMode="decimal"
+                label="Montant EUR"
+                onChangeText={setTrainingAmount}
+                value={trainingAmount}
+              />
+              <TextField
+                label="Libellé"
+                maxLength={200}
+                onChangeText={setLabel}
+                value={label}
+              />
+              <Button
+                label={
+                  editing === null
+                    ? 'Créer la dépense'
+                    : 'Enregistrer les modifications'
+                }
+                loading={saving}
+                onPress={() =>
+                  void saveTrainingCost().then((saved) => {
+                    if (saved) setExpenseModalVisible(false);
+                  })
+                }
+              />
+              <Button
+                label="Annuler"
+                variant="secondary"
+                onPress={() => {
+                  resetTrainingCost();
+                  setExpenseModalVisible(false);
+                }}
+              />
             </ScrollView>
           </View>
         </KeyboardAvoidingView>
@@ -505,7 +564,18 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     gap: spacing.sm,
   },
-  modalBackdrop: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(23,32,51,0.4)' },
-  modalCard: { maxHeight: '88%', gap: spacing.md, borderTopLeftRadius: radii.md, borderTopRightRadius: radii.md, padding: spacing.xl, backgroundColor: colors.surface },
+  modalBackdrop: {
+    flex: 1,
+    justifyContent: 'flex-end',
+    backgroundColor: 'rgba(23,32,51,0.4)',
+  },
+  modalCard: {
+    maxHeight: '88%',
+    gap: spacing.md,
+    borderTopLeftRadius: radii.md,
+    borderTopRightRadius: radii.md,
+    padding: spacing.xl,
+    backgroundColor: colors.surface,
+  },
   modalForm: { gap: spacing.md, paddingBottom: spacing.lg },
 });

@@ -13,7 +13,8 @@ export async function saveDownloadedFile(
   }
   const permission =
     await FileSystem.StorageAccessFramework.requestDirectoryPermissionsAsync();
-  if (!permission.granted) throw new Error('Accès au dossier de téléchargement refusé.');
+  if (!permission.granted)
+    throw new Error('Accès au dossier de téléchargement refusé.');
   const target = await FileSystem.StorageAccessFramework.createFileAsync(
     permission.directoryUri,
     fileName,

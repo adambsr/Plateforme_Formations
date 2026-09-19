@@ -67,7 +67,7 @@ export function TutorChat({
       id: 0,
       role: 'ASSISTANT',
       content:
-        'Bonjour ! Je réponds uniquement à partir de cette formation et je cite les leçons utilisées. Que souhaitez-vous travailler ?',
+        'Bonjour ! Je réponds uniquement à partir de cette formation, y compris ses documents pédagogiques, et je cite les leçons utilisées. Que souhaitez-vous travailler ?',
       grounded: true,
     },
   ]);
@@ -143,7 +143,8 @@ export function TutorChat({
       <Text style={styles.eyebrow}>ASSISTANT PÉDAGOGIQUE</Text>
       <Text style={styles.title}>Tuteur IA de la formation</Text>
       <Text style={styles.muted}>
-        Réponses limitées au contenu du cours, avec sources vérifiables.
+        Réponses ancrées dans les leçons et documents PDF, Word, PowerPoint,
+        Excel, texte ou CSV de la formation, avec sources vérifiables.
       </Text>
       <Pressable
         accessibilityRole="button"
@@ -151,121 +152,126 @@ export function TutorChat({
         onPress={() => setExpanded((value) => !value)}
         style={styles.toggle}
       >
-        <Text style={styles.toggleText}>{expanded ? 'Réduire' : 'Ouvrir le tuteur'}</Text>
+        <Text style={styles.toggleText}>
+          {expanded ? 'Réduire' : 'Ouvrir le tuteur'}
+        </Text>
         {expanded ? (
           <ChevronUp color={colors.primaryDark} size={18} />
         ) : (
           <ChevronDown color={colors.primaryDark} size={18} />
         )}
       </Pressable>
-      {!expanded ? null : <>
-      <Text style={styles.label}>Leçon à privilégier</Text>
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.chips}
-      >
-        <LessonChip
-          label="Toute la formation"
-          selected={currentLessonId === ''}
-          onPress={() => setCurrentLessonId('')}
-        />
-        {lessons.map((lesson) => (
-          <LessonChip
-            key={lesson.id}
-            label={`${lesson.moduleTitle} · ${lesson.title}`}
-            selected={currentLessonId === lesson.id}
-            onPress={() => setCurrentLessonId(lesson.id)}
-          />
-        ))}
-      </ScrollView>
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.chips}
-      >
-        {quickActions.map((action) => (
-          <Pressable
-            key={action.mode}
-            disabled={busy}
-            onPress={() => void send(action.prompt, action.mode)}
-            style={styles.quick}
+      {!expanded ? null : (
+        <>
+          <Text style={styles.label}>Leçon à privilégier</Text>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.chips}
           >
-            <Text style={styles.quickText}>{action.label}</Text>
-          </Pressable>
-        ))}
-      </ScrollView>
-      <View style={styles.messages}>
-        {messages.map((item) => (
-          <View
-            key={item.id}
-            style={[
-              styles.message,
-              item.role === 'USER' ? styles.user : styles.assistant,
-            ]}
+            <LessonChip
+              label="Toute la formation"
+              selected={currentLessonId === ''}
+              onPress={() => setCurrentLessonId('')}
+            />
+            {lessons.map((lesson) => (
+              <LessonChip
+                key={lesson.id}
+                label={`${lesson.moduleTitle} · ${lesson.title}`}
+                selected={currentLessonId === lesson.id}
+                onPress={() => setCurrentLessonId(lesson.id)}
+              />
+            ))}
+          </ScrollView>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.chips}
           >
-            <Text style={styles.author}>
-              {item.role === 'USER' ? 'Vous' : 'Tuteur IA'}
-            </Text>
-            <Text style={styles.body}>{item.content}</Text>
-            {item.grounded === false && (
-              <Text style={styles.warning}>
-                Le contenu disponible ne permet pas de confirmer cette réponse.
-              </Text>
-            )}
-            {item.citations !== undefined && item.citations.length > 0 && (
-              <View style={styles.sources}>
-                <Text style={styles.sourceLabel}>Sources du cours</Text>
-                {item.citations.map((citation) => (
+            {quickActions.map((action) => (
+              <Pressable
+                key={action.mode}
+                disabled={busy}
+                onPress={() => void send(action.prompt, action.mode)}
+                style={styles.quick}
+              >
+                <Text style={styles.quickText}>{action.label}</Text>
+              </Pressable>
+            ))}
+          </ScrollView>
+          <View style={styles.messages}>
+            {messages.map((item) => (
+              <View
+                key={item.id}
+                style={[
+                  styles.message,
+                  item.role === 'USER' ? styles.user : styles.assistant,
+                ]}
+              >
+                <Text style={styles.author}>
+                  {item.role === 'USER' ? 'Vous' : 'Tuteur IA'}
+                </Text>
+                <Text style={styles.body}>{item.content}</Text>
+                {item.grounded === false && (
+                  <Text style={styles.warning}>
+                    Le contenu disponible ne permet pas de confirmer cette
+                    réponse.
+                  </Text>
+                )}
+                {item.citations !== undefined && item.citations.length > 0 && (
+                  <View style={styles.sources}>
+                    <Text style={styles.sourceLabel}>Sources du cours</Text>
+                    {item.citations.map((citation) => (
+                      <Pressable
+                        key={citation.lessonId}
+                        onPress={() => onOpenLesson(citation.lessonId)}
+                      >
+                        <Text style={styles.link}>
+                          {citation.moduleTitle} · {citation.lessonTitle}
+                        </Text>
+                      </Pressable>
+                    ))}
+                  </View>
+                )}
+                {item.followUpQuestions?.map((question) => (
                   <Pressable
-                    key={citation.lessonId}
-                    onPress={() => onOpenLesson(citation.lessonId)}
+                    key={question}
+                    disabled={busy}
+                    onPress={() => void send(question)}
                   >
-                    <Text style={styles.link}>
-                      {citation.moduleTitle} · {citation.lessonTitle}
-                    </Text>
+                    <Text style={styles.followUp}>{question}</Text>
                   </Pressable>
                 ))}
               </View>
-            )}
-            {item.followUpQuestions?.map((question) => (
-              <Pressable
-                key={question}
-                disabled={busy}
-                onPress={() => void send(question)}
-              >
-                <Text style={styles.followUp}>{question}</Text>
-              </Pressable>
             ))}
+            {busy && (
+              <Text style={styles.thinking}>
+                Le tuteur recherche dans les leçons et documents…
+              </Text>
+            )}
           </View>
-        ))}
-        {busy && (
-          <Text style={styles.thinking}>
-            Le tuteur recherche dans les leçons…
+          {error !== '' && <Text style={styles.error}>{error}</Text>}
+          <TextField
+            label="Votre question"
+            value={draft}
+            onChangeText={setDraft}
+            maxLength={2000}
+            multiline
+            numberOfLines={3}
+            placeholder="Ex. Peux-tu reformuler cette notion avec un exemple ?"
+          />
+          <Button
+            label="Envoyer"
+            loading={busy}
+            disabled={draft.trim().length < 2}
+            onPress={() => void send(draft)}
+          />
+          <Text style={styles.disclaimer}>
+            L’IA peut se tromper : utilisez les sources pour vérifier dans le
+            cours. Ne partagez aucune donnée personnelle ou de paiement.
           </Text>
-        )}
-      </View>
-      {error !== '' && <Text style={styles.error}>{error}</Text>}
-      <TextField
-        label="Votre question"
-        value={draft}
-        onChangeText={setDraft}
-        maxLength={2000}
-        multiline
-        numberOfLines={3}
-        placeholder="Ex. Peux-tu reformuler cette notion avec un exemple ?"
-      />
-      <Button
-        label="Envoyer"
-        loading={busy}
-        disabled={draft.trim().length < 2}
-        onPress={() => void send(draft)}
-      />
-      <Text style={styles.disclaimer}>
-        L’IA peut se tromper : utilisez les sources pour vérifier dans le cours.
-        Ne partagez aucune donnée personnelle ou de paiement.
-      </Text>
-      </>}
+        </>
+      )}
     </View>
   );
 }

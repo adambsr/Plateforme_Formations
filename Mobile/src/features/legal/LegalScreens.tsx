@@ -18,7 +18,7 @@ import { colors, radii, spacing } from '../../shared/theme/tokens';
 import { AnalyticsPreferences } from '../../core/analytics/AnalyticsPreferences';
 
 const supportEmail =
-  process.env.EXPO_PUBLIC_CENTER_EMAIL ?? 'contact.hsa.tn@gmail.com';
+  process.env.EXPO_PUBLIC_CENTER_EMAIL ?? 'hsa.tn.contact@gmail.com';
 
 type Section = { title: string; paragraphs: string[]; items?: string[] };
 type LegalDocument = { title: string; intro: string; sections: Section[] };
@@ -260,9 +260,9 @@ const styles = StyleSheet.create({
     borderColor: '#e8d496',
     borderRadius: radii.sm,
     padding: spacing.lg,
-    backgroundColor: '#fff9e7',
+    backgroundColor: colors.warningSoft,
   },
-  reviewText: { color: '#694c05', fontSize: 14, lineHeight: 21 },
+  reviewText: { color: colors.warning, fontSize: 14, lineHeight: 21 },
   card: {
     gap: spacing.md,
     borderWidth: 1,

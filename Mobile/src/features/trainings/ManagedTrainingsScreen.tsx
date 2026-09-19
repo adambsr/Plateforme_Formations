@@ -11,7 +11,15 @@ import {
   Text,
   View,
 } from 'react-native';
-import { Archive, BookOpen, Edit3, Eye, Plus, Send, Trash2 } from 'lucide-react-native';
+import {
+  Archive,
+  BookOpen,
+  Edit3,
+  Eye,
+  Plus,
+  Send,
+  Trash2,
+} from 'lucide-react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -620,7 +628,8 @@ export function TrainingCreateScreen({
   const [type, setType] = useState<TrainingType>('SELF_PACED_ONLINE');
   const [durationMinutes, setDurationMinutes] = useState('');
   const [price, setPrice] = useState('');
-  const [minimumAttendancePercent, setMinimumAttendancePercent] = useState('80');
+  const [minimumAttendancePercent, setMinimumAttendancePercent] =
+    useState('80');
   const [objectives, setObjectives] = useState('');
   const [prerequisites, setPrerequisites] = useState('');
   const [busy, setBusy] = useState(false);
@@ -632,17 +641,33 @@ export function TrainingCreateScreen({
       user?.role === 'ADMIN'
         ? request<UserPage>('/trainers?pageSize=100')
         : Promise.resolve(undefined),
-    ]).then(([categoryList, trainerPage]) => {
-      setCategories(categoryList);
-      setTrainers(trainerPage?.items.filter(({ isActive }) => isActive) ?? []);
-    }).catch((caught) => setError(message(caught)));
+    ])
+      .then(([categoryList, trainerPage]) => {
+        setCategories(categoryList);
+        setTrainers(
+          trainerPage?.items.filter(({ isActive }) => isActive) ?? [],
+        );
+      })
+      .catch((caught) => setError(message(caught)));
   }, [request, user?.role]);
 
   async function submit() {
     const priceMinor = Math.round(Number(price.replace(',', '.')) * 100);
     const duration = Number(durationMinutes);
     const minimum = Number(minimumAttendancePercent);
-    if (title.trim() === '' || description.trim() === '' || categoryId === '' || level.trim() === '' || !Number.isInteger(duration) || duration <= 0 || !Number.isInteger(priceMinor) || priceMinor <= 0 || (type === 'IN_PERSON' && (!Number.isInteger(minimum) || minimum < 1 || minimum > 100)) || (user?.role === 'ADMIN' && ownerTrainerId === '')) {
+    if (
+      title.trim() === '' ||
+      description.trim() === '' ||
+      categoryId === '' ||
+      level.trim() === '' ||
+      !Number.isInteger(duration) ||
+      duration <= 0 ||
+      !Number.isInteger(priceMinor) ||
+      priceMinor <= 0 ||
+      (type === 'IN_PERSON' &&
+        (!Number.isInteger(minimum) || minimum < 1 || minimum > 100)) ||
+      (user?.role === 'ADMIN' && ownerTrainerId === '')
+    ) {
       setError('Complétez les champs obligatoires avec des valeurs valides.');
       return;
     }
@@ -652,10 +677,18 @@ export function TrainingCreateScreen({
       await request('/trainings', {
         method: 'POST',
         body: JSON.stringify({
-          title: title.trim(), description: description.trim(), categoryId,
-          level: level.trim(), durationMinutes: duration, priceMinor,
-          objectives: lines(objectives), prerequisites: lines(prerequisites), type,
-          ...(type === 'IN_PERSON' ? { minimumAttendancePercent: minimum } : {}),
+          title: title.trim(),
+          description: description.trim(),
+          categoryId,
+          level: level.trim(),
+          durationMinutes: duration,
+          priceMinor,
+          objectives: lines(objectives),
+          prerequisites: lines(prerequisites),
+          type,
+          ...(type === 'IN_PERSON'
+            ? { minimumAttendancePercent: minimum }
+            : {}),
           ...(user?.role === 'ADMIN' ? { ownerTrainerId } : {}),
         }),
       });
@@ -671,26 +704,57 @@ export function TrainingCreateScreen({
   const selectedCategory = categories.find(({ id }) => id === categoryId);
   return (
     <SafeAreaView edges={['bottom']} style={styles.safeArea}>
-      <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+      <ScrollView
+        contentContainerStyle={styles.content}
+        keyboardShouldPersistTaps="handled"
+      >
         <View style={styles.heading}>
           <Text style={styles.eyebrow}>GESTION PÉDAGOGIQUE</Text>
           <Text style={styles.title}>Créer une formation</Text>
-          <Text style={styles.muted}>Créez un brouillon, puis complétez son contenu pédagogique.</Text>
+          <Text style={styles.muted}>
+            Créez un brouillon, puis complétez son contenu pédagogique.
+          </Text>
         </View>
         <Notice message={error} />
         <View style={styles.card}>
           <TextField label="Titre" onChangeText={setTitle} value={title} />
-          <TextField label="Description" multiline onChangeText={setDescription} value={description} />
+          <TextField
+            label="Description"
+            multiline
+            onChangeText={setDescription}
+            value={description}
+          />
           <Text style={styles.label}>Catégorie</Text>
-          <Pressable style={styles.choice} onPress={() => setCategoryOpen(true)}>
-            <Text style={styles.choiceText}>{selectedCategory?.name ?? 'Sélectionner une catégorie'}</Text>
+          <Pressable
+            style={styles.choice}
+            onPress={() => setCategoryOpen(true)}
+          >
+            <Text style={styles.choiceText}>
+              {selectedCategory?.name ?? 'Sélectionner une catégorie'}
+            </Text>
           </Pressable>
-          <Modal transparent visible={categoryOpen} animationType="fade" onRequestClose={() => setCategoryOpen(false)}>
-            <Pressable style={styles.modalOverlay} onPress={() => setCategoryOpen(false)}>
+          <Modal
+            transparent
+            visible={categoryOpen}
+            animationType="fade"
+            onRequestClose={() => setCategoryOpen(false)}
+          >
+            <Pressable
+              style={styles.modalOverlay}
+              onPress={() => setCategoryOpen(false)}
+            >
               <View style={styles.modalCard}>
                 <Text style={styles.cardTitle}>Choisir une catégorie</Text>
                 {categories.map((category) => (
-                  <Choice key={category.id} label={category.name} selected={category.id === categoryId} onPress={() => { setCategoryId(category.id); setCategoryOpen(false); }} />
+                  <Choice
+                    key={category.id}
+                    label={category.name}
+                    selected={category.id === categoryId}
+                    onPress={() => {
+                      setCategoryId(category.id);
+                      setCategoryOpen(false);
+                    }}
+                  />
                 ))}
               </View>
             </Pressable>
@@ -698,26 +762,75 @@ export function TrainingCreateScreen({
           <TextField label="Niveau" onChangeText={setLevel} value={level} />
           <Text style={styles.label}>Type</Text>
           <View style={styles.optionsRow}>
-            <Choice label="En ligne autonome" selected={type === 'SELF_PACED_ONLINE'} onPress={() => setType('SELF_PACED_ONLINE')} />
-            <Choice label="Présentiel" selected={type === 'IN_PERSON'} onPress={() => setType('IN_PERSON')} />
+            <Choice
+              label="En ligne autonome"
+              selected={type === 'SELF_PACED_ONLINE'}
+              onPress={() => setType('SELF_PACED_ONLINE')}
+            />
+            <Choice
+              label="Présentiel"
+              selected={type === 'IN_PERSON'}
+              onPress={() => setType('IN_PERSON')}
+            />
           </View>
-          <TextField inputMode="numeric" label="Durée en minutes" onChangeText={setDurationMinutes} value={durationMinutes} />
-          <TextField inputMode="decimal" label="Prix EUR" onChangeText={setPrice} value={price} />
-          {type === 'IN_PERSON' && <TextField inputMode="numeric" label="Présence minimale (%)" onChangeText={setMinimumAttendancePercent} value={minimumAttendancePercent} />}
-          <TextField label="Objectifs (un par ligne)" multiline onChangeText={setObjectives} value={objectives} />
-          <TextField label="Prérequis (un par ligne)" multiline onChangeText={setPrerequisites} value={prerequisites} />
+          <TextField
+            inputMode="numeric"
+            label="Durée en minutes"
+            onChangeText={setDurationMinutes}
+            value={durationMinutes}
+          />
+          <TextField
+            inputMode="decimal"
+            label="Prix EUR"
+            onChangeText={setPrice}
+            value={price}
+          />
+          {type === 'IN_PERSON' && (
+            <TextField
+              inputMode="numeric"
+              label="Présence minimale (%)"
+              onChangeText={setMinimumAttendancePercent}
+              value={minimumAttendancePercent}
+            />
+          )}
+          <TextField
+            label="Objectifs (un par ligne)"
+            multiline
+            onChangeText={setObjectives}
+            value={objectives}
+          />
+          <TextField
+            label="Prérequis (un par ligne)"
+            multiline
+            onChangeText={setPrerequisites}
+            value={prerequisites}
+          />
           {user.role === 'ADMIN' && (
             <>
               <Text style={styles.label}>Formateur propriétaire</Text>
               <View style={styles.options}>
                 {trainers.map((trainer) => (
-                  <Choice key={trainer.id} label={userName(trainer)} selected={trainer.id === ownerTrainerId} onPress={() => setOwnerTrainerId(trainer.id)} />
+                  <Choice
+                    key={trainer.id}
+                    label={userName(trainer)}
+                    selected={trainer.id === ownerTrainerId}
+                    onPress={() => setOwnerTrainerId(trainer.id)}
+                  />
                 ))}
               </View>
             </>
           )}
-          <Button label="Créer le brouillon" icon={Plus} loading={busy} onPress={() => void submit()} />
-          <Button label="Annuler" onPress={() => navigation.goBack()} variant="secondary" />
+          <Button
+            label="Créer le brouillon"
+            icon={Plus}
+            loading={busy}
+            onPress={() => void submit()}
+          />
+          <Button
+            label="Annuler"
+            onPress={() => navigation.goBack()}
+            variant="secondary"
+          />
         </View>
       </ScrollView>
     </SafeAreaView>

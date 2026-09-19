@@ -6,6 +6,7 @@ import { AuthProvider } from '../core/auth/AuthProvider';
 import { AnalyticsConsentBanner } from '../core/analytics/AnalyticsConsentBanner';
 import { trackScreenView } from '../core/analytics/firebase';
 import { navigationTheme } from '../shared/theme/navigation';
+import { ThemeProvider, useAppTheme } from '../shared/theme/ThemeProvider';
 import { RootNavigator } from './navigation/RootNavigator';
 import { linking } from './navigation/linking';
 import { navigationRef } from './navigation/navigation-ref';
@@ -17,31 +18,40 @@ import { MobileErrorBoundary } from '../features/system/SystemScreens';
 export function App() {
   return (
     <SafeAreaProvider>
-      <AuthProvider>
-        <NavigationContainer
-          linking={linking}
-          ref={navigationRef}
-          theme={navigationTheme}
-          onReady={() => {
-            const route = navigationRef.getCurrentRoute();
-            if (route !== undefined) trackScreenView(route.name);
-            openPendingNotification();
-          }}
-          onStateChange={() => {
-            const route = navigationRef.getCurrentRoute();
-            if (route !== undefined) trackScreenView(route.name);
-          }}
-        >
-          <StatusBar style="dark" />
-          <MobileErrorBoundary>
-            <NotificationProvider>
-              <RootNavigator />
-              <PublicConcierge />
-              <AnalyticsConsentBanner />
-            </NotificationProvider>
-          </MobileErrorBoundary>
-        </NavigationContainer>
-      </AuthProvider>
+      <ThemeProvider>
+        <ThemedApp />
+      </ThemeProvider>
     </SafeAreaProvider>
+  );
+}
+
+function ThemedApp() {
+  const { theme } = useAppTheme();
+  return (
+    <AuthProvider>
+      <NavigationContainer
+        linking={linking}
+        ref={navigationRef}
+        theme={navigationTheme(theme === 'dark')}
+        onReady={() => {
+          const route = navigationRef.getCurrentRoute();
+          if (route !== undefined) trackScreenView(route.name);
+          openPendingNotification();
+        }}
+        onStateChange={() => {
+          const route = navigationRef.getCurrentRoute();
+          if (route !== undefined) trackScreenView(route.name);
+        }}
+      >
+        <StatusBar style={theme === 'dark' ? 'light' : 'dark'} />
+        <MobileErrorBoundary>
+          <NotificationProvider>
+            <RootNavigator />
+            <PublicConcierge />
+            <AnalyticsConsentBanner />
+          </NotificationProvider>
+        </MobileErrorBoundary>
+      </NavigationContainer>
+    </AuthProvider>
   );
 }

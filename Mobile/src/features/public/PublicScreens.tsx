@@ -30,7 +30,7 @@ const centerAddress =
   process.env.EXPO_PUBLIC_CENTER_ADDRESS ??
   'Route Manzel Chaker km 2.5 en face Magasin Général (MG), Sfax, Tunisia';
 const centerEmail =
-  process.env.EXPO_PUBLIC_CENTER_EMAIL ?? 'contact.hsa.tn@gmail.com';
+  process.env.EXPO_PUBLIC_CENTER_EMAIL ?? 'hsa.tn.contact@gmail.com';
 const centerPhone = process.env.EXPO_PUBLIC_CENTER_PHONE ?? '+216 70 000 000';
 const centerHours =
   process.env.EXPO_PUBLIC_CENTER_HOURS ?? 'Lundi–vendredi, 8 h 30–17 h 30';
@@ -535,7 +535,7 @@ const styles = StyleSheet.create({
     gap: spacing.lg,
     borderRadius: radii.md,
     padding: spacing.xl,
-    backgroundColor: colors.primaryDark,
+    backgroundColor: colors.brandDeep,
   },
   heroEyebrow: {
     color: '#bcd8f5',
@@ -544,7 +544,7 @@ const styles = StyleSheet.create({
     letterSpacing: 1,
   },
   heroTitle: {
-    color: colors.surface,
+    color: colors.onBrand,
     fontSize: 34,
     lineHeight: 40,
     fontWeight: '800',
@@ -556,7 +556,7 @@ const styles = StyleSheet.create({
     borderTopColor: '#47709f',
     paddingTop: spacing.sm,
   },
-  proofTitle: { color: colors.surface, fontWeight: '800' },
+  proofTitle: { color: colors.onBrand, fontWeight: '800' },
   proofText: { color: '#dbe7f5', fontSize: 13 },
   heading: { gap: spacing.xs, marginTop: spacing.md },
   eyebrow: {

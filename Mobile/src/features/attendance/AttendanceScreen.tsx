@@ -398,7 +398,7 @@ const styles = StyleSheet.create({
   },
   tabSelected: { borderColor: colors.primary, backgroundColor: colors.primary },
   tabText: { color: colors.ink, fontWeight: '700' },
-  tabTextSelected: { color: colors.surface },
+  tabTextSelected: { color: colors.onBrand },
   pagination: {
     flexDirection: 'row',
     alignItems: 'center',

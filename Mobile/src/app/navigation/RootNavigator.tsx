@@ -1,6 +1,4 @@
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import { Menu } from 'lucide-react-native';
-import { Pressable } from 'react-native';
 
 import { useAuth } from '../../core/auth/AuthContext';
 import {
@@ -69,10 +67,13 @@ import {
   GuestStatusScreen,
   SystemStatusView,
 } from '../../features/system/SystemScreens';
-import { useDrawer } from './drawer-context';
 import { DrawerProvider } from './drawer-provider';
 import { navigationRef } from './navigation-ref';
-import { colors } from '../../shared/theme/tokens';
+import { darkPalette, lightPalette } from '../../shared/theme/tokens';
+import { useAppTheme } from '../../shared/theme/ThemeProvider';
+import { HeaderActions } from './HeaderActions';
+import { NotificationCenterScreen } from '../../features/notifications/NotificationCenterScreen';
+import { SearchScreen } from '../../features/notifications/SearchScreen';
 import type {
   AppStackParamList,
   GuestStackParamList,
@@ -82,38 +83,6 @@ import type {
 const GuestStack = createNativeStackNavigator<GuestStackParamList>();
 const AppStack = createNativeStackNavigator<AppStackParamList>();
 const PasswordStack = createNativeStackNavigator<PasswordStackParamList>();
-
-const screenOptions = {
-  headerShadowVisible: false,
-  headerBackTitleVisible: false,
-  headerStyle: { backgroundColor: colors.surface },
-  headerTintColor: colors.ink,
-  contentStyle: { backgroundColor: colors.canvas },
-};
-
-function AppMenuButton() {
-  const { openDrawer } = useDrawer();
-  return (
-    <Pressable
-      accessibilityLabel="Ouvrir la navigation"
-      hitSlop={8}
-      onPress={openDrawer}
-      style={{
-        minWidth: 44,
-        minHeight: 44,
-        alignItems: 'center',
-        justifyContent: 'center',
-      }}
-    >
-      <Menu color={colors.primaryDark} size={22} />
-    </Pressable>
-  );
-}
-
-const appScreenOptions = () => ({
-  ...screenOptions,
-  headerRight: () => <AppMenuButton />,
-});
 
 function ForbiddenAppRoute() {
   return (
@@ -127,6 +96,19 @@ function ForbiddenAppRoute() {
 
 export function RootNavigator() {
   const { authNotice, dismissAuthNotice, status, user } = useAuth();
+  const { theme } = useAppTheme();
+  const palette = theme === 'dark' ? darkPalette : lightPalette;
+  const screenOptions = {
+    headerShadowVisible: false,
+    headerBackTitleVisible: false,
+    headerStyle: { backgroundColor: palette.surface },
+    headerTintColor: palette.ink,
+    contentStyle: { backgroundColor: palette.canvas },
+  };
+  const appScreenOptions = () => ({
+    ...screenOptions,
+    headerRight: () => <HeaderActions />,
+  });
   if (status === 'loading') {
     return <ScreenMessage message="Chargement de votre session…" />;
   }
@@ -377,6 +359,16 @@ export function RootNavigator() {
             name="Settings"
             component={SettingsScreen}
             options={{ title: 'Paramètres' }}
+          />
+          <AppStack.Screen
+            name="Search"
+            component={SearchScreen}
+            options={{ title: 'Recherche' }}
+          />
+          <AppStack.Screen
+            name="Notifications"
+            component={NotificationCenterScreen}
+            options={{ title: 'Notifications' }}
           />
           <AppStack.Screen
             name="Profile"

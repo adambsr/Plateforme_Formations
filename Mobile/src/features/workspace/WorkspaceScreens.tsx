@@ -19,6 +19,8 @@ import {
   Home,
   LogOut,
   Menu,
+  Bell,
+  Search,
   Settings,
   UserRound,
   UsersRound,
@@ -40,6 +42,8 @@ import { AnalyticsPreferences } from '../../core/analytics/AnalyticsPreferences'
 import { Brand } from '../../shared/components/Brand';
 import { Button } from '../../shared/components/Button';
 import { TextField } from '../../shared/components/TextField';
+import { ThemeToggle } from '../../shared/components/ThemeToggle';
+import { useNotifications } from '../../core/notifications/NotificationProvider';
 import { colors, radii, spacing } from '../../shared/theme/tokens';
 import { RoleDashboardSummary } from './RoleDashboardSummary';
 import { roleWorkspace } from './role-workspace';
@@ -56,6 +60,7 @@ export function WorkspaceScreen({
 }: NativeStackScreenProps<AppStackParamList, 'Workspace'>) {
   const { user } = useAuth();
   const { openDrawer } = useDrawer();
+  const { unread } = useNotifications();
   if (user === null) return null;
   const workspace = roleWorkspace(user.role);
   return (
@@ -71,6 +76,30 @@ export function WorkspaceScreen({
           <Menu color={colors.primaryDark} size={24} />
         </Pressable>
         <Brand compact onPress={() => navigation.navigate('Home')} />
+        <View style={styles.barSpacer} />
+        <Pressable
+          accessibilityLabel="Rechercher"
+          hitSlop={6}
+          onPress={() => navigation.navigate('Search')}
+          style={styles.iconButton}
+        >
+          <Search color={colors.primaryDark} size={21} />
+        </Pressable>
+        <Pressable
+          accessibilityLabel={
+            unread > 0 ? `Notifications, ${unread} non lues` : 'Notifications'
+          }
+          hitSlop={6}
+          onPress={() => navigation.navigate('Notifications')}
+          style={styles.iconButton}
+        >
+          <Bell color={colors.primaryDark} size={21} />
+          {unread > 0 && (
+            <Text style={styles.notificationBadge}>
+              {unread > 99 ? '99+' : unread}
+            </Text>
+          )}
+        </Pressable>
       </View>
       <ScrollView
         contentContainerStyle={styles.content}
@@ -178,6 +207,7 @@ export function AuthenticatedDrawer() {
         ]
       : []),
     { label: 'Mon profil', Icon: UserRound, route: 'Profile' as const },
+    { label: 'Notifications', Icon: Bell, route: 'Notifications' as const },
     { label: 'Paramètres', Icon: Settings, route: 'Settings' as const },
   ];
   function close(after?: () => void) {
@@ -368,6 +398,10 @@ export function SettingsScreen({
     <SafeAreaView style={styles.safeArea} edges={['bottom']}>
       <ScrollView contentContainerStyle={styles.content}>
         <View style={styles.card}>
+          <Text style={styles.cardTitle}>Apparence</Text>
+          <ThemeToggle />
+        </View>
+        <View style={styles.card}>
           <Text style={styles.cardTitle}>Notifications</Text>
           <NotificationPreferences />
         </View>
@@ -443,6 +477,23 @@ const styles = StyleSheet.create({
     borderBottomColor: colors.line,
     backgroundColor: colors.surface,
   },
+  barSpacer: { flex: 1 },
+  notificationBadge: {
+    position: 'absolute',
+    top: 1,
+    right: 0,
+    minWidth: 17,
+    height: 17,
+    overflow: 'hidden',
+    borderRadius: 9,
+    paddingHorizontal: 3,
+    color: colors.onBrand,
+    backgroundColor: colors.danger,
+    fontSize: 9,
+    fontWeight: '900',
+    textAlign: 'center',
+    lineHeight: 17,
+  },
   iconButton: {
     minWidth: 44,
     minHeight: 44,
@@ -454,7 +505,7 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
     borderRadius: radii.md,
     padding: spacing.xl,
-    backgroundColor: colors.primaryDark,
+    backgroundColor: colors.brandDeep,
   },
   eyebrow: {
     color: '#bcd8f5',
@@ -463,7 +514,7 @@ const styles = StyleSheet.create({
     letterSpacing: 1.1,
   },
   title: {
-    color: colors.surface,
+    color: colors.onBrand,
     fontSize: 28,
     fontWeight: '700',
     letterSpacing: -0.6,

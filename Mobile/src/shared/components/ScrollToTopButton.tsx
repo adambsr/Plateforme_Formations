@@ -38,6 +38,6 @@ const styles = StyleSheet.create({
     backgroundColor: colors.primary,
     elevation: 5,
   },
-  label: { color: colors.surface, fontSize: 27, fontWeight: '800' },
+  label: { color: colors.onBrand, fontSize: 27, fontWeight: '800' },
   pressed: { opacity: 0.82 },
 });

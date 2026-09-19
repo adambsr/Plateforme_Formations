@@ -40,13 +40,13 @@ export function Button({
     >
       {loading ? (
         <ActivityIndicator
-          color={variant === 'primary' ? colors.surface : colors.primary}
+          color={variant === 'primary' ? colors.onBrand : colors.primary}
         />
       ) : (
         <>
           {Icon !== undefined && (
             <Icon
-              color={variant === 'primary' ? colors.surface : colors.primary}
+              color={variant === 'primary' ? colors.onBrand : colors.primary}
               size={18}
             />
           )}
@@ -83,7 +83,7 @@ const styles = StyleSheet.create({
   pressed: { opacity: 0.78 },
   disabled: { opacity: 0.55 },
   label: { fontSize: 15, fontWeight: '700', textAlign: 'center' },
-  primaryLabel: { color: colors.surface },
+  primaryLabel: { color: colors.onBrand },
   secondaryLabel: { color: colors.primaryDark },
   dangerLabel: { color: colors.danger },
   linkLabel: { color: colors.primary },

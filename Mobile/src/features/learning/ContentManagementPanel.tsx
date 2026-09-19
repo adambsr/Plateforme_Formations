@@ -1,4 +1,5 @@
 import * as DocumentPicker from 'expo-document-picker';
+import { File } from 'expo-file-system';
 import { useState } from 'react';
 import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Archive, BookPlus, Edit3, Trash2 } from 'lucide-react-native';
@@ -10,6 +11,20 @@ import { Notice } from '../../shared/components/Notice';
 import { TextField } from '../../shared/components/TextField';
 import { colors, radii, spacing } from '../../shared/theme/tokens';
 import type { ResourceType, TrainingContent } from './types';
+
+const supportedUploadTypes = [
+  'application/pdf',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  'text/plain',
+  'text/csv',
+  'application/zip',
+  'image/png',
+  'image/jpeg',
+  'image/gif',
+  'image/webp',
+];
 
 function message(error: unknown) {
   return error instanceof ApiError
@@ -186,6 +201,7 @@ export function ContentManagementPanel({
     if (resourceDraft === undefined) return;
     const result = await DocumentPicker.getDocumentAsync({
       copyToCacheDirectory: true,
+      type: supportedUploadTypes,
     });
     if (!result.canceled && result.assets[0] !== undefined) {
       setResourceDraft({ ...resourceDraft, file: result.assets[0] });
@@ -229,11 +245,8 @@ export function ContentManagementPanel({
         body.append('order', String(order));
         body.append('type', 'FILE');
         body.append('isVisibleToLearners', String(draft.isVisibleToLearners));
-        body.append('file', {
-          uri: draft.file.uri,
-          name: draft.file.name,
-          type: draft.file.mimeType ?? 'application/octet-stream',
-        } as unknown as Blob);
+        const file = new File(draft.file.uri);
+        body.append('file', file, draft.file.name);
         await request(`/lessons/${draft.lessonId}/resources`, {
           method: 'POST',
           body,
@@ -337,7 +350,7 @@ export function ContentManagementPanel({
           </Text>
           <Button
             label="Modifier le module"
-              icon={Edit3}
+            icon={Edit3}
             onPress={() =>
               setModuleDraft({
                 id: module.id,
@@ -609,6 +622,11 @@ function ResourceEditor({
           {draft.file !== undefined && (
             <Text style={styles.muted}>{draft.file.name}</Text>
           )}
+          <Text style={styles.muted}>
+            Formats acceptés : PDF, DOCX, PPTX, XLSX, TXT, CSV, ZIP et images.
+            Le Tuteur IA et la génération d’évaluations extraient le texte des
+            six premiers formats documentaires.
+          </Text>
         </>
       )}
       <Choice

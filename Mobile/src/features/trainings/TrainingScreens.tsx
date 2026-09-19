@@ -694,7 +694,7 @@ const styles = StyleSheet.create({
     gap: spacing.xs,
     borderRadius: radii.md,
     padding: spacing.lg,
-    backgroundColor: colors.primaryDark,
+    backgroundColor: colors.brandDeep,
   },
-  trainerName: { color: colors.surface, fontSize: 18, fontWeight: '700' },
+  trainerName: { color: colors.onBrand, fontSize: 18, fontWeight: '700' },
 });

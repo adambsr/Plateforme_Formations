@@ -606,7 +606,7 @@ export async function seedDevelopmentData(environment = process.env) {
     const issuer = {
       name: 'High Skills Academy : Démonstration',
       address: 'Route Manzel Chaker km 2.5 en face Magasin Général (MG) , Sfax, Tunisia',
-      email: 'contact.hsa.tn@gmail.com',
+      email: 'hsa.tn.contact@gmail.com',
       phone: '+216 70 000 000',
       registrationId: 'DEV-DEMO-001',
     };

@@ -21,7 +21,9 @@ export function NotificationPreferences({
   const { request } = useAuth();
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
-  const [state, setState] = useState<'enabled' | 'denied' | 'undecided'>('undecided');
+  const [state, setState] = useState<'enabled' | 'denied' | 'undecided'>(
+    'undecided',
+  );
   const [promptVisible, setPromptVisible] = useState(false);
 
   useEffect(() => {
@@ -87,13 +89,29 @@ export function NotificationPreferences({
             onPress={() => void enable()}
           />
         ))}
-      <Modal animationType="fade" transparent visible={promptVisible} onRequestClose={() => void decline()}>
+      <Modal
+        animationType="fade"
+        transparent
+        visible={promptVisible}
+        onRequestClose={() => void decline()}
+      >
         <View style={styles.overlay}>
           <View style={styles.modal}>
             <Text style={styles.title}>Restez informé(e)</Text>
-            <Text style={styles.body}>Souhaitez-vous recevoir les informations importantes concernant vos formations et vos sessions ?</Text>
-            <Button label="Activer les notifications" loading={loading} onPress={() => void enable()} />
-            <Button label="Pas maintenant" variant="secondary" onPress={() => void decline()} />
+            <Text style={styles.body}>
+              Souhaitez-vous recevoir les informations importantes concernant
+              vos formations et vos sessions ?
+            </Text>
+            <Button
+              label="Activer les notifications"
+              loading={loading}
+              onPress={() => void enable()}
+            />
+            <Button
+              label="Pas maintenant"
+              variant="secondary"
+              onPress={() => void decline()}
+            />
           </View>
         </View>
       </Modal>
@@ -114,6 +132,16 @@ const styles = StyleSheet.create({
   title: { color: colors.ink, fontSize: 20, fontWeight: '700' as const },
   body: { color: colors.muted, fontSize: 14, lineHeight: 20 },
   message: { color: colors.success, fontSize: 14, fontWeight: '600' as const },
-  overlay: { flex: 1, justifyContent: 'center', padding: spacing.xl, backgroundColor: 'rgba(23,32,51,0.45)' },
-  modal: { gap: spacing.lg, borderRadius: radii.md, padding: spacing.xl, backgroundColor: colors.surface },
+  overlay: {
+    flex: 1,
+    justifyContent: 'center',
+    padding: spacing.xl,
+    backgroundColor: 'rgba(23,32,51,0.45)',
+  },
+  modal: {
+    gap: spacing.lg,
+    borderRadius: radii.md,
+    padding: spacing.xl,
+    backgroundColor: colors.surface,
+  },
 });

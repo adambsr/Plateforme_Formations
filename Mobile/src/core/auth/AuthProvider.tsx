@@ -11,7 +11,10 @@ import {
   type AuthStatus,
 } from './AuthContext';
 import type { MobileAuthSession, User } from './types';
-import { refreshMobileSession } from './mobile-session';
+import {
+  refreshMobileSession,
+  SessionRefreshSupersededError,
+} from './mobile-session';
 import { unregisterPushDevice } from '../notifications/firebase-messaging';
 
 export function AuthProvider({ children }: React.PropsWithChildren) {
@@ -20,9 +23,14 @@ export function AuthProvider({ children }: React.PropsWithChildren) {
   const [authNotice, setAuthNotice] = useState<AuthNotice>(null);
   const accessToken = useRef<string | null>(null);
   const refreshInFlight = useRef<Promise<MobileAuthSession> | null>(null);
+  const refreshAllowed = useRef(true);
+  const sessionGeneration = useRef(0);
+  const authStatus = useRef<AuthStatus>('loading');
 
   const applySession = useCallback((session: MobileAuthSession) => {
     accessToken.current = session.accessToken;
+    refreshAllowed.current = true;
+    authStatus.current = 'authenticated';
     setUser(session.user);
     setAuthNotice(null);
     setStatus('authenticated');
@@ -39,6 +47,8 @@ export function AuthProvider({ children }: React.PropsWithChildren) {
 
   const becomeGuest = useCallback(async (notice: AuthNotice = null) => {
     accessToken.current = null;
+    refreshAllowed.current = false;
+    authStatus.current = 'guest';
     setUser(null);
     try {
       await secureRefreshTokenStore.clear();
@@ -49,10 +59,14 @@ export function AuthProvider({ children }: React.PropsWithChildren) {
   }, []);
 
   const refreshSession = useCallback((): Promise<MobileAuthSession> => {
+    if (!refreshAllowed.current)
+      return Promise.reject(new SessionRefreshSupersededError());
     if (refreshInFlight.current !== null) return refreshInFlight.current;
+    const generation = sessionGeneration.current;
     refreshInFlight.current = refreshMobileSession(
       apiClient,
       secureRefreshTokenStore,
+      () => refreshAllowed.current && generation === sessionGeneration.current,
     )
       .then((session) => {
         applySession(session);
@@ -102,7 +116,13 @@ export function AuthProvider({ children }: React.PropsWithChildren) {
           accessToken.current ?? undefined,
         );
       } catch (error) {
-        if (!(error instanceof ApiError) || error.status !== 401) throw error;
+        if (
+          !(error instanceof ApiError) ||
+          error.status !== 401 ||
+          authStatus.current !== 'authenticated' ||
+          !refreshAllowed.current
+        )
+          throw error;
         try {
           const session = await refreshSession();
           return await apiClient.request<T>(path, options, session.accessToken);
@@ -166,6 +186,8 @@ export function AuthProvider({ children }: React.PropsWithChildren) {
         setAuthNotice(null);
       },
       async login(email, password) {
+        refreshAllowed.current = true;
+        sessionGeneration.current += 1;
         return acceptSession(
           await apiClient.request<MobileAuthSession>('/auth/login', {
             method: 'POST',
@@ -178,6 +200,8 @@ export function AuthProvider({ children }: React.PropsWithChildren) {
         );
       },
       async register(input) {
+        refreshAllowed.current = true;
+        sessionGeneration.current += 1;
         return acceptSession(
           await apiClient.request<MobileAuthSession>('/auth/register', {
             method: 'POST',
@@ -192,6 +216,8 @@ export function AuthProvider({ children }: React.PropsWithChildren) {
         );
       },
       async logout() {
+        refreshAllowed.current = false;
+        sessionGeneration.current += 1;
         try {
           await unregisterPushDevice(request).catch(() => undefined);
           const refreshToken = await secureRefreshTokenStore.get();

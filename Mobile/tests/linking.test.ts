@@ -6,6 +6,9 @@ describe('Mobile deep-link contract', () => {
     expect(linking.config?.screens).toMatchObject({
       ResetPassword: 'reset-password',
       CheckoutReturn: 'payments/:result',
+      Notifications: 'app/notifications',
+      Search: 'app/search',
+      Content: 'app/content/:trainingId',
     });
   });
 });

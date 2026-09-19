@@ -6,6 +6,7 @@ const Icon = () => <View />;
 
 export const BookOpen = Icon;
 export const BadgeCheck = Icon;
+export const Bell = Icon;
 export const CalendarDays = Icon;
 export const ChevronDown = Icon;
 export const ChevronUp = Icon;
@@ -14,7 +15,10 @@ export const ClipboardCheck = Icon;
 export const Home = Icon;
 export const LogOut = Icon;
 export const Menu = Icon;
+export const Moon = Icon;
+export const Search = Icon;
 export const Settings = Icon;
+export const Sun = Icon;
 export const UserRound = Icon;
 export const UsersRound = Icon;
 export const WalletCards = Icon;

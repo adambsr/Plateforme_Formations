@@ -11,7 +11,8 @@ const defaultDrawerContext: DrawerContextValue = {
   openDrawer: () => undefined,
   closeDrawer: () => undefined,
 };
-export const DrawerContext = createContext<DrawerContextValue>(defaultDrawerContext);
+export const DrawerContext =
+  createContext<DrawerContextValue>(defaultDrawerContext);
 
 export function useDrawer(): DrawerContextValue {
   return useContext(DrawerContext);

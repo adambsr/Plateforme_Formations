@@ -11,11 +11,18 @@
       "resizeMode": "contain",
       "backgroundColor": "#FFFFFF"
     },
-    "userInterfaceStyle": "light",
+    "userInterfaceStyle": "automatic",
     "plugins": [
       "expo-secure-store",
       "expo-sharing",
-      "expo-notifications",
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/android-icon-monochrome.png",
+          "color": "#1859A6",
+          "defaultChannel": "hsa-default"
+        }
+      ],
       [
         "expo-image-picker",
         {
@@ -39,7 +46,8 @@
             "useFrameworks": "dynamic"
           }
         }
-      ]
+      ],
+      "./plugins/with-hsa-theme"
     ],
     "ios": {
       "supportsTablet": true

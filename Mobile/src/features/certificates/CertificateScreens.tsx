@@ -30,13 +30,17 @@ function message(error: unknown): string {
 }
 
 function eligibilityFailureLabel(failure: string): string {
-  return {
-    TRAINING_INCOMPLETE: 'Formation non terminée : consultez les leçons restantes.',
-    CERTIFYING_EVALUATION_NOT_PASSED:
-      'Évaluation certifiante non réussie : une nouvelle tentative est nécessaire.',
-    ATTENDANCE_INCOMPLETE: 'Présence insuffisante : vérifiez votre planning.',
-    PAYMENT_NOT_CONFIRMED: 'Paiement non confirmé : le certificat sera disponible après validation.',
-  }[failure] ?? failure.replaceAll('_', ' ').toLowerCase();
+  return (
+    {
+      TRAINING_INCOMPLETE:
+        'Formation non terminée : consultez les leçons restantes.',
+      CERTIFYING_EVALUATION_NOT_PASSED:
+        'Évaluation certifiante non réussie : une nouvelle tentative est nécessaire.',
+      ATTENDANCE_INCOMPLETE: 'Présence insuffisante : vérifiez votre planning.',
+      PAYMENT_NOT_CONFIRMED:
+        'Paiement non confirmé : le certificat sera disponible après validation.',
+    }[failure] ?? failure.replaceAll('_', ' ').toLowerCase()
+  );
 }
 
 export function CertificatesScreen() {
@@ -215,7 +219,9 @@ export function CertificatesScreen() {
                       {certificate === undefined &&
                         enrollment.eligibility?.eligible === true && (
                           <>
-                            <Text style={[styles.status, styles.statusReady]}>Éligible au certificat</Text>
+                            <Text style={[styles.status, styles.statusReady]}>
+                              Éligible au certificat
+                            </Text>
                             <Button
                               label="Générer le certificat"
                               loading={busy === `certificate:${enrollment.id}`}
@@ -234,7 +240,9 @@ export function CertificatesScreen() {
                       {certificate === undefined &&
                         enrollment.eligibility?.eligible === false && (
                           <View style={styles.statusBlock}>
-                            <Text style={[styles.status, styles.statusBlocked]}>Conditions à compléter</Text>
+                            <Text style={[styles.status, styles.statusBlocked]}>
+                              Conditions à compléter
+                            </Text>
                             {enrollment.eligibility.failures.map((failure) => (
                               <Text key={failure} style={styles.muted}>
                                 {eligibilityFailureLabel(failure)}
@@ -359,8 +367,8 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '700',
   },
-  statusReady: { color: '#176b42', backgroundColor: '#d9f5e6' },
-  statusBlocked: { color: '#8a5a00', backgroundColor: '#fff1c7' },
+  statusReady: { color: colors.success, backgroundColor: colors.successSoft },
+  statusBlocked: { color: colors.warning, backgroundColor: colors.warningSoft },
   statusBlock: { gap: spacing.xs },
   body: { color: colors.ink, fontSize: 14 },
   ratingRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
@@ -373,7 +381,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.md,
     backgroundColor: colors.canvas,
   },
-  ratingText: { color: '#9a650f', fontWeight: '700' },
+  ratingText: { color: colors.warning, fontWeight: '700' },
   success: { color: colors.success, fontSize: 14, fontWeight: '700' },
   average: { color: colors.primaryDark, fontSize: 30, fontWeight: '800' },
 });

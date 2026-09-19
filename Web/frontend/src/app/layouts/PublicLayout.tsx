@@ -127,8 +127,8 @@ export function PublicLayout() {
           </h2>
           <nav aria-label="Contact et informations légales">
             <Link to="/contact">Contact</Link>
-            <a href="mailto:contact.hsa.tn@gmail.com">
-              contact.hsa.tn@gmail.com
+            <a href="mailto:hsa.tn.contact@gmail.com">
+              hsa.tn.contact@gmail.com
             </a>
             <Link to="/privacy">Confidentialité</Link>
             <Link to="/terms">Conditions</Link>

@@ -55,6 +55,16 @@ interface Recommendations {
   strategy: 'HISTORY_AND_POPULARITY';
   recommendations: Recommendation[];
 }
+interface TrainerWorkspace {
+  learnerCount: number;
+  activity: Array<{
+    id: string;
+    type: 'ENROLLMENT' | 'EVALUATION' | 'SESSION';
+    title: string;
+    description: string;
+    occurredAt: string;
+  }>;
+}
 
 export function RoleDashboardSummary({
   navigation,
@@ -73,6 +83,7 @@ export function RoleDashboardSummary({
     trainings: Page<Named>;
     sessions: Page<TrainerSessionSummary>;
     evaluations: Page<Named>;
+    workspace: TrainerWorkspace;
   }>();
   const [error, setError] = useState('');
 
@@ -104,12 +115,17 @@ export function RoleDashboardSummary({
           })),
         );
       } else {
-        const [trainings, sessions, evaluations] = await Promise.all([
-          request<Page<Named>>('/trainings?view=MANAGED&page=1&pageSize=5'),
-          request<Page<TrainerSessionSummary>>('/sessions?view=MANAGED&page=1&pageSize=5'),
-          request<Page<Named>>('/evaluations?view=MANAGED&page=1&pageSize=5'),
-        ]);
-        setTrainer({ trainings, sessions, evaluations });
+        const [trainings, sessions, evaluations, workspace] = await Promise.all(
+          [
+            request<Page<Named>>('/trainings?view=MANAGED&page=1&pageSize=5'),
+            request<Page<TrainerSessionSummary>>(
+              '/sessions?view=MANAGED&status=PLANNED&page=1&pageSize=5',
+            ),
+            request<Page<Named>>('/evaluations?view=MANAGED&page=1&pageSize=5'),
+            request<TrainerWorkspace>('/dashboard/trainer'),
+          ],
+        );
+        setTrainer({ trainings, sessions, evaluations, workspace });
       }
     } catch (caught) {
       setError(
@@ -142,7 +158,11 @@ export function RoleDashboardSummary({
         <Text style={styles.sectionTitle}>Vue d’ensemble</Text>
         <View style={styles.metrics}>
           <Metric label="Formations gérées" value={trainer.trainings.total} />
-          <Metric label="Sessions affectées" value={trainer.sessions.total} />
+          <Metric
+            label="Mes apprenants"
+            value={trainer.workspace.learnerCount}
+          />
+          <Metric label="Sessions planifiées" value={trainer.sessions.total} />
           <Metric label="Évaluations" value={trainer.evaluations.total} />
         </View>
         <Text style={styles.cardTitle}>Sessions récentes</Text>
@@ -154,18 +174,45 @@ export function RoleDashboardSummary({
           trainer.sessions.items.map((item) => (
             <View key={item.id} style={styles.sessionCard}>
               {item.training?.thumbnailUrl !== undefined && (
-                <Image source={{ uri: apiAssetUrl(item.training.thumbnailUrl) }} style={styles.sessionThumbnail} />
+                <Image
+                  source={{ uri: apiAssetUrl(item.training.thumbnailUrl) }}
+                  style={styles.sessionThumbnail}
+                />
               )}
-              <Text style={styles.cardTitle}>{item.training?.title ?? 'Formation'}</Text>
+              <Text style={styles.cardTitle}>
+                {item.training?.title ?? 'Formation'}
+              </Text>
               <Text style={styles.muted}>{item.title ?? 'Session'}</Text>
               {item.startAt !== undefined && (
                 <Text style={styles.muted}>
-                  {formatTunisDate(item.startAt)}{item.endAt !== undefined ? ` au ${formatTunisDate(item.endAt)}` : ''}
+                  {formatTunisDate(item.startAt)}
+                  {item.endAt !== undefined
+                    ? ` au ${formatTunisDate(item.endAt)}`
+                    : ''}
                   {item.location !== undefined ? ` · ${item.location}` : ''}
                   {item.room !== undefined ? ` · ${item.room}` : ''}
                 </Text>
               )}
-              {item.status && <Text style={styles.sessionStatus}>{item.status}</Text>}
+              {item.status && (
+                <Text style={styles.sessionStatus}>{item.status}</Text>
+              )}
+            </View>
+          ))
+        )}
+        <Text style={styles.cardTitle}>Activité récente</Text>
+        {trainer.workspace.activity.length === 0 ? (
+          <Text style={styles.muted}>Aucune activité récente.</Text>
+        ) : (
+          trainer.workspace.activity.map((item) => (
+            <View key={item.id} style={styles.activityRow}>
+              <View style={styles.activityDot} />
+              <View style={styles.activityCopy}>
+                <Text style={styles.activityTitle}>{item.title}</Text>
+                <Text style={styles.muted}>{item.description}</Text>
+                <Text style={styles.activityTime}>
+                  {relativeTime(item.occurredAt)}
+                </Text>
+              </View>
             </View>
           ))
         )}
@@ -246,6 +293,16 @@ function Metric({ label, value }: { label: string; value: string | number }) {
   );
 }
 
+function relativeTime(value: string) {
+  const hours = Math.max(
+    0,
+    Math.floor((Date.now() - Date.parse(value)) / 3_600_000),
+  );
+  if (hours < 1) return 'À l’instant';
+  if (hours < 24) return `Il y a ${hours} h`;
+  return `Il y a ${Math.floor(hours / 24)} j`;
+}
+
 const styles = StyleSheet.create({
   section: { gap: spacing.md },
   sectionTitle: { color: colors.ink, fontSize: 21, fontWeight: '800' },
@@ -289,4 +346,23 @@ const styles = StyleSheet.create({
   },
   sessionThumbnail: { width: '100%', height: 96, borderRadius: radii.sm },
   sessionStatus: { color: colors.primaryDark, fontSize: 12, fontWeight: '700' },
+  activityRow: {
+    flexDirection: 'row',
+    gap: spacing.md,
+    borderWidth: 1,
+    borderColor: colors.line,
+    borderRadius: radii.sm,
+    padding: spacing.md,
+    backgroundColor: colors.surface,
+  },
+  activityDot: {
+    width: 10,
+    height: 10,
+    marginTop: 5,
+    borderRadius: 5,
+    backgroundColor: colors.primary,
+  },
+  activityCopy: { flex: 1, minWidth: 0, gap: spacing.xs },
+  activityTitle: { color: colors.ink, fontSize: 14, fontWeight: '800' },
+  activityTime: { color: colors.primaryDark, fontSize: 11, fontWeight: '700' },
 });

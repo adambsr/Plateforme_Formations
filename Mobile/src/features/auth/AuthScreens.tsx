@@ -531,7 +531,7 @@ const styles = StyleSheet.create({
     borderColor: colors.primary,
     backgroundColor: colors.primary,
   },
-  checkmark: { color: colors.surface, fontSize: 15, fontWeight: '900' },
+  checkmark: { color: colors.onBrand, fontSize: 15, fontWeight: '900' },
   consentText: { flex: 1, color: colors.ink, fontSize: 14, lineHeight: 20 },
   legalLinks: { gap: spacing.xs },
   alert: {

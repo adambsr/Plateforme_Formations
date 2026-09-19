@@ -1,5 +1,6 @@
 import { ApiClient } from '../src/core/api/client';
 import { refreshMobileSession } from '../src/core/auth/mobile-session';
+import { SessionRefreshSupersededError } from '../src/core/auth/mobile-session';
 import type { MobileAuthSession } from '../src/core/auth/types';
 import type { RefreshTokenStore } from '../src/core/storage/refresh-token-store';
 
@@ -62,5 +63,24 @@ describe('Mobile secure session refresh', () => {
     ).rejects.toMatchObject({ code: 'INVALID_REFRESH_TOKEN', status: 401 });
     expect(request).not.toHaveBeenCalled();
     request.mockRestore();
+  });
+
+  it('does not persist a rotated token after a newer auth action wins', async () => {
+    jest.spyOn(ApiClient.prototype, 'request').mockResolvedValue(session);
+    const store: RefreshTokenStore = {
+      get: jest.fn(async () => 'current-refresh-token'),
+      set: jest.fn(async () => undefined),
+      clear: jest.fn(async () => undefined),
+    };
+
+    await expect(
+      refreshMobileSession(
+        new ApiClient('https://api.example.test/api'),
+        store,
+        () => false,
+      ),
+    ).rejects.toBeInstanceOf(SessionRefreshSupersededError);
+    expect(store.set).not.toHaveBeenCalled();
+    jest.restoreAllMocks();
   });
 });

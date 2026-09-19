@@ -16,7 +16,7 @@ export function ContactPage() {
   const address =
     import.meta.env.VITE_CENTER_ADDRESS ??
     'Route Manzel Chaker km 2.5 en face Magasin Général (MG) , Sfax, Tunisia';
-  const email = import.meta.env.VITE_CENTER_EMAIL ?? 'contact.hsa.tn@gmail.com';
+  const email = import.meta.env.VITE_CENTER_EMAIL ?? 'hsa.tn.contact@gmail.com';
   const phone = import.meta.env.VITE_CENTER_PHONE ?? '+216 70 000 000';
   const hours =
     import.meta.env.VITE_CENTER_HOURS ?? 'Lundi-vendredi, 8 h 30-17 h 30';
