@@ -12,7 +12,7 @@
 
 ## Résumé
 
-High Skills Academy est une plateforme web de gestion de formations professionnelles. Elle centralise la publication des offres, les inscriptions, les paiements, l'accès au contenu, les sessions présentielles, le suivi pédagogique, les évaluations, la certification et les indicateurs de gestion.
+High Skills Academy est une plateforme web et mobile de gestion de formations professionnelles. Elle centralise la publication des offres, les inscriptions, les paiements, l'accès au contenu, les sessions présentielles, le suivi pédagogique, les évaluations, la certification, les notifications et les indicateurs de gestion.
 
 Le projet répond au problème de la fragmentation des opérations d'un centre de formation entre outils de bureautique, échanges manuels, plateformes de paiement et documents isolés. La solution propose une application web et mobile structurée autour d'une API sécurisée, d'une base MongoDB et de services externes sélectionnés : Stripe pour le paiement, Gemini pour des fonctionnalités d'assistance intelligente, Firebase Analytics pour une mesure optionnelle du produit et Firebase Cloud Messaging pour les notifications mobiles.
 
@@ -52,6 +52,7 @@ L'objectif général est de mettre à disposition un système de gestion de form
 - relier l'accès à une confirmation de paiement côté serveur;
 - prendre en charge l'évaluation, la certification, la facture et le feedback;
 - proposer des tableaux de bord basés sur des données métier persistées;
+- fournir une recherche adaptée au rôle et des notifications avec état lu/non lu;
 - intégrer une IA fondée sur des sources explicitement autorisées;
 - mesurer l'usage du produit avec consentement explicite.
 
@@ -105,8 +106,9 @@ Une formation suit les états `DRAFT`, `PUBLISHED` et `ARCHIVED`. Seules les for
 | Évaluations | Questions objectives, tentatives, correction automatique, résultats et désignation certifiante |
 | Paiement et documents | Stripe Checkout de test, webhook vérifié, inscriptions, factures et certificats PDF protégés |
 | Gestion | Coûts, satisfaction, revenus, résultat et rentabilité dans les tableaux de bord |
-| Intelligence artificielle | Tuteur de formation, concierge public, génération de questions brouillon |
-| Application mobile | Client Expo/React Native Android, navigation par rôle, accès au contenu et notifications push |
+| Intelligence artificielle | Tuteur fondé sur les leçons et documents, concierge public, génération de questions brouillon |
+| Recherche et notifications | Recherche globale filtrée par rôle, centre persistant, compteur non lu, lecture et actualisation temps réel/périodique |
+| Application mobile | Client Expo/React Native Android, tableaux de bord par rôle, navigation groupée, thème clair/sombre, recherche, centre de notifications, accès protégé et fonctions IA |
 | Mesure | Firebase Analytics optionnel pour les pages, écrans et recommandations |
 
 ## 3. Conception architecturale
@@ -134,7 +136,7 @@ flowchart LR
   Init[mongodb-init] -->|initialise rs0| DB
 ```
 
-Le client web et le client mobile présentent les parcours utilisateur et appellent l'API via `/api`. L'API est le point de contrôle central : elle valide les données, applique l'autorisation, accède à MongoDB et contacte les fournisseurs externes. Les clés privées de Stripe et Gemini, ainsi que les identifiants de compte de service Firebase utilisés par FCM, ne quittent jamais le serveur. Le client mobile utilise une session adaptée à son environnement natif, tandis que le backend conserve les mêmes règles d'autorisation métier.
+Le client web et le client mobile présentent les parcours utilisateur et appellent l'API via `/api`. L'API est le point de contrôle central : elle valide les données, applique l'autorisation, accède à MongoDB et contacte les fournisseurs externes. Les clés privées de Stripe et Gemini, ainsi que les identifiants de compte de service Firebase utilisés par FCM, ne quittent jamais le serveur. Le client mobile utilise un refresh token rotatif dans Secure Store et un access token en mémoire, tandis que le navigateur conserve son refresh token dans un cookie HTTP-only. Les deux clients partagent les mêmes règles d'autorisation métier.
 
 ### 3.3 Technologies
 
@@ -176,6 +178,7 @@ Les modules et leçons portent une référence de formation qui permet de vérif
 | Paiement et accès | Payment, Enrollment, Invoice, InvoiceItem |
 | Suivi et validation | LessonProgress, Evaluation, EvaluationQuestion, EvaluationAttempt, EvaluationAnswer, Certificate, Feedback |
 | Pilotage | TrainerCost, TrainingCost |
+| Communication | Notification, NotificationDevice |
 
 Les index Mongoose sont initialisés au démarrage du backend. Ils protègent notamment l'unicité des comptes, des inscriptions, des présences et des documents métier lorsque cette unicité est nécessaire.
 
@@ -192,7 +195,7 @@ Les index Mongoose sont initialisés au démarrage du backend. Ils protègent no
 
 ### 5.1 Authentification et autorisation
 
-Le client utilise un jeton d'accès Bearer en mémoire et un cookie de rafraîchissement HTTP-only. Les opérations protégées sont vérifiées par l'API; les gardes d'interface ne suffisent donc pas à contourner une restriction de rôle ou de propriété.
+Les deux clients utilisent un jeton d'accès Bearer en mémoire. Le Web renouvelle la session avec un cookie de rafraîchissement HTTP-only; le Mobile utilise un jeton opaque rotatif conservé dans Expo Secure Store. Les opérations protégées sont vérifiées par l'API; les gardes d'interface ne suffisent donc pas à contourner une restriction de rôle ou de propriété.
 
 Les mécanismes principaux sont :
 
@@ -220,8 +223,8 @@ Il peut : répondre à une question de cours, simplifier une notion, proposer un
 | Dimension | Mise en œuvre |
 | --- | --- |
 | Endpoint | `POST /api/trainings/:id/tutor/messages` |
-| Retrieval | Au plus cinq leçons actives/non archivées de la formation, classées par pertinence |
-| Données données au modèle | Message, huit éléments récents de conversation au plus et extraits des leçons sélectionnées |
+| Retrieval | Au plus cinq leçons actives/non archivées, enrichies du texte des ressources visibles PDF, DOCX, PPTX, XLSX, TXT et CSV, puis classées par pertinence |
+| Données données au modèle | Message, huit éléments récents de conversation au plus et extraits autorisés des leçons et documents sélectionnés |
 | Données exclues | Identité, paiement, progression, certificat, évaluation et autres informations de compte |
 | Limites | Contexte plafonné au minimum de `AI_MAX_CONTEXT_CHARS` et 24 000 caractères; messages à 2 000 caractères |
 | Grounding | Une réponse fondée doit citer les leçons fournies; toute citation non autorisée ou incohérente est rejetée |
@@ -251,7 +254,7 @@ Le prompt considère les messages, l'historique et les sources comme des donnée
 
 ### 6.3 Génération de questions d'évaluation
 
-Un Formateur peut appeler `POST /api/evaluations/:id/generate-ai` pour une évaluation brouillon dont il est propriétaire. Le contexte est limité à la formation concernée : modules, leçons et fichiers locaux PDF, DOCX, PPTX ou TXT dont le texte est extractible.
+Un Formateur peut appeler `POST /api/evaluations/:id/generate-ai` pour une évaluation brouillon dont il est propriétaire. Le contexte est limité à la formation concernée : modules, leçons et fichiers locaux PDF, DOCX, PPTX, XLSX, TXT ou CSV dont le texte est extractible.
 
 Les questions retournées sont validées par le backend et importées comme brouillons modifiables. Le Formateur doit les vérifier et publier explicitement l'évaluation. L'IA ne peut ni publier ni désigner une évaluation certifiante. Cette fonction utilise `AI_MAX_CONTEXT_CHARS`, `AI_MODEL`, un plafond de 8 192 jetons et ne réalise ni OCR ni exploration d'URL.
 
@@ -283,13 +286,15 @@ Le client mobile Android utilise `@react-native-firebase/analytics` et reprend l
 
 Les écrans affichés par React Navigation produisent des événements `screen_view`. Les événements `recommendation_impression`, `recommendation_click` et `recommendation_enrollment` reprennent les mêmes noms et paramètres que sur le web. L'attribution d'une inscription à une recommandation est conservée localement pendant au plus sept jours, puis supprimée après conversion ou expiration. Aucun nom, e-mail, élément de paiement ou autre donnée directement identifiante n'est transmis par ces événements. En l'absence de consentement, la fonction de suivi retourne sans initialiser ni appeler le SDK Analytics.
 
-### 7.3 Notifications mobiles avec FCM
+### 7.3 Notifications en application et notifications mobiles avec FCM
 
-Les notifications reposent sur une séparation entre le client mobile, l'API métier et Firebase Cloud Messaging. Après authentification et accord explicite de l'utilisateur, l'application obtient un jeton FCM, puis l'enregistre auprès de `POST /api/notifications/devices`. Le backend associe le jeton à l'utilisateur authentifié dans la collection `notification_devices`. Le rafraîchissement du jeton est pris en compte par le même mécanisme.
+Les notifications reposent d'abord sur des entrées persistées dans la collection `notifications`. Les clients chargent une liste paginée et le compteur non lu, puis peuvent marquer une notification ou l'ensemble comme lu. Le Web reçoit aussi les créations par un flux SSE et se resynchronise lors du retour au premier plan. Le Mobile actualise le compteur au démarrage, toutes les 30 secondes, au retour de l'application et lors d'un message FCM. Cette séparation préserve l'état lu/non lu même si une notification push n'est pas délivrée.
+
+Après authentification et accord explicite de l'utilisateur, l'application mobile obtient un jeton FCM, puis l'enregistre auprès de `POST /api/notifications/devices`. Le backend associe le jeton à l'utilisateur authentifié dans la collection `notification_devices`. Le rafraîchissement du jeton est pris en compte par le même mécanisme.
 
 L'envoi est réservé à l'Administrateur via `POST /api/notifications/send`. Le service backend utilise le SDK Firebase Admin et les identifiants de compte de service fournis par les identifiants d'application par défaut. Les erreurs indiquant qu'un jeton est invalide ou n'est plus enregistré entraînent sa suppression. La désactivation de FCM (`FCM_ENABLED=false`) ne bloque ni l'authentification ni le reste de l'application.
 
-Sur Android, `expo-notifications` présente les messages reçus au premier plan et utilise le canal `hsa-default`. Une notification ouverte depuis l'arrière-plan ou depuis un état fermé est convertie en destination interne contrôlée : catalogue, détail d'une formation, détail d'une session, achats ou certificats. Une destination inconnue est ignorée. Lors de la déconnexion, l'application supprime le jeton distant avec `DELETE /api/notifications/devices` avant de fermer la session.
+Sur Android, `expo-notifications` présente les messages reçus au premier plan et utilise le canal `hsa-default`. Une notification ouverte depuis l'arrière-plan ou depuis un état fermé est convertie en destination interne contrôlée; une destination inconnue est ignorée. Lors de la déconnexion, l'application supprime le jeton distant avec `DELETE /api/notifications/devices` avant de fermer la session.
 
 ## 8. Déploiement et environnement de développement
 
@@ -320,9 +325,11 @@ Les paramètres critiques côté serveur incluent `MONGODB_URI`, `JWT_ACCESS_SEC
 
 ### 8.3 Installation et configuration du client mobile
 
-Le client mobile est situé dans `Mobile/` et est construit avec Expo 57 et React Native 0.86. Après l'installation des dépendances à la racine du dépôt, la configuration locale est créée à partir de `Mobile/.env.example`. `EXPO_PUBLIC_API_BASE_URL` doit désigner une adresse accessible depuis l'émulateur ou le terminal physique : `http://10.0.2.2:3000/api` pour l'émulateur Android, ou l'adresse IP du poste sur le réseau local pour un appareil réel. Le schéma `EXPO_PUBLIC_APP_SCHEME` est utilisé par les liens profonds.
+Le client mobile est situé dans `Mobile/` et est construit avec Expo 57 et React Native 0.86. Après l'installation des dépendances à la racine du dépôt, la configuration locale est créée à partir de `Mobile/.env.example`. Dans le flux Android Studio AVD standard, `EXPO_PUBLIC_API_BASE_URL=http://10.0.2.2:3000/api` désigne l'API du poste hôte. Le schéma `EXPO_PUBLIC_APP_SCHEME` est utilisé par les liens profonds.
 
-Les modules natifs Firebase nécessitent une application Android enregistrée avec l'identifiant `com.highskillsacademy.formations` et son fichier local `google-services.json`. Une application iOS correspondante utilise `GoogleService-Info.plist`. Ces fichiers de configuration d'application sont distincts du compte de service Firebase du backend et ne doivent pas être confondus avec lui. Le client se lance avec `npm run dev:mobile` et le projet Android natif avec `npm run android --workspace @plateforme-formations/mobile`.
+Les modules natifs Firebase nécessitent une application Android enregistrée avec l'identifiant `com.highskillsacademy.formations` et son fichier local `google-services.json`. Une application iOS correspondante utilise `GoogleService-Info.plist`. Ces fichiers de configuration d'application sont distincts du compte de service Firebase du backend et ne doivent pas être confondus avec lui. Pour le parcours habituel, l'utilisateur démarre son AVD existant dans Android Studio, attend son démarrage, puis exécute `npm run android --workspace @plateforme-formations/mobile`, qui construit, installe et ouvre l'application native.
+
+L'interface mobile persiste le choix clair/sombre dans Secure Store. Des ressources Android `values` et `values-night`, générées par le plugin Expo du projet, alimentent les couleurs natives. Le thème est hydraté avant le montage de l'application et la sous-arborescence d'écran visible est remontée lors d'un changement, ce qui évite d'exiger un retour arrière ou un rafraîchissement manuel. La navigation latérale regroupe les entrées selon le rôle et maintient le profil, les paramètres et la déconnexion dans une zone de compte distincte.
 
 Pour activer la mesure native, `EXPO_PUBLIC_FIREBASE_ANALYTICS_ENABLED=true` est défini dans l'environnement mobile. Pour activer les notifications, le backend reçoit `FCM_ENABLED=true` et utilise `GOOGLE_APPLICATION_CREDENTIALS` ou les identifiants d'application par défaut. Sur Android 13 et supérieur, la permission `POST_NOTIFICATIONS` est demandée au moment où l'utilisateur choisit d'activer les notifications; sur les versions antérieures, l'accès aux notifications est déterminé par le système. La configuration FCM reste facultative pour exécuter le client et accéder aux fonctionnalités qui ne dépendent pas des notifications.
 
@@ -338,7 +345,7 @@ Les vérifications les plus significatives couvrent notamment :
 - la progression, les présences, les évaluations, les certificats et les tableaux de bord;
 - la configuration, le replica set et les scripts d'initialisation;
 - les garde-fous du tuteur, du concierge public et des événements Firebase;
-- la configuration mobile, les sessions natives, le consentement Analytics et les flux de notifications.
+- la configuration mobile, les sessions natives, le consentement Analytics, le thème persistant, la recherche, le centre de notifications et les flux de parité Web/Mobile.
 
 Pour le mémoire final, cette section devra être complétée par des résultats mesurés : nombre de tests exécutés, taux de réussite, exemples de scénarios, captures d'écran de l'API et tests manuels des parcours critiques.
 
@@ -360,7 +367,7 @@ Ces pistes ne remettent pas en cause les règles actuelles : l'autorisation doit
 
 High Skills Academy met en œuvre un cycle de formation complet, depuis la publication d'une offre jusqu'à la délivrance d'un certificat. Le projet associe des clients React web et Expo/React Native, une API Express modulaire, MongoDB, Stripe, Gmail SMTP, Gemini, Firebase Analytics et Firebase Cloud Messaging dans une architecture cohérente pour son périmètre.
 
-Les développements récents apportent trois contributions importantes au projet : une assistance IA séparée selon le contexte — tuteur fondé sur les leçons pour l'Apprenant et concierge fondé sur les informations publiques pour le visiteur —, une application mobile native partageant les règles métier de l'API, et une mesure analytique optionnelle complétée par des notifications push FCM, toutes deux limitées par des mécanismes de consentement ou d'activation explicite.
+Les développements récents apportent plusieurs contributions importantes : une assistance IA séparée selon le contexte, dont un tuteur et une génération d'évaluations fondés sur les leçons et documents extractibles; une application mobile native alignée sur les tableaux de bord, la recherche, les notifications, le thème et les règles métier du Web; et une mesure analytique optionnelle complétée par des notifications persistées et FCM, limitées par des mécanismes de consentement ou d'activation explicite.
 
 La valeur académique de la solution réside autant dans les fonctionnalités délivrées que dans les choix de conception : contrôle backend des droits, protection des flux financiers, modularisation du domaine, contraintes explicites sur l'IA et prise en compte de la confidentialité dès l'implémentation.
 
@@ -797,6 +804,9 @@ Pour un mémoire de master, la structure ci-dessous est plus pertinente qu'une d
 | F07 | Le tuteur IA répond uniquement à partir du cours autorisé | Haute | Citations valides et accès limité à l'Apprenant inscrit |
 | F08 | Le concierge IA utilise uniquement l'information publique | Haute | Pas d'accès aux données métier privées; liens validés par serveur |
 | F09 | Les recommandations peuvent être mesurées avec consentement | Moyenne | Aucun événement Firebase avant consentement |
+| F10 | Les utilisateurs authentifiés recherchent selon leur rôle | Moyenne | Les groupes et liens retournés respectent les autorisations |
+| F11 | Les utilisateurs reçoivent et lisent leurs notifications | Haute | Liste, compteur non lu et actions de lecture restent cohérents entre Web et Mobile |
+| F12 | Le Mobile applique immédiatement le thème choisi | Moyenne | Tous les écrans et superpositions changent sans navigation forcée ni rafraîchissement manuel |
 
 ### C.2 Exigences non fonctionnelles à présenter
 
@@ -815,13 +825,15 @@ Pour un mémoire de master, la structure ci-dessous est plus pertinente qu'une d
 1. Page d'accueil et catalogue public.
 2. Fiche de formation et déclenchement du parcours d'inscription.
 3. Espace Apprenant : contenu, progression et documents.
-4. Tuteur IA : question, réponse et citations de leçons.
+4. Tuteur IA : question, réponse et citations de leçons/documents.
 5. Concierge IA : suggestions et liens vers les sources publiques.
 6. Espace Formateur : édition de formation et génération de questions IA en brouillon.
 7. Gestion de session et grille de présence.
 8. Espace Administrateur : tableau de bord, coûts et indicateurs.
 9. Bannière Analytics et vue DebugView — uniquement avec données de démonstration non sensibles.
 10. Swagger UI ou réponse `/api/health` illustrant l'état de l'API.
+11. Recherche et centre de notifications sur le Web et sur Mobile.
+12. Écrans mobiles Apprenant, Formateur et Admin en modes clair et sombre.
 
 Pour chaque figure : numéro, titre explicite, source (« réalisation personnelle »), légende et une phrase d'analyse dans le texte. Éviter les captures contenant des e-mails, clés, tokens ou données réelles identifiantes.
 
@@ -843,6 +855,10 @@ Pour chaque figure : numéro, titre explicite, source (« réalisation personnel
 | T08 | Concierge protégé | Question sur des données privées | Refus/orientation Contact sans fuite | Capture du widget |
 | T09 | Consentement Analytics | Acceptation puis navigation | `page_view` visible dans DebugView | Capture DebugView anonymisée |
 | T10 | Refus Analytics | Refus de bannière | Aucun événement Firebase envoyé | Capture/observation documentée |
+| T11 | Ressource de cours mobile | Fichier PDF, DOCX, PPTX, XLSX, TXT ou CSV | Upload autorisé puis texte utilisable par le tuteur et la génération d'évaluation | Capture du Formateur + réponse IA sourcée |
+| T12 | Notifications Web/Mobile | Notification métier non lue | Compteur mis à jour, entrée ouvrable et état lu persisté | Captures des deux clients + réponse API |
+| T13 | Recherche par rôle | Même requête avec plusieurs rôles | Résultats et destinations limités aux droits du compte | Captures + tests de service |
+| T14 | Thème mobile | Bascule clair/sombre depuis plusieurs écrans | Écran actif, drawer, modales et assistants changent immédiatement | Vidéo courte ou captures avant/après |
 
 ### D.2 Questions de discussion pour la soutenance
 

@@ -2,7 +2,7 @@
 
 # High Skills Academy
 
-> A web platform for discovering, delivering, managing, and validating professional training.
+> Web and native mobile clients for discovering, delivering, managing, and validating professional training.
 
 ![Node.js 24+](https://img.shields.io/badge/Node.js-24%2B-339933?logo=node.js&logoColor=white) ![TypeScript](https://img.shields.io/badge/TypeScript-6-3178C6?logo=typescript&logoColor=white) ![MongoDB](https://img.shields.io/badge/MongoDB-8-47A248?logo=mongodb&logoColor=white) ![Docker Compose](https://img.shields.io/badge/Docker%20Compose-local-2496ED?logo=docker&logoColor=white)
 
@@ -10,16 +10,16 @@ High Skills Academy is a French-language training platform with a public catalog
 
 ## Features
 
-| Area              | Current capabilities                                                                                                                  |
-| ----------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
-| Public website    | Published-training catalogue and details, available sessions, FAQ, contact form, registration and password recovery                   |
-| Identity          | Learner registration; authenticated Learner, Trainer, and Admin workspaces; profile and password management                           |
-| Training delivery | Categories, draft/published/archived training, ownership, modules, lessons, protected resources, online and in-person delivery        |
-| Learning          | Paid enrollment, lesson progress, sessions, attendance, evaluations, automatic grading, certificates, immutable satisfaction feedback |
-| Reporting         | Stripe test-mode checkout and webhook fulfillment, invoices, trainer/training costs, recommendations, dashboards                      |
-| AI                | Course tutor, public website concierge, and trainer-controlled Gemini draft-question generation                                       |
-| Mobile            | Expo/React Native Android client with role-aware navigation, protected content, push notifications, and mobile-specific API sessions  |
-| Measurement       | Optional consent-based Firebase Analytics for web and mobile page views and recommendations                                           |
+| Area              | Current capabilities                                                                                                                     |
+| ----------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| Public website    | Published-training catalogue and details, available sessions, FAQ, contact form, registration and password recovery                      |
+| Identity          | Learner registration; authenticated Learner, Trainer, and Admin workspaces; profile and password management                              |
+| Training delivery | Categories, draft/published/archived training, ownership, modules, lessons, protected resources, online and in-person delivery           |
+| Learning          | Paid enrollment, lesson progress, sessions, attendance, evaluations, automatic grading, certificates, immutable satisfaction feedback    |
+| Reporting         | Stripe test-mode checkout and webhook fulfillment, invoices, trainer/training costs, recommendations, dashboards                         |
+| AI                | Grounded course tutor using lesson and uploaded-document text, public concierge, and trainer-controlled Gemini question generation       |
+| Mobile            | Native Android client with role dashboards, search, notification centre/unread state, dark mode, protected files, AI and secure sessions |
+| Measurement       | Optional consent-based Firebase Analytics for web and mobile page views and recommendations                                              |
 
 ## Architecture
 
@@ -41,7 +41,7 @@ flowchart LR
   Init[mongodb-init] -->|initiates rs0| Mongo
 ```
 
-The browser calls `/api`; the API authorizes requests, owns access control and external-service credentials, and reads or writes MongoDB. Gemini and Stripe secret keys never reach the browser.
+The Web and Mobile clients call `/api`; the API authorizes requests, owns access control and external-service credentials, and reads or writes MongoDB. Gemini and Stripe secret keys never reach either client.
 
 | Layer          | Implementation                                                   |
 | -------------- | ---------------------------------------------------------------- |
@@ -84,6 +84,7 @@ Local `.env` files are ignored by Git. Create them from the committed templates:
 Copy-Item .env.example .env
 Copy-Item Web/backend/.env.example Web/backend/.env
 Copy-Item Web/frontend/.env.example Web/frontend/.env
+Copy-Item Mobile/.env.example Mobile/.env
 ```
 
 Edit them using the [environment reference](#environment-variables). Backend
@@ -178,20 +179,21 @@ values such as the internal MongoDB address and upload path.
 
 ### 8. Run the mobile client
 
-The mobile workspace is an Expo development-build project targeting Android. Install the workspace dependencies from the repository root, then create the mobile environment file:
+The mobile workspace is an Expo development-build project targeting Android. Install the workspace dependencies from the repository root, then create the mobile environment file if it was not created in step 2:
 
 ```powershell
 Copy-Item Mobile/.env.example Mobile/.env
 ```
 
-Set `EXPO_PUBLIC_API_BASE_URL` to an address reachable from the device. The default `http://10.0.2.2:3000/api` is for the Android emulator; a physical device must use the development computer's LAN address, for example `http://192.168.1.20:3000/api`. The API must be reachable through the selected network address.
+For the standard Android Studio AVD workflow, keep the default `EXPO_PUBLIC_API_BASE_URL=http://10.0.2.2:3000/api`; Android maps `10.0.2.2` to the host computer. Start the backend, open Android Studio, launch the existing virtual device from Device Manager, and wait for Android to finish booting.
 
-Start the Expo development server or build the native Android project:
+Then build, install, and launch the native Android application from the repository root:
 
 ```powershell
-npm run dev:mobile
 npm run android --workspace @plateforme-formations/mobile
 ```
+
+This is the normal native development-build command. It invokes `expo run:android` and uses the already running AVD; Android Studio, the AVD, SDK, and network settings do not need to be recreated or modified.
 
 The native Firebase integrations require a registered Android Firebase app whose application ID is `com.highskillsacademy.formations`. Set `GOOGLE_SERVICES_JSON` in `Mobile/.env` to the local `google-services.json` path. For iOS builds, provide `GOOGLE_SERVICE_INFO_PLIST` and use the matching iOS Firebase app. These release-environment inputs are not server service-account credentials.
 
@@ -376,7 +378,7 @@ The mobile client uses `@react-native-firebase/analytics` and follows the same c
 
 FCM is an authenticated device-registration service shared by the web backend and the Android client. The mobile client obtains an FCM registration token with `@react-native-firebase/messaging`, registers it with `POST /api/notifications/devices`, and refreshes it when Firebase rotates the token. The backend stores tokens in the `notification_devices` collection, associates them with the authenticated user, and exposes the administrator-only `POST /api/notifications/send` operation. Invalid or unregistered tokens are removed after delivery failures.
 
-On Android, `expo-notifications` displays foreground messages and creates the `hsa-default` notification channel. Notification responses and messages that open the app are translated into controlled destinations such as `Catalogue`, `TrainingDetail`, `SessionDetail`, `Purchases`, and `Certificates`; unknown destinations are ignored. Logout calls `DELETE /api/notifications/devices` before terminating the mobile session. FCM is disabled by default and remains optional for authentication and normal application use.
+On Android, `expo-notifications` displays foreground messages and creates the `hsa-default` notification channel. The authenticated notification centre lists server notifications, preserves unread state, supports individual/all-read actions, refreshes on foreground and every 30 seconds, and exposes controlled links to supported native screens. Unknown destinations are ignored. Logout calls `DELETE /api/notifications/devices` before terminating the mobile session. FCM is disabled by default and remains optional for authentication and normal application use.
 
 ## AI features
 
@@ -388,7 +390,7 @@ The **Tuteur IA de la formation** appears for an enrolled learner in `/app/conte
 
 - `POST /api/trainings/:id/tutor/messages` requires an authenticated Learner, changed password, and training enrollment.
 - The backend ranks active, non-archived course lessons and retrieves no more than **five** relevant excerpts. A selected current lesson is boosted.
-- Gemini receives only the learner message, up to **eight** recent conversation messages, and retrieved lesson text—not identity, payment, progress, certificate, evaluation, or other account data.
+- Gemini receives only the learner message, up to **eight** recent conversation messages, and retrieved text from authorized lessons plus visible uploaded PDF, DOCX, PPTX, XLSX, TXT, or CSV resources—not identity, payment, progress, certificate, evaluation, or other account data.
 - Context is capped at the smaller of `AI_MAX_CONTEXT_CHARS` and **24,000 characters**. Messages/conversation entries are capped at 2,000 characters.
 - A supported answer must cite supplied lesson IDs. Unauthorized, fabricated, or inconsistent citations are rejected. If sources are insufficient, Gemini is instructed to return an ungrounded answer with no citations.
 - Chat history is held in the current browser UI; it is not stored by the tutor service. The in-memory IP limiter permits **30 requests per 15 minutes**.
@@ -411,7 +413,7 @@ It is a public website concierge—not a course tutor. It explains the platform,
 
 ### Trainer AI question generation
 
-Trainers can create draft objective questions through `POST /api/evaluations/:id/generate-ai`. The backend builds a bounded training-only context from active modules, lessons, and extractable local PDF, DOCX, PPTX, or TXT resources. Gemini returns schema-constrained questions that are validated and imported as drafts; the trainer must review, edit, and explicitly publish. AI cannot publish an evaluation or designate it certifying. This flow uses `AI_MAX_CONTEXT_CHARS`, `AI_MODEL`, and an 8,192-token output cap; it does not crawl URLs or use OCR.
+Trainers can create draft objective questions through `POST /api/evaluations/:id/generate-ai`. The backend builds a bounded training-only context from active modules, lessons, and extractable local PDF, DOCX, PPTX, XLSX, TXT, or CSV resources. Gemini returns schema-constrained questions that are validated and imported as drafts; the trainer must review, edit, and explicitly publish. AI cannot publish an evaluation or designate it certifying. This flow uses `AI_MAX_CONTEXT_CHARS`, `AI_MODEL`, and an 8,192-token output cap; it does not crawl URLs or use OCR.
 
 ## External services
 
@@ -475,8 +477,9 @@ The repository also has a development demonstration-data seed that deliberately 
 │   ├── src/
 │   │   ├── app/                   # Navigation, linking, and notification routing
 │   │   ├── core/                  # API, authentication, Analytics, FCM, storage
-│   │   ├── features/              # Mobile workspaces and feature screens
-│   │   └── shared/                # Reusable components, theme, and utilities
+│   │   ├── features/              # Role workspaces, search, notifications, learning and management
+│   │   └── shared/                # Reusable components, persisted adaptive theme and utilities
+│   ├── plugins/                   # Expo config plugin for native Android theme resources
 │   ├── android/                   # Generated/native Android project
 │   ├── .env.example               # Mobile public configuration template
 │   └── app.config.js              # Conditional native Firebase file configuration

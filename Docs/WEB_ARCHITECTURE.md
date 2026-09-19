@@ -10,6 +10,7 @@ Le projet Web est la plateforme principale de **High Skills Academy**. Il réuni
 - une API REST commune au Web et au Mobile ;
 - la gestion du catalogue, des contenus, sessions, paiements, inscriptions, progressions, présences, évaluations, certificats, factures, feedbacks, coûts et tableaux de bord ;
 - trois fonctions Gemini distinctes : tuteur pédagogique, concierge public et génération de questions ;
+- une recherche authentifiée et filtrée selon le rôle, ainsi qu'un centre de notifications persistées avec état non lu ;
 - Firebase Analytics facultatif côté navigateur et Firebase Cloud Messaging côté API pour le client mobile.
 
 ## Architecture globale et choix architecturaux
@@ -103,9 +104,10 @@ Tous les chemins ci-dessous sont relatifs à `Web/backend/src/modules`.
 | `certificates` / `invoices` | snapshots métier, génération PDF à la demande et téléchargement protégé ; un certificat par inscription et une facture par paiement                                                                  |
 | `feedback`                  | note immuable de 1 à 5 après éligibilité et agrégats de satisfaction                                                                                                                                 |
 | `costs` / `dashboard`       | coûts formateurs et formations ; agrégats administrateur sur périodes `Africa/Tunis` ; recommandations déterministes par historique de catégorie et popularité                                       |
-| `tutor`                     | sélection de leçons et réponse Gemini fondée avec citations vérifiées                                                                                                                                |
+| `tutor`                     | retrieval sur leçons et documents visibles extractibles, réponse Gemini fondée et citations vérifiées                                                                                               |
 | `public-concierge`          | contexte limité aux pages publiques et formations publiées, réponses/liens contrôlés                                                                                                                 |
-| `notifications`             | enregistrement des appareils Android et envoi FCM réservé à l'Administrateur                                                                                                                         |
+| `search`                    | recherche transversale par rôle sur formations, cours, sessions, utilisateurs, évaluations, paiements et certificats                                                                                |
+| `notifications`             | notifications en application, compteur non lu, lecture, flux SSE, appareils Android et envoi FCM                                                                                                    |
 | `contact`                   | validation, protection anti-abus et envoi vers une adresse fixe via le service email                                                                                                                 |
 
 Les adaptateurs importants se trouvent dans `src/infrastructure` : `StripeSdkCheckoutGateway`, `LocalFileStorage`, `ProtectedDocumentStorage`, générateurs PDF, service email transactionnel avec fournisseur SMTP configurable, connexion/index MongoDB, middleware d'erreurs et document OpenAPI.
@@ -120,13 +122,15 @@ Les adaptateurs importants se trouvent dans `src/infrastructure` : `StripeSdkChe
 | `src/core/auth/*`                       | `AuthProvider`, `AuthContext`, hook `useAuth`, refresh unique partagé et nouvelle tentative après 401                   |
 | `src/core/api/client.ts`                | `apiRequest`, `apiDownload`, `ApiError`, ajout Bearer/cookie et localisation des erreurs                                |
 | `src/core/analytics/*`                  | consentement, vues de page et mesure du tunnel de recommandation                                                        |
+| `src/shared/theme.ts`                   | préférence claire/sombre persistée, initialisée avant le rendu pour éviter le flash de thème                            |
 | `src/features/trainings`                | catalogue/fiches, achat, catégories et gestion des formations                                                           |
 | `src/features/content`                  | consultation/édition du contenu, téléchargements, progression et `TutorChat`                                            |
 | `src/features/sessions`, `attendance`   | sessions/planning et saisie/consultation des présences                                                                  |
 | `src/features/evaluations`              | création, questions manuelles/IA, tentatives, correction et résultats                                                   |
 | `src/features/payments`, `certificates` | statut de paiement, factures, certificats et feedback                                                                   |
 | `src/features/dashboard`                | tableaux de bord par rôle et indicateurs administrateur                                                                 |
-| `src/features/public`                   | accueil, à propos, FAQ, contact et `PublicConcierge`; celui-ci reste monté sur les pages publiques même après connexion |
+| `src/features/notifications`            | recherche d'en-tête, cloche temps réel, centre paginé et actions de lecture                                             |
+| `src/features/public`                   | accueil, à propos, FAQ, contact et `PublicConcierge` réservé au layout public                                            |
 | `src/shared/components`                 | avatar, menu utilisateur, pagination, sélection, icônes, titre et gestion du défilement                                 |
 
 Les pages utilisent principalement `useState`, `useEffect`, `useCallback` et `useMemo`. Il n'existe pas de couche de cache serveur côté client ni de store Redux ; un changement de page relance généralement ses requêtes.
@@ -148,7 +152,7 @@ Les pages utilisent principalement `useState`, `useEffect`, `useCallback` et `us
 | Offre/contenu      | `/trainings/*`, `/modules/*`, `/lessons/*`, `/resources/*`, `/sessions/*`, `/schedules/*`                                |
 | Apprentissage      | `/progress`, `/attendance`, `/evaluations`, `/attempts`, `/trainings/:id/tutor/messages`                                 |
 | Commerce/documents | `/payments/checkout`, `/payments`, `/enrollments`, `/invoices`, `/certificates`, `/feedback`                             |
-| Pilotage           | `/costs/*`, `/dashboard/*`, `/notifications/*`                                                                           |
+| Pilotage           | `/costs/*`, `/dashboard/*`, `/search`, `/notifications/*`                                                                |
 
 Le contrat complet est codé dans `Web/backend/src/infrastructure/openapi/document.ts` et servi sur `/api/openapi.json` et `/api/docs`.
 
@@ -176,7 +180,7 @@ MongoDB contient les collections suivantes, initialisées par `initializeDatabas
 | Présentiel        | `training_sessions`, `session_schedules`, `attendances`                                               |
 | Commerce          | `payments`, `enrollments`, `invoices`, `invoice_items`                                                |
 | Pédagogie         | `lesson_progress`, `evaluations`, `evaluation_questions`, `evaluation_attempts`, `evaluation_answers` |
-| Sorties/pilotage  | `certificates`, `feedback`, `trainer_costs`, `training_costs`, `notification_devices`                 |
+| Sorties/pilotage  | `certificates`, `feedback`, `trainer_costs`, `training_costs`, `notifications`, `notification_devices` |
 
 Relations structurantes : `Training` référence sa catégorie et son Formateur propriétaire ; le contenu et les sessions référencent la formation ; `Enrollment` relie Apprenant, formation/session et paiement ; progression, présence et tentative sont rattachées à l'inscription ; facture et certificat stockent des snapshots pour préserver l'historique.
 
@@ -220,9 +224,13 @@ Le traitement est idempotent si le paiement est déjà `PAID`. Les index et la t
 
 | Fonction  | Public/source                                                                                                  | Garde-fous concrets                                                                                                                                   |
 | --------- | -------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Tuteur    | Apprenant inscrit ; au plus 5 leçons actives pertinentes                                                       | contexte ≤ min(`AI_MAX_CONTEXT_CHARS`, 24 000), 8 messages, schéma Zod, citations limitées aux IDs fournis, pas de stockage du chat, rate limit       |
+| Tuteur    | Apprenant inscrit ; au plus 5 leçons actives pertinentes enrichies des ressources visibles PDF/DOCX/PPTX/XLSX/TXT/CSV | contexte ≤ min(`AI_MAX_CONTEXT_CHARS`, 24 000), 8 messages, extraction tolérante aux fichiers endommagés, schéma Zod, citations limitées aux IDs fournis, pas de stockage du chat, rate limit |
 | Concierge | Anonyme ; pages publiques + champs sélectionnés de 100 formations `PUBLISHED` max.                             | 8 sources/12 000 caractères, 4 messages, liens résolus côté serveur, prompt anti-injection, honeypot, rate limit, aucune collection privée interrogée |
-| Questions | Formateur propriétaire d'une évaluation `DRAFT` ; contenu de sa formation et fichiers PDF/DOCX/PPTX/TXT locaux | contexte borné, JSON structuré et revalidé, nombre/type exacts, import en brouillon ; publication et désignation restent manuelles                    |
+| Questions | Formateur propriétaire d'une évaluation `DRAFT` ; contenu et fichiers PDF/DOCX/PPTX/XLSX/TXT/CSV locaux       | contexte borné, JSON structuré et revalidé, nombre/type exacts, import en brouillon ; publication et désignation restent manuelles                    |
+
+### Recherche et notifications Web
+
+`HeaderSearch` attend au moins deux caractères, temporise les appels et demande `/search` avec une limite par groupe. Le backend adapte les types de résultats au rôle et fournit des liens internes. `NotificationBell` charge le compteur et les éléments récents, se resynchronise toutes les 30 secondes et au retour de l'onglet, puis reçoit les créations via `/notifications/stream` en Server-Sent Events. La page `/app/notifications` conserve la pagination et les actions de lecture individuelles ou globales. Les événements métier (paiement, progression, sessions et autres changements importants) créent les notifications côté serveur ; FCM complète ce mécanisme pour Android sans constituer la source de vérité de l'état lu/non lu.
 
 ### Firebase Analytics Web
 

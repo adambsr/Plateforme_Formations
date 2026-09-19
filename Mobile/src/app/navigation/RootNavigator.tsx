@@ -1,4 +1,6 @@
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
+import type { PropsWithChildren, ReactNode } from 'react';
+import { View } from 'react-native';
 
 import { useAuth } from '../../core/auth/AuthContext';
 import {
@@ -84,6 +86,20 @@ const GuestStack = createNativeStackNavigator<GuestStackParamList>();
 const AppStack = createNativeStackNavigator<AppStackParamList>();
 const PasswordStack = createNativeStackNavigator<PasswordStackParamList>();
 
+function ThemeScreenBoundary({ children }: PropsWithChildren) {
+  const { theme } = useAppTheme();
+  const palette = theme === 'dark' ? darkPalette : lightPalette;
+  return (
+    <View key={theme} style={{ flex: 1, backgroundColor: palette.canvas }}>
+      {children}
+    </View>
+  );
+}
+
+function themedScreenLayout({ children }: { children: ReactNode }) {
+  return <ThemeScreenBoundary>{children}</ThemeScreenBoundary>;
+}
+
 function ForbiddenAppRoute() {
   return (
     <SystemStatusView
@@ -126,6 +142,7 @@ export function RootNavigator() {
       <>
         <GuestStack.Navigator
           initialRouteName="Home"
+          screenLayout={themedScreenLayout}
           screenOptions={screenOptions}
         >
           <GuestStack.Screen
@@ -199,7 +216,10 @@ export function RootNavigator() {
   }
   if (user.mustChangePassword) {
     return (
-      <PasswordStack.Navigator screenOptions={{ headerShown: false }}>
+      <PasswordStack.Navigator
+        screenLayout={themedScreenLayout}
+        screenOptions={{ headerShown: false }}
+      >
         <PasswordStack.Screen
           name="ChangePassword"
           component={ChangePasswordScreen}
@@ -212,6 +232,7 @@ export function RootNavigator() {
       <DrawerProvider>
         <AppStack.Navigator
           initialRouteName="Workspace"
+          screenLayout={themedScreenLayout}
           screenOptions={appScreenOptions}
         >
           <AppStack.Screen
@@ -391,8 +412,11 @@ export function RootNavigator() {
             options={{ headerShown: false }}
           />
         </AppStack.Navigator>
-        <AuthenticatedDrawer />
-        <NotificationPreferences autoPrompt />
+        <AuthenticatedDrawer key={`drawer-${theme}`} />
+        <NotificationPreferences
+          key={`notification-prompt-${theme}`}
+          autoPrompt
+        />
       </DrawerProvider>
     </>
   );

@@ -47,8 +47,8 @@ function ThemedApp() {
         <MobileErrorBoundary>
           <NotificationProvider>
             <RootNavigator />
-            <PublicConcierge />
-            <AnalyticsConsentBanner />
+            <PublicConcierge key={`concierge-${theme}`} />
+            <AnalyticsConsentBanner key={`analytics-${theme}`} />
           </NotificationProvider>
         </MobileErrorBoundary>
       </NavigationContainer>

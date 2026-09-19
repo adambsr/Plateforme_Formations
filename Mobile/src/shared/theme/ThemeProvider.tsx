@@ -31,6 +31,7 @@ function applyTheme(theme: AppTheme) {
 
 export function ThemeProvider({ children }: React.PropsWithChildren) {
   const [theme, setThemeState] = useState<AppTheme>('light');
+  const [ready, setReady] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -38,10 +39,17 @@ export function ThemeProvider({ children }: React.PropsWithChildren) {
       .then((stored) => {
         if (!active) return;
         const savedTheme: AppTheme = stored === 'dark' ? 'dark' : 'light';
-        setThemeState(savedTheme);
         applyTheme(savedTheme);
+        setThemeState(savedTheme);
       })
-      .catch(() => undefined);
+      .catch(() => {
+        if (!active) return;
+        applyTheme('light');
+        setThemeState('light');
+      })
+      .finally(() => {
+        if (active) setReady(true);
+      });
     return () => {
       active = false;
     };
@@ -63,7 +71,9 @@ export function ThemeProvider({ children }: React.PropsWithChildren) {
   );
 
   return (
-    <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>
+    <ThemeContext.Provider value={value}>
+      {ready ? children : null}
+    </ThemeContext.Provider>
   );
 }
 

@@ -6,7 +6,7 @@
 
 Le projet Mobile est le client natif Expo/React Native de **High Skills Academy**. Il transpose sur téléphone les parcours public, Apprenant, Formateur et Administrateur : catalogue, authentification, achat Stripe, contenus, progression, sessions, présence, évaluations, certificats, gestion et tableaux de bord.
 
-Ses adaptations natives vérifiables sont le stockage sécurisé du refresh token, les liens profonds, la sélection et le partage de fichiers, Firebase Analytics avec consentement et les notifications Android via FCM. Toute règle métier et toute donnée durable restent dans l'API Web.
+Ses adaptations natives vérifiables sont le stockage sécurisé du refresh token et du thème, les liens profonds, la sélection et le partage de fichiers, les tableaux de bord et la navigation par rôle, la recherche, le centre de notifications, Firebase Analytics avec consentement et les notifications Android via FCM. Toute règle métier et toute donnée durable restent dans l'API Web.
 
 ## Architecture globale et choix architecturaux
 
@@ -14,16 +14,17 @@ Ses adaptations natives vérifiables sont le stockage sécurisé du refresh toke
 index.ts
   → App
     → SafeAreaProvider
-      → AuthProvider
-        → NavigationContainer + deep links
-          → NotificationProvider
-            → RootNavigator
-              ├─ pile invité
-              ├─ pile mot de passe obligatoire
-              └─ pile authentifiée + drawer par rôle
+      → ThemeProvider (thème persistant appliqué avant le rendu)
+        → AuthProvider
+          → NavigationContainer + deep links
+            → NotificationProvider
+              → RootNavigator
+                ├─ pile invité
+                ├─ pile mot de passe obligatoire
+                └─ pile authentifiée + drawer groupé par rôle
 
 Écrans/features → useAuth().request/download → API REST Web
-Stockage local   → Expo SecureStore (refresh, consentements, attribution)
+Stockage local   → Expo SecureStore (refresh, thème, consentements, attribution)
 Services natifs  → Firebase Analytics/FCM, Expo Notifications, fichiers/partage
 ```
 
@@ -40,7 +41,7 @@ Mobile/
 ├── app.config.js                    # injecte conditionnellement les fichiers Firebase natifs
 ├── firebase.json                    # désactive collecte/écrans/auto-init par défaut
 ├── src/
-│   ├── app/App.tsx                  # providers, navigation, Analytics, concierge
+│   ├── app/App.tsx                  # thème, session, navigation, Analytics, concierge
 │   ├── app/navigation/              # stacks, types, linking, drawer, navigation FCM
 │   ├── core/api/                    # client HTTP et erreurs
 │   ├── core/auth/                   # Context, Provider, rotation de session
@@ -51,6 +52,7 @@ Mobile/
 │   ├── core/config/                 # validation de l'URL API et du scheme
 │   ├── features/                    # écrans regroupés par domaine
 │   └── shared/                      # composants, thème et formats date/pourcentage
+├── plugins/with-hsa-theme.js        # ressources Android light/dark générées par Expo
 ├── tests/                           # Jest/Testing Library, API, auth, navigation et flux
 └── android/                         # projet natif généré, Gradle, manifeste et ressources
 ```
@@ -86,6 +88,7 @@ Les répertoires `.expo`, `dist`, `node_modules` et `android` sont générés/ig
 | `src/core/auth/mobile-session.ts`               | échange le refresh token contre une nouvelle session et persiste le remplaçant                   |
 | `src/core/storage/refresh-token-store.ts`       | adaptateur `secureRefreshTokenStore` sur Expo SecureStore                                        |
 | `src/core/config/environment.ts`                | construit `appConfig` et valide URL HTTP(S), nom du centre et URI scheme                         |
+| `src/shared/theme/ThemeProvider.tsx`             | hydrate, applique et persiste le mode clair/sombre avant de monter les écrans                    |
 
 ### Fonctionnalités
 
@@ -101,7 +104,8 @@ Les répertoires `.expo`, `dist`, `node_modules` et `android` sont générés/ig
 | `features/payments`     | retour Checkout avec polling, historique, factures téléchargées                                 |
 | `features/certificates` | éligibilité, génération idempotente, téléchargement, feedback et statistiques Admin             |
 | `features/admin`        | utilisateurs, catégories, coûts et six agrégats de tableau de bord                              |
-| `features/workspace`    | accueil par rôle, résumé, drawer, profil et paramètres                                          |
+| `features/notifications`| recherche globale et centre de notifications avec état lu/non lu                                |
+| `features/workspace`    | accueil par rôle, résumé, drawer groupé, profil et paramètres                                   |
 
 ### Éléments natifs et partagés
 
@@ -109,7 +113,9 @@ Les répertoires `.expo`, `dist`, `node_modules` et `android` sont générés/ig
 - `core/analytics/firebase.ts` et `recommendation-analytics.ts` gèrent consentement, vues d'écran et attribution des recommandations.
 - `core/files/download.ts` enregistre via Storage Access Framework sur Android ; ailleurs il ouvre le partage. `share.ts` encapsule Expo Sharing.
 - `shared/components` fournit `Button`, `TextField`, `StatePanel`, `Notice`, `ProgressBar`, `Brand` et le bouton de retour en haut.
-- `shared/theme/tokens.ts` centralise couleurs, espacements et rayons ; `shared/utils/format.ts` affiche dates en `Africa/Tunis` et pourcentages.
+- `shared/theme/tokens.ts` fournit des couleurs Android natives adaptatives et les palettes explicites. `ThemeProvider` restaure `hsa-theme` avant le rendu, applique `Appearance.setColorScheme`, et `RootNavigator` remonte la sous-arborescence visible lors d'un changement pour que tous les styles natifs se mettent à jour immédiatement sans perdre l'état de navigation.
+- Le drawer présente l'identité et le rôle, regroupe les liens en `ESPACE`, `APPRENTISSAGE`/`GESTION` et `ADMINISTRATION`, affiche le badge non lu, puis fixe `Mon profil`, `Paramètres` et `Se déconnecter` dans la zone de compte inférieure.
+- `shared/utils/format.ts` affiche dates en `Africa/Tunis` et pourcentages.
 
 ## Flux de données et interactions API
 
@@ -131,9 +137,10 @@ Les requêtes publiques (`catalogue`, sessions publiques, contact, concierge, ou
 | Contenu/progression/IA  | `/trainings/:id/content`, `/modules`, `/lessons`, `/resources`, `/progress`, `/trainings/:id/tutor/messages`        |
 | Sessions/présence       | `/sessions`, `/session-trainers`, `/schedules`, `/attendance`                                                       |
 | Achat                   | `/payments/checkout`, `/payments`, `/enrollments`, `/invoices`                                                      |
-| Évaluations/certificats | `/evaluations`, `/questions`, `/attempts`, `/certificates`, `/feedback`                                             |
+| Évaluations/certificats | `/evaluations`, `/evaluations/:id/generate-ai`, `/questions`, `/attempts`, `/certificates`, `/feedback`             |
 | Administration          | `/users`, `/learners`, `/trainers`, `/costs`, `/dashboard`                                                          |
-| Public/notifications    | `/contact`, `/public/concierge/messages`, `/notifications/devices`                                                  |
+| Recherche/notifications | `/search`, `/notifications`, `/notifications/unread-count`, `/notifications/read-all`, `/notifications/:id/read`   |
+| Public/push             | `/contact`, `/public/concierge/messages`, `/notifications/devices`                                                  |
 
 Les interfaces de `features/*/types.ts` décrivent les réponses attendues, mais elles sont maintenues manuellement et ne sont pas générées depuis l'OpenAPI du backend.
 
@@ -154,7 +161,7 @@ Le Mobile n'a **aucune base de données métier locale**. Les formations, utilis
 
 | Stockage          | Données réellement conservées                                                                                                             |
 | ----------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
-| SecureStore       | refresh token, consentement Analytics, attribution de recommandation, choix de notification, indicateur de prompt déjà affiché, token FCM |
+| SecureStore       | refresh token, thème `hsa-theme`, consentement Analytics, attribution de recommandation, choix de notification, indicateur de prompt déjà affiché, token FCM |
 | Mémoire React     | access token, utilisateur courant, listes/détails et historiques de chat de la session UI                                                 |
 | Cache de fichiers | téléchargements authentifiés temporaires avant sauvegarde/partage                                                                         |
 | Firebase SDK      | collecte Analytics uniquement après consentement ; token d'installation pour FCM lorsque les notifications sont activées                  |
@@ -198,34 +205,36 @@ Lancement → lecture du refresh token SecureStore
 ### Contenu, progression et documents
 
 - `ContentScreen` charge le contenu autorisé ; les Apprenants marquent les leçons, tandis que `ContentManagementPanel` permet au propriétaire/Admin de gérer modules, leçons et ressources.
+- Le sélecteur natif accepte les formats backend actuels : PDF, DOCX, PPTX, XLSX, TXT, CSV, ZIP et images. Le formulaire multipart réutilise les routes `/lessons/:id/resources`; aucun traitement documentaire métier n'est dupliqué sur le téléphone.
 - Un lien externe est ouvert par `Linking`; un fichier protégé est téléchargé avec Bearer, puis sauvegardé ou partagé nativement.
 - Factures et certificats suivent le même téléchargement protégé.
 - Les écrans n'évaluent pas localement l'éligibilité, les scores ou les présences : ils affichent les calculs retournés par l'API.
 
 ### Assistants IA
 
-- `TutorChat` envoie mode, message, leçon privilégiée et au plus huit éléments récents ; timeout client de 35 s. L'accès, le retrieval et les citations sont contrôlés par le backend.
+- `TutorChat` envoie mode, message, leçon privilégiée et au plus huit éléments récents ; timeout client de 35 s. Le backend extrait et classe le texte des leçons et des ressources visibles PDF, DOCX, PPTX, XLSX, TXT et CSV, ignore un document endommagé sans rendre le tuteur indisponible, puis vérifie le grounding et les citations avant de renvoyer la réponse et ses sources.
 - `PublicConcierge` n'est rendu que lorsque `status === 'guest'`. Il envoie au plus quatre messages récents, mais fixe actuellement `currentPath: '/'` quelle que soit la page mobile.
-- L'écran Évaluations permet au Formateur de demander des questions IA, puis de les relire/éditer avant publication. Le modèle n'est jamais appelé directement depuis le téléphone.
+- L'écran Évaluations permet au Formateur de demander des questions IA depuis le même contexte de cours et de documents extractibles, puis de les relire/éditer avant publication. Les états de chargement, erreurs et repli backend sont affichés ; le modèle n'est jamais appelé directement depuis le téléphone.
 
 ### Analytics et notifications
 
 - Analytics : si l'interrupteur est actif, un modal demande `granted/denied`. La décision SecureStore commande `setAnalyticsCollectionEnabled`. Les événements manuels sont `screen_view` et les trois événements de recommandation avec ID, catégorie et rang ; aucun événement n'est envoyé avant accord.
-- Notifications : après choix explicite, Android 13+ demande `POST_NOTIFICATIONS`, FCM fournit un token enregistré avec l'utilisateur. Les messages foreground sont reproduits via Expo Notifications ; une ouverture accepte uniquement `Catalogue`, `TrainingDetail`, `SessionDetail`, `Purchases` ou `Certificates`.
+- Notifications : après choix explicite, Android 13+ demande `POST_NOTIFICATIONS`, FCM fournit un token enregistré avec l'utilisateur. Le centre natif charge les notifications persistées, permet de marquer une ou toutes les entrées comme lues et synchronise le badge au démarrage, toutes les 30 secondes, au retour au premier plan et à la réception FCM. Les liens backend sont convertis vers une liste contrôlée de routes natives ; les destinations inconnues sont ignorées. Contrairement au Web, le Mobile utilise ce rafraîchissement et FCM plutôt qu'un flux SSE permanent.
+- Recherche : un écran authentifié appelle `/search` après au moins deux caractères, présente les groupes autorisés au rôle et traduit les liens du backend vers la navigation native.
 
 ## Points d'entrée, développement, build et déploiement
 
 - Entrée : `index.ts` appelle `registerRootComponent(App)`.
-- Développement : `npm run dev:mobile` à la racine ou `npm start` dans le workspace lance Metro/Expo ; `npm run android --workspace @plateforme-formations/mobile` exécute `expo run:android`.
+- Développement Android standard : démarrer l'API, lancer l'AVD existant dans Android Studio, attendre son démarrage, puis exécuter `npm run android --workspace @plateforme-formations/mobile` à la racine. La commande `expo run:android` construit, installe et ouvre le client natif sur cet AVD.
 - Contrôles : `npm run lint`, `typecheck` et `test` dans le workspace. La CI racine les exécute via `npm run check`.
-- Build natif : le dossier Android généré utilise Hermes et `newArchEnabled=true`. Le plugin Google Services est appliqué.
+- Build natif : le dossier Android généré utilise Hermes et `newArchEnabled=true`. Les plugins Google Services et `with-hsa-theme` sont appliqués ; ce dernier régénère les ressources Android `values`/`values-night` afin que `PlatformColor` suive le mode courant.
 - Limite de livraison : il n'existe ni `eas.json`, ni pipeline de publication, ni commande `build` mobile dans `package.json`. La variante `release` Gradle utilise encore la configuration de signature **debug** ; elle n'est donc pas prête pour une distribution de production. Le build racine construit uniquement le backend et le frontend.
 - Le parcours de paiement dépend encore du backend Stripe en mode test : l'API n'accepte actuellement que des clés `sk_test_`.
 
 ## Patterns, conventions et dépendances
 
 - **Feature-first** : écran et types proches, noyau transversal sous `core`.
-- **Provider/Context** : session et drawer ; hook `useAuth` comme façade pour API, refresh et fichiers.
+- **Provider/Context** : thème, session, notifications et drawer ; hook `useAuth` comme façade pour API, refresh et fichiers.
 - **Adapter** : `ApiClient`, `RefreshTokenStore`, utilitaires fichiers/Firebase isolent les APIs externes.
 - **Navigation déclarative typée** : trois stacks, paramètres TypeScript, deep links et `navigationRef` pour FCM.
 - **Server-authoritative** : le client ne calcule ni rôle effectif, ni paiement, ni progression, ni score, ni éligibilité.
@@ -237,7 +246,7 @@ Lancement → lecture du refresh token SecureStore
 2. Étudier `core/auth/AuthProvider.tsx`, `mobile-session.ts` et `core/api/client.ts` pour comprendre toutes les communications.
 3. Choisir ensuite un dossier `features` et suivre ses appels `/api` vers le backend ; les fichiers `types.ts` donnent la forme attendue.
 4. Pour les contraintes natives, lire `app.json`, `app.config.js`, `firebase.json`, puis les modules `core/notifications`, `core/analytics` et `core/files`.
-5. Utiliser les tests `mobile-session`, `checkout-return`, `workspace-navigation` et `phase13-feature-flows` comme exemples compacts des scénarios critiques.
+5. Utiliser les tests `mobile-session`, `checkout-return`, `workspace-navigation`, `theme-provider`, `latest-web-parity` et `phase13-feature-flows` comme exemples compacts des scénarios critiques.
 
 ## Questions de discussion pour la soutenance
 

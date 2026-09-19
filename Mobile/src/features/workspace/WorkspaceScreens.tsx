@@ -26,6 +26,7 @@ import {
   UsersRound,
   WalletCards,
   X,
+  type LucideIcon,
 } from 'lucide-react-native';
 import {
   SafeAreaView,
@@ -54,6 +55,27 @@ function displayName(profile: { firstName?: string; lastName?: string }) {
     'Votre espace'
   );
 }
+
+function profileInitials(profile: { firstName?: string; lastName?: string }) {
+  const initials = [profile.firstName, profile.lastName]
+    .filter(Boolean)
+    .map((part) => part?.trim().charAt(0).toUpperCase())
+    .join('');
+  return initials || 'HSA';
+}
+
+function roleLabel(role: 'LEARNER' | 'TRAINER' | 'ADMIN') {
+  if (role === 'ADMIN') return 'Administrateur';
+  if (role === 'TRAINER') return 'Formateur';
+  return 'Apprenant';
+}
+
+type DrawerEntry = {
+  label: string;
+  Icon: LucideIcon;
+  route: keyof AppStackParamList;
+  badge?: number;
+};
 
 export function WorkspaceScreen({
   navigation,
@@ -134,6 +156,7 @@ export function WorkspaceScreen({
 export function AuthenticatedDrawer() {
   const { user, logout } = useAuth();
   const { isOpen, closeDrawer } = useDrawer();
+  const { unread } = useNotifications();
   const insets = useSafeAreaInsets();
   const drawerX = useState(() => new Animated.Value(-320))[0];
   useEffect(() => {
@@ -147,9 +170,17 @@ export function AuthenticatedDrawer() {
   }, [drawerX, isOpen]);
   if (user === null || !isOpen) return null;
   const currentRoute = navigationRef.getCurrentRoute()?.name;
-  const items = [
-    { label: 'Tableau de bord', Icon: Home, route: 'Workspace' as const },
-    { label: 'Catalogue', Icon: BookOpen, route: 'Catalogue' as const },
+  const workspaceItems: DrawerEntry[] = [
+    { label: 'Tableau de bord', Icon: Home, route: 'Workspace' },
+    { label: 'Catalogue', Icon: BookOpen, route: 'Catalogue' },
+    {
+      label: 'Notifications',
+      Icon: Bell,
+      route: 'Notifications',
+      badge: unread,
+    },
+  ];
+  const activityItems: DrawerEntry[] = [
     ...(user.role === 'LEARNER'
       ? [
           {
@@ -173,42 +204,42 @@ export function AuthenticatedDrawer() {
     {
       label: user.role === 'LEARNER' ? 'Mon planning' : 'Sessions',
       Icon: CalendarDays,
-      route: 'Sessions' as const,
+      route: 'Sessions',
     },
     {
       label: user.role === 'LEARNER' ? 'Mes présences' : 'Présences',
       Icon: ClipboardCheck,
-      route: 'Attendance' as const,
+      route: 'Attendance',
     },
-    {
-      label: 'Évaluations',
-      Icon: ClipboardCheck,
-      route: 'Evaluations' as const,
-    },
-    { label: 'Certificats', Icon: BadgeCheck, route: 'Certificates' as const },
-    ...(user.role === 'ADMIN'
+    { label: 'Évaluations', Icon: ClipboardCheck, route: 'Evaluations' },
+    { label: 'Certificats', Icon: BadgeCheck, route: 'Certificates' },
+  ];
+  const adminItems: DrawerEntry[] =
+    user.role === 'ADMIN'
       ? [
           {
             label: 'Indicateurs',
             Icon: ChartNoAxesCombined,
-            route: 'AdminDashboard' as const,
+            route: 'AdminDashboard',
           },
-          {
-            label: 'Utilisateurs',
-            Icon: UsersRound,
-            route: 'AdminUsers' as const,
-          },
-          { label: 'Coûts', Icon: WalletCards, route: 'AdminCosts' as const },
-          {
-            label: 'Catégories',
-            Icon: Settings,
-            route: 'AdminCategories' as const,
-          },
+          { label: 'Utilisateurs', Icon: UsersRound, route: 'AdminUsers' },
+          { label: 'Coûts', Icon: WalletCards, route: 'AdminCosts' },
+          { label: 'Catégories', Icon: Settings, route: 'AdminCategories' },
         ]
+      : [];
+  const sections = [
+    { label: 'ESPACE', items: workspaceItems },
+    {
+      label: user.role === 'LEARNER' ? 'APPRENTISSAGE' : 'GESTION',
+      items: activityItems,
+    },
+    ...(adminItems.length > 0
+      ? [{ label: 'ADMINISTRATION', items: adminItems }]
       : []),
-    { label: 'Mon profil', Icon: UserRound, route: 'Profile' as const },
-    { label: 'Notifications', Icon: Bell, route: 'Notifications' as const },
-    { label: 'Paramètres', Icon: Settings, route: 'Settings' as const },
+  ];
+  const accountItems: DrawerEntry[] = [
+    { label: 'Mon profil', Icon: UserRound, route: 'Profile' },
+    { label: 'Paramètres', Icon: Settings, route: 'Settings' },
   ];
   function close(after?: () => void) {
     Animated.timing(drawerX, {
@@ -249,12 +280,70 @@ export function AuthenticatedDrawer() {
             <X color={colors.ink} size={24} />
           </Pressable>
         </View>
-        <Text style={styles.drawerLabel}>NAVIGATION</Text>
+        <View style={styles.drawerIdentity}>
+          <View style={styles.drawerAvatar}>
+            <Text style={styles.drawerAvatarText}>
+              {profileInitials(user.profile)}
+            </Text>
+          </View>
+          <View style={styles.drawerIdentityCopy}>
+            <Text numberOfLines={1} style={styles.drawerIdentityName}>
+              {displayName(user.profile)}
+            </Text>
+            <Text numberOfLines={1} style={styles.drawerIdentityRole}>
+              {roleLabel(user.role)}
+            </Text>
+          </View>
+        </View>
         <ScrollView
+          style={styles.drawerScroll}
           showsVerticalScrollIndicator={false}
           contentContainerStyle={styles.drawerList}
         >
-          {items.map(({ label, Icon, route }) => (
+          {sections.map((section) => (
+            <View key={section.label} style={styles.drawerSection}>
+              <Text style={styles.drawerLabel}>{section.label}</Text>
+              {section.items.map(({ label, Icon, route, badge }) => (
+                <Pressable
+                  key={label}
+                  accessibilityRole="button"
+                  accessibilityState={{ selected: currentRoute === route }}
+                  onPress={() =>
+                    close(() => navigationRef.navigate(route as never))
+                  }
+                  style={({ pressed }) => [
+                    styles.drawerItem,
+                    currentRoute === route && styles.drawerItemActive,
+                    pressed && styles.drawerItemPressed,
+                  ]}
+                >
+                  <Icon
+                    color={
+                      currentRoute === route ? colors.primaryDark : colors.muted
+                    }
+                    size={21}
+                  />
+                  <Text
+                    numberOfLines={1}
+                    style={[
+                      styles.drawerText,
+                      currentRoute === route && styles.drawerTextActive,
+                    ]}
+                  >
+                    {label}
+                  </Text>
+                  {badge !== undefined && badge > 0 && (
+                    <Text style={styles.drawerBadge}>
+                      {badge > 99 ? '99+' : badge}
+                    </Text>
+                  )}
+                </Pressable>
+              ))}
+            </View>
+          ))}
+        </ScrollView>
+        <View style={styles.drawerFooter}>
+          {accountItems.map(({ label, Icon, route }) => (
             <Pressable
               key={label}
               accessibilityRole="button"
@@ -272,7 +361,7 @@ export function AuthenticatedDrawer() {
                 color={
                   currentRoute === route ? colors.primaryDark : colors.muted
                 }
-                size={22}
+                size={21}
               />
               <Text
                 style={[
@@ -284,15 +373,19 @@ export function AuthenticatedDrawer() {
               </Text>
             </Pressable>
           ))}
-        </ScrollView>
-        <Pressable
-          accessibilityRole="button"
-          onPress={() => void logout()}
-          style={styles.drawerItem}
-        >
-          <LogOut color={colors.danger} size={22} />
-          <Text style={styles.drawerLogout}>Se déconnecter</Text>
-        </Pressable>
+          <View style={styles.drawerDivider} />
+          <Pressable
+            accessibilityRole="button"
+            onPress={() => close(() => void logout())}
+            style={({ pressed }) => [
+              styles.drawerItem,
+              pressed && styles.drawerItemPressed,
+            ]}
+          >
+            <LogOut color={colors.danger} size={21} />
+            <Text style={styles.drawerLogout}>Se déconnecter</Text>
+          </Pressable>
+        </View>
       </Animated.View>
     </>
   );
@@ -552,7 +645,7 @@ const styles = StyleSheet.create({
     top: 0,
     bottom: 0,
     width: 310,
-    gap: spacing.xs,
+    gap: spacing.sm,
     padding: spacing.lg,
     borderRightWidth: 1,
     borderRightColor: colors.line,
@@ -565,17 +658,46 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
   },
+  drawerIdentity: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    borderWidth: 1,
+    borderColor: colors.line,
+    borderRadius: radii.md,
+    padding: spacing.md,
+    backgroundColor: colors.subtle,
+  },
+  drawerAvatar: {
+    width: 42,
+    height: 42,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 21,
+    backgroundColor: colors.brandDeep,
+  },
+  drawerAvatarText: {
+    color: colors.onBrand,
+    fontSize: 13,
+    fontWeight: '900',
+    letterSpacing: 0.4,
+  },
+  drawerIdentityCopy: { flex: 1, gap: 2 },
+  drawerIdentityName: { color: colors.ink, fontSize: 15, fontWeight: '800' },
+  drawerIdentityRole: { color: colors.muted, fontSize: 12, fontWeight: '600' },
+  drawerScroll: { flex: 1 },
   drawerLabel: {
-    marginTop: spacing.lg,
-    marginBottom: spacing.sm,
+    marginBottom: spacing.xs,
+    paddingHorizontal: spacing.md,
     color: colors.muted,
     fontSize: 11,
     fontWeight: '800',
     letterSpacing: 1,
   },
-  drawerList: { gap: spacing.xs, paddingBottom: spacing.md },
+  drawerList: { gap: spacing.lg, paddingVertical: spacing.sm },
+  drawerSection: { gap: 2 },
   drawerItem: {
-    minHeight: 48,
+    minHeight: 46,
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.md,
@@ -584,7 +706,32 @@ const styles = StyleSheet.create({
   },
   drawerItemActive: { backgroundColor: colors.primarySoft },
   drawerItemPressed: { opacity: 0.72 },
-  drawerText: { color: colors.ink, fontSize: 15, fontWeight: '700' },
+  drawerText: { flex: 1, color: colors.ink, fontSize: 15, fontWeight: '700' },
   drawerTextActive: { color: colors.primaryDark },
+  drawerBadge: {
+    minWidth: 22,
+    height: 22,
+    overflow: 'hidden',
+    borderRadius: 11,
+    paddingHorizontal: 5,
+    color: colors.onBrand,
+    backgroundColor: colors.danger,
+    fontSize: 10,
+    fontWeight: '900',
+    lineHeight: 22,
+    textAlign: 'center',
+  },
+  drawerFooter: {
+    gap: 2,
+    borderTopWidth: 1,
+    borderTopColor: colors.line,
+    paddingTop: spacing.sm,
+  },
+  drawerDivider: {
+    height: 1,
+    marginHorizontal: spacing.md,
+    marginVertical: spacing.xs,
+    backgroundColor: colors.line,
+  },
   drawerLogout: { color: colors.danger, fontSize: 15, fontWeight: '700' },
 });
